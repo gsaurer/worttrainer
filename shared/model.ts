@@ -18,6 +18,32 @@ export type AuthState = {
   email: string | null
 }
 
+export type PhotoRecognition = {
+  answers: { number: number; text: string | null; confidence: number | null }[]
+  warnings: string[]
+}
+
+export type PhotoRound = {
+  id: string
+  startedAt: string
+  writtenAt: string | null
+  reviewedAt: string | null
+  nextIndex: number
+  words: { id: string; text: string; language: Language; attemptId: string }[]
+  recognition: PhotoRecognition | null
+  results: boolean[] | null
+}
+
+export type PhotoStatus = {
+  rounds: PhotoRound[]
+  ocr: { enabled: boolean; month: string; used: number; limit: number }
+}
+
+export function suggestedResult(expected: string, text: string | null, confidence: number | null): boolean | null {
+  if (text === null || confidence === null || confidence < 0.8) return null
+  return expected.normalize('NFC') === text.trim().normalize('NFC')
+}
+
 export function validateWord(value: string): string | null {
   if (!value.trim()) return 'Please enter a word.'
   if ([...value.trim()].length > 80) return 'Please keep each word to 80 characters or fewer.'

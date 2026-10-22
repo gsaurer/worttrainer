@@ -3,7 +3,9 @@
 A small, self-hosted family spelling workshop. German and English words, spoken
 dictation, paper answers, and parent-marked progress. One shared parent
 email/password account, a Node.js backend, and **real JSON storage on disk**.
-No cloud service, email provider, child profiles, or database provisioning needed.
+No cloud service, email provider, child profiles, or database provisioning needed
+for normal practice. Optional end-of-round photo reading uses Azure's Free/F0
+handwriting recognition service and requires separate configuration.
 
 React + TypeScript + Vite for the interface, Express for the same-origin API.
 The container serves both. Short-sentence dictation is intentionally a later step.
@@ -43,8 +45,8 @@ Do not delete the data file or create a fresh account to make this change.
 ## Deploy as a container (including on Proxmox)
 
 Run Docker/Compose inside a Linux VM in your Proxmox cluster. A single application
-container and persistent volume are all that is needed; no Supabase or other
-external backend is used.
+container and persistent volume are all that is needed; no Supabase or external
+authentication/database backend is used. Optional OCR calls Azure.
 
 For a local container preview:
 
@@ -136,6 +138,9 @@ without stopping the server and signs other devices out.
 | `DATA_FILE` | `data/store.json` | `/app/data/store.json` |
 | `COOKIE_SECURE` | `false` | `true`; Compose overrides to false only for its local HTTP default |
 | `TRUST_PROXY` | `0` | Set `1` only behind exactly one trusted proxy |
+| `OCR_AZURE_ENDPOINT` | Unset | Optional HTTPS resource root, e.g. `https://your-resource.cognitiveservices.azure.com` |
+| `OCR_AZURE_KEY` | Unset | Server-only API key for a **Free/F0** Document Intelligence resource |
+| `OCR_MONTHLY_LIMIT` | `450` | Integer 1–450; reserved single-photo analyses per UTC calendar month |
 
 Compose reads `.env`. Plain `npm run dev` uses the defaults, or environment
 variables exported in your shell; no environment file is required. Never put
@@ -166,6 +171,92 @@ visible; **Sync** refreshes manually. Practice rounds are snapshots, but each ma
 uses current server progress. Two devices' distinct answers apply in the order
 the server receives them. Deleting a word deletes its attempt history.
 
+### Check one photo at the end
+
+Choose the language/category as usual, then **One photo at the end**:
+
+1. Start a numbered round. Each word is dictated without displaying its spelling.
+   Write one answer per line, numbered **1, 2, 3...** in dictation order. A sheet
+   supports 1–100 words; a short round is much easier to photograph/read.
+2. Tap **Written — next word**. The server saves the ordered word snapshots,
+   current position, start time, and writing-finished time. Pause and reopen
+   **Saved photo rounds** on either device to continue.
+3. At the end, photograph the entire numbered sheet clearly, upright, flat,
+   without shadows, names, faces, or other personal information. Upload one
+   **JPEG or PNG, up to 4 MiB and 24 megapixels**. HEIC, PDFs, and multi-page
+   images are not supported. Reduce camera resolution or export JPEG if needed.
+4. **Send photo to Azure for reading** explicitly shares the normalized image
+   with your configured Azure resource. Selecting a photo alone does not send it.
+   The interface shows expected spelling, recognized spelling, confidence,
+   and editable parent results. Recognition does not receive the expected word
+   list as a correction prompt.
+5. Check **every** result against the actual paper/photo, correct suggested
+   results as needed, then **Confirm all results**. All attempts and category
+   changes save in one atomic transaction. Retrying the same confirmation,
+   including after a restart, never counts an answer twice.
+
+No recognition result changes progress automatically. Missing/duplicate numbers,
+unmatched lines, missing confidence, and confidence below 80% require manual
+marking. Answers are matched **only by explicit number**, never shifted into
+place by list order. Spelling comparison is case-sensitive, preserves accents
+and umlauts, and normalizes Unicode composition and outer whitespace only.
+OCR can inadvertently read a misspelled word as its correct spelling: confidence
+is **not** proof of spelling correctness. Parent review is always necessary.
+**Review the sheet manually** remains available without credentials, if Azure
+fails, or once a free quota is exhausted.
+
+Writing-position timestamps indicate when **Written** was tapped, not when the
+pencil physically touched paper. Each practice attempt and the word's
+`last_practiced_at` record the **parent confirmation time**. Saved photo rounds
+show their start, writing-finished, and review times; there are no separate child
+identities or child-specific statistics. Original per-word practice continues
+to record marking timestamps without creating a photo-round record. The word
+collection shows the last-practiced **date and time** in the viewing device's
+local time zone.
+
+### Configure free handwriting recognition (optional)
+
+An Azure account/subscription and a **Document Intelligence resource explicitly
+created on the Free/F0 pricing tier** are required. Choose a suitable data region.
+The currently advertised F0 allowance is
+[500 pages per month](https://azure.microsoft.com/en-us/pricing/details/document-intelligence/);
+Read supports [English and German handwriting](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/language-support/ocr?view=doc-intel-4.0.0).
+Free-tier availability and terms can change. This is not an unlimited service
+and is not a paid trial dependency.
+
+- In Azure, create Document Intelligence with **Free F0**, not Standard S0.
+  Verify the tier in the resource's pricing settings before copying its endpoint
+  and a key from **Keys and Endpoint**. Do not create paid supporting services.
+- For Compose, put `OCR_AZURE_ENDPOINT` and `OCR_AZURE_KEY` in the ignored `.env`
+  file, then recreate the container with `docker compose up -d`.
+- For local development, export those variables in the same terminal before
+  starting `npm run dev`. On PowerShell, use masked input for the key:
+
+  ```powershell
+  $env:OCR_AZURE_ENDPOINT = 'https://your-resource.cognitiveservices.azure.com'
+  $env:OCR_AZURE_KEY = Read-Host 'Azure Free/F0 API key' -MaskInput
+  npm run dev
+  ```
+
+- Do not paste the key into chat, commit it, use a `VITE_` variable, or put it in
+  client code. Never configure an S0/paid resource. The app does not provision
+  resources, upgrade tiers, retry with a paid provider, or use paid OCR add-ons.
+
+**The key-only API cannot verify Azure's resource pricing SKU.** You must confirm
+the resource is F0 in Azure; an in-app request counter cannot make an accidentally
+configured paid resource free. Dedicate the resource to this app so other callers
+do not consume its allowance. There are no Azure credentials included in this
+repository and no working external recognition until these are configured.
+
+The app reserves one analysis **before** each provider submission, persisted in
+the same JSON file. Failed/uncertain requests and explicit re-uploads still count.
+The default hard ceiling is **450 per UTC calendar month**, adjustable downward
+only (1–450). Single-image inputs analyze only page 1. There is no automatic retry
+of analysis submissions. Azure throttling/quota errors are shown explicitly; use
+manual review instead. The local budget is an additional guard, not a measurement
+of Azure's billing period or other clients' usage. Keep the data volume intact:
+restoring an older backup or deleting it also rolls back that local counter.
+
 ## Authentication and privacy
 
 - Passwords use Node's asynchronous **scrypt** (N=131072, r=8, p=1), random salts,
@@ -175,13 +266,28 @@ the server receives them. Deleting a word deletes its attempt history.
   (`Secure` over HTTPS). Only their SHA-256 hashes are stored on disk. Sessions
   expire after seven days; at most 20 sessions are retained. Logout revokes that
   device's session; changing/recovering the password revokes other sessions.
-- Mutations require JSON content and the exact allowed browser Origin. Login,
+- Mutations require JSON content (or JPEG/PNG for the single photo route) and the exact allowed browser Origin. Login,
   setup, and password changes are rate-limited; expensive password hashing is
   concurrency-limited. No permissive CORS or public account registration.
-- No child identity, age, handwriting, photo, microphone recording, or analytics
-  is collected. Only the parent's email is stored as the sign-in identifier; no
+- No child identity, age, microphone recording, or analytics is collected.
+  Optional photo mode processes handwriting only after an explicit parent upload.
+  Only the parent's email is stored as the sign-in identifier; no
   email service is contacted. The single parent account owns the family's one
   shared collection.
+- Photos are processed in memory, re-encoded as JPEG with metadata (including
+  EXIF/GPS) stripped, and **never saved on the app's disk**. Recognized text,
+  word snapshots, timestamps, and parent-confirmed results are stored in JSON.
+  Backups therefore also contain recognized text. **Remove sheet** deletes that
+  round's snapshots/recognition, retaining recorded practice progress/attempts.
+  Deleting a word also deletes all saved sheets containing it and that word's
+  attempts. Other words' progress is not undone.
+- Azure processes the photo in the configured resource region. According to
+  [Microsoft's retention policy](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/document-intelligence/data-privacy-security),
+  input and results are temporarily stored for up to 24 hours after processing.
+  The app also requests early deletion after retrieving a result or encountering
+  a polling failure. Cleanup failures are logged without image content or keys;
+  Azure's retention policy still applies. No provider training/privacy promises
+  beyond those published terms are assumed.
 - Deleting `data/store.json` **while the app is stopped** removes the account,
   words, history, and sessions; back it up first if needed. The next start
   generates a fresh private setup link.
@@ -209,8 +315,13 @@ Tests exercise the real Express API and real temporary JSON files: initial setup
 password authentication, cookies, session invalidation, CSRF, input validation,
 all category transitions, concurrent answers, idempotent retries, fresh-store
 restarts, deletion, corrupt-file protection, email normalization/validation, and
-non-destructive username-to-email upgrades. UI tests cover concealed
-dictation, parent marking, retry behavior, language voices, and account forms.
+non-destructive username-to-email upgrades. Photo tests cover saved ordering and
+timestamps, atomic/idempotent batch review, free-budget reservations/restarts,
+image validation/metadata removal, explicit numbering, recognition uncertainty,
+and provider errors. Provider responses in tests are fixtures, not live Azure
+recognition or an accuracy guarantee for children's handwriting. UI tests cover
+concealed dictation, end-of-sheet review, explicit uploads, retry behavior,
+language voices, and account forms.
 No authentication/storage mocks are used by the running app.
 
 For non-container production, run the compiled Node server with `NODE_ENV=production`,

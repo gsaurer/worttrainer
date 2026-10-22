@@ -1,4 +1,4 @@
-import type { AuthState, Language, Word } from '../../shared/model'
+import type { AuthState, Language, PhotoRound, PhotoStatus, Word } from '../../shared/model'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -10,6 +10,10 @@ async function request<T>(path: string, method = 'GET', body?: unknown, protecte
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+  return readResponse<T>(response, protectedRequest)
+}
+
+async function readResponse<T>(response: Response, protectedRequest: boolean): Promise<T> {
   if (!response.headers.get('content-type')?.includes('application/json') && response.status !== 204) {
     throw new Error('The app backend is not responding correctly. Check that the Worttrainer server is running.')
   }
@@ -31,4 +35,12 @@ export const api = {
   addWord: (text: string, language: Language) => request<Word>('/words', 'POST', { text, language }, true),
   deleteWord: (id: string) => request<void>(`/words/${encodeURIComponent(id)}`, 'DELETE', {}, true),
   mark: (wordId: string, correct: boolean, attemptId: string) => request<Word>('/practice', 'POST', { wordId, correct, attemptId }, true),
+  photoStatus: () => request<PhotoStatus>('/photo-rounds', 'GET', undefined, true),
+  createPhotoRound: (wordIds: string[]) => request<PhotoRound>('/photo-rounds', 'POST', { wordIds }, true),
+  advancePhotoRound: (id: string, nextIndex: number) => request<PhotoRound>(`/photo-rounds/${encodeURIComponent(id)}/advance`, 'POST', { nextIndex }, true),
+  readPhoto: async (id: string, photo: File) => readResponse<PhotoRound>(await fetch(`/api/photo-rounds/${encodeURIComponent(id)}/photo`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': photo.type }, body: photo,
+  }), true),
+  reviewPhotoRound: (id: string, results: boolean[]) => request<PhotoRound>(`/photo-rounds/${encodeURIComponent(id)}/review`, 'POST', { results }, true),
+  deletePhotoRound: (id: string) => request<void>(`/photo-rounds/${encodeURIComponent(id)}`, 'DELETE', {}, true),
 }

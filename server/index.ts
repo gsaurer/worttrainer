@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { resolve } from 'node:path'
 import { createApp } from './app.js'
 import { FileStore } from './store.js'
+import { ocrConfiguration } from './ocr.js'
 
 const production = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT ?? (production ? 3000 : 3001))
@@ -18,6 +19,7 @@ const app = createApp({
   store, origin, production, secureCookie, setupToken,
   setupExpiresAt: Date.now() + 15 * 60 * 1000,
   trustProxy: process.env.TRUST_PROXY === '1',
+  ocr: ocrConfiguration(process.env),
 })
 const host = process.env.HOST ?? (production ? '0.0.0.0' : '127.0.0.1')
 const server = app.listen(port, host, () => {

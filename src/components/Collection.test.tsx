@@ -11,6 +11,14 @@ const words: Word[] = [
 ]
 
 describe('word collection', () => {
+  it('shows the local practice date and time while preserving the server timestamp', () => {
+    const timestamp = '2026-10-22T12:34:56Z'
+    const { container } = render(<Collection words={[{ ...words[0], last_practiced_at: timestamp }]} loading={false} category="all" onCategory={vi.fn()} refresh={vi.fn()} onPractice={vi.fn()} />)
+    const time = container.querySelector('time')
+    expect(time).toHaveAttribute('dateTime', timestamp)
+    expect(time).toHaveTextContent(new Date(timestamp).toLocaleString())
+  })
+
   it('adds correct spelling and language, leaving category and attempts to server defaults', async () => {
     const user = userEvent.setup()
     const insert = vi.spyOn(api, 'addWord').mockResolvedValue(words[0])

@@ -7,6 +7,7 @@ import { validateWord, type AuthState } from '../shared/model.js'
 import { FileStore, parentEmailSchema } from './store.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { HttpError } from './errors.js'
+import { normalizePhoto, readAzurePhoto, type OcrOptions } from './ocr.js'
 
 export type AppOptions = {
   store: FileStore
@@ -16,6 +17,7 @@ export type AppOptions = {
   setupToken: string
   setupExpiresAt: number
   trustProxy?: boolean
+  ocr?: OcrOptions
 }
 
 const cookieName = 'worttrainer_session'
@@ -43,14 +45,17 @@ export function createApp(options: AppOptions) {
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Frame-Options', 'DENY')
-    if (options.production) res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+    if (options.production) res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     next()
   })
   app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store')
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (req.headers.origin !== options.origin) return next(new HttpError(403, 'Request origin is not allowed. Open the app at its configured address.'))
-      if (!req.is('application/json')) return next(new HttpError(415, 'Send requests as application/json.'))
+      const photoUpload = req.method === 'POST' && /^\/photo-rounds\/[0-9a-f-]+\/photo$/.test(req.path)
+      if (photoUpload ? !req.is(['image/jpeg', 'image/png']) : !req.is('application/json')) {
+        return next(new HttpError(415, photoUpload ? 'Upload one JPEG or PNG photo.' : 'Send requests as application/json.'))
+      }
     }
     next()
   })
@@ -152,6 +157,46 @@ export function createApp(options: AppOptions) {
   app.post('/api/practice', requireAuth, async (req, res) => {
     const input = parse(z.object({ wordId: z.uuid(), correct: z.boolean(), attemptId: z.uuid() }).strict(), req.body)
     res.json(await store.mark(input.wordId, input.correct, input.attemptId))
+  })
+  app.get('/api/photo-rounds', requireAuth, (_req, res) => {
+    res.json({ rounds: store.photoRounds, ocr: { enabled: !!options.ocr, ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
+  })
+  app.post('/api/photo-rounds', requireAuth, async (req, res) => {
+    const input = parse(z.object({ wordIds: z.array(z.uuid()).min(1).max(100, 'Use at most 100 words on one numbered sheet.') }).strict(), req.body)
+    res.status(201).json(await store.createPhotoRound(input.wordIds))
+  })
+  app.post('/api/photo-rounds/:id/advance', requireAuth, async (req, res) => {
+    const id = parse(z.uuid(), req.params.id)
+    const input = parse(z.object({ nextIndex: z.number().int().min(1).max(100) }).strict(), req.body)
+    res.json(await store.advancePhotoRound(id, input.nextIndex))
+  })
+  let photoReading = false
+  const photoLimiter = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Please wait a minute before sending another photo.' } })
+  const photoAvailable: express.RequestHandler = (_req, _res, next) => {
+    next(options.ocr ? undefined : new HttpError(503, 'Automatic photo reading needs an Azure Free/F0 endpoint and key. You can still review the sheet manually.'))
+  }
+  app.post('/api/photo-rounds/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb' }), async (req, res) => {
+    const id = parse(z.uuid(), req.params.id)
+    const round = store.photoRound(id)
+    if (!round.writtenAt || round.reviewedAt) throw new HttpError(409, 'Finish writing first. A reviewed sheet cannot be read again.')
+    if (photoReading) throw new HttpError(429, 'Another photo is being read. Please wait and try again.')
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Choose a JPEG or PNG photo first.')
+    photoReading = true
+    try {
+      const image = await normalizePhoto(req.body)
+      await store.reserveOcr(options.ocr!.monthlyLimit)
+      const recognition = await readAzurePhoto(image, round.words[0].language, round.words.length, options.ocr!)
+      res.json(await store.saveRecognition(id, recognition))
+    } finally { photoReading = false }
+  })
+  app.post('/api/photo-rounds/:id/review', requireAuth, async (req, res) => {
+    const id = parse(z.uuid(), req.params.id)
+    const input = parse(z.object({ results: z.array(z.boolean()).min(1).max(100) }).strict(), req.body)
+    res.json(await store.reviewPhotoRound(id, input.results))
+  })
+  app.delete('/api/photo-rounds/:id', requireAuth, async (req, res) => {
+    await store.deletePhotoRound(parse(z.uuid(), req.params.id))
+    res.status(204).end()
   })
   app.use('/api', (_req, _res, next) => { next(new HttpError(404, 'Unknown API endpoint.')) })
   if (options.production) {

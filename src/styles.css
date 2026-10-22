@@ -198,6 +198,34 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .practice-footer { text-align: center; font-family: var(--serif); font-style: italic; color: var(--muted); font-size: .85rem; margin-top: 26px; }
 .session-summary { max-width: 700px; margin: 10px auto; text-align: center; background: #fffef9; border: 1px solid var(--line); border-radius: 14px; padding: 45px; }
 .summary-flower { display: block; font-size: 5rem; color: #829669; margin-bottom: 18px; }
+.photo-mode-button { margin-top: 12px; }
+.photo-practice { max-width: 900px; margin: 12px auto; }
+.photo-intro, .photo-history, .photo-review { padding: 28px; background: #fffef9; border: 1px solid var(--line); border-radius: 12px; margin: 20px 0; }
+.photo-intro h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+.photo-intro input { margin-top: 10px; }
+.photo-intro .answer-buttons { margin-top: 24px; justify-content: flex-start; }
+.photo-intro > .button { margin-top: 20px; }
+.photo-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 0; border-top: 1px solid var(--line); }
+.photo-history-row > div:first-child { flex: 1; min-width: 170px; }
+.photo-history-row small { display: block; margin-top: 8px; font-size: .75rem; line-height: 1.7; color: var(--muted); }
+.photo-history-row > div:last-child { font-size: .8rem; }
+.photo-history-row .text-button { margin-right: 12px; }
+.answer-sheet-preview { display: block; max-width: 100%; max-height: 650px; object-fit: contain; margin: 20px auto; border-radius: 8px; }
+.photo-answer-list { margin: 25px 0; padding-left: 25px; }
+.photo-answer-list li { padding: 20px 0 20px 8px; border-bottom: 1px solid var(--line); }
+.photo-answer-spelling { display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere; }
+.photo-answer-spelling .eyebrow { margin: 0; }
+.photo-answer-spelling strong { font-family: var(--serif); font-size: 1.5rem; font-weight: 500; }
+.photo-answer-spelling > span:not(.eyebrow) { font-size: .85rem; }
+.photo-answer-spelling small { font-size: .75rem; color: var(--muted); }
+.photo-answer-list label { margin-top: 16px; max-width: 300px; }
+.photo-answer-list select { margin-top: 8px; }
+.photo-answer-list .badge { margin-top: 16px; }
+@media (max-width: 600px) {
+  .photo-intro, .photo-history, .photo-review { padding: 20px 16px; }
+  .photo-practice .practice-topline { gap: 15px; }
+  .photo-practice .answer-buttons > .button { width: 100%; }
+}
 .session-summary h2 { font-size: 2.5rem; }
 .session-summary > p:not(.eyebrow):not(.fine-print) { font-size: .9rem; color: var(--muted); max-width: 410px; margin: 0 auto; }
 .summary-stats { display: flex; justify-content: center; gap: 65px; margin: 30px 0; }

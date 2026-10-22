@@ -5,6 +5,7 @@ import { useDictation } from '../hooks/useDictation'
 import { createAttemptId } from '../lib/attempts'
 import { api } from '../lib/api'
 import { ArrowIcon, SpeakerIcon } from './Icons'
+import { PhotoPractice } from './PhotoPractice'
 
 export function Practice({ words, onUpdated, loading }: {
   words: Word[]
@@ -12,6 +13,7 @@ export function Practice({ words, onUpdated, loading }: {
   loading: boolean
 }) {
   const [language, setLanguage] = useState<Language>('de')
+  const [photoMode, setPhotoMode] = useState(false)
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [queue, setQueue] = useState<Word[] | null>(null)
   const [index, setIndex] = useState(0)
@@ -78,6 +80,8 @@ export function Practice({ words, onUpdated, loading }: {
     void onUpdated()
   }
 
+  if (photoMode) return <PhotoPractice words={candidates} onUpdated={onUpdated} onClose={() => setPhotoMode(false)} />
+
   if (finished && queue) return <section className="session-summary">
     <span className="summary-flower" aria-hidden="true">✳</span><p className="eyebrow">THAT’S A LITTLE MORE CONFIDENCE</p><h2>Practice, not perfection.</h2><p>You gave {queue.length} {queue.length === 1 ? 'word' : 'words'} some attention. That’s how progress happens.</p><div className="summary-stats"><div><strong>{correctCount}</strong><span>Correct this time</span></div><div><strong>{queue.length - correctCount}</strong><span>Keep practicing</span></div></div><p className="fine-print">All marked answers have been saved to your account.</p><button className="button primary" onClick={end}>Back to practice<ArrowIcon /></button>
   </section>
@@ -100,7 +104,10 @@ export function Practice({ words, onUpdated, loading }: {
     <section className="practice-options" aria-labelledby="practice-options-title"><p className="eyebrow">MAKE IT A SMALL, HAPPY HABIT</p><h2 id="practice-options-title">Today’s little practice.</h2><label htmlFor="practice-language">Which language?</label><select id="practice-language" value={language} onChange={e => setLanguage(e.target.value as Language)}><option value="de">Deutsch</option><option value="en">English</option></select><label htmlFor="practice-category">Which words?</label><select id="practice-category" value={category} onChange={e => setCategory(e.target.value as Category | 'all')}><option value="all">All categories</option>{(Object.keys(categories) as Category[]).map(key => <option key={key} value={key}>{categories[key].label} · {categories[key].description}</option>)}</select><div className="available-count"><strong>{candidates.length}</strong><span>{candidates.length === 1 ? 'word is' : 'words are'} ready for a little attention.<small>One shuffled round. Stop whenever you like.</small></span></div>
       {!speech.supported && <p className="error" role="alert">This browser does not support spoken dictation. Use a current Chrome, Edge, or Safari browser.</p>}
       {!candidates.length && <p className="notice">{loading ? 'Syncing your collection…' : 'Add words in this language or choose another category first.'}</p>}
-      <button className="button primary wide" onClick={start} disabled={loading || !candidates.length || !speech.supported}>Let’s begin<ArrowIcon /></button><p className="fine-print">Words are spoken by your browser’s speech service. A German or English voice must be installed. Some voices require internet access.</p>
+      <button className="button primary wide" onClick={start} disabled={loading || !candidates.length || !speech.supported}>Let’s begin<ArrowIcon /></button>
+      <button className="button secondary wide photo-mode-button" onClick={() => setPhotoMode(true)} disabled={loading}>One photo at the end</button>
+      <p className="fine-print">The first button checks each word as you go. Photo mode uses a numbered answer sheet and a parent review at the end. You can also reopen a saved photo round.</p>
+      <p className="fine-print">Words are spoken by your browser’s speech service. A German or English voice must be installed. Some voices require internet access.</p>
     </section>
   </div>
 }
