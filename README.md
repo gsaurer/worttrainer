@@ -16,8 +16,15 @@ Requires Node.js **22.12+** and npm. Docker is not required for local developmen
 
 ```powershell
 npm ci
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 npm run dev
 ```
+
+Copy the example only if `.env` does not already exist. Put local configuration,
+including optional Azure credentials, in **`.env` beside `package.json`**.
+The file is ignored by Git and excluded from Docker builds. The example leaves
+deployment-specific overrides commented, so copying it preserves local defaults.
+Restart the API after editing `.env` to load the new values.
 
 Open **http://localhost:5173**. The API runs on `127.0.0.1:3001`; Vite proxies
 `/api` to it. On the first run, the API prints a **private setup link** in the
@@ -62,8 +69,8 @@ this local preview**.
 For a real installation:
 
 1. Copy `.env.example` to `.env`, set `APP_ORIGIN` to the final HTTPS origin
-   (for example `https://words.example.com`, no trailing slash), and leave
-   `COOKIE_SECURE=true`.
+   (for example `https://words.example.com`, no trailing slash), and explicitly set
+   `COOKIE_SECURE=true`. Keep an existing `.env` rather than overwriting its keys.
 2. Put an HTTPS reverse proxy in front of port 3000. If the proxy is on another
    machine/container, change the Compose port binding appropriately and firewall
    it so only the proxy can reach the backend. Do not publicly expose the backend
@@ -142,9 +149,16 @@ without stopping the server and signs other devices out.
 | `OCR_AZURE_KEY` | Unset | Server-only API key for a **Free/F0** Document Intelligence resource |
 | `OCR_MONTHLY_LIMIT` | `450` | Integer 1–450; reserved single-photo analyses per UTC calendar month |
 
-Compose reads `.env`. Plain `npm run dev` uses the defaults, or environment
-variables exported in your shell; no environment file is required. Never put
-passwords in `.env`. The secure first-run browser form sets them.
+`npm run dev`, `npm run dev:api`, `npm start`, and `npm run reset-password`
+automatically load the root **`.env`** using Node's built-in environment-file
+support. Docker Compose also reads that file. It is optional: if absent, the app
+uses its documented defaults. Existing shell/container environment variables
+override values in `.env`; remove a stale exported value if a file change seems
+to have no effect. After changing `.env`, restart the API (or recreate the Compose
+container) to load the new values. Source-code watching does not reload this file.
+
+No dotenv dependency or client-side credential configuration is needed.
+Never put the parent account password in `.env`; the secure browser form sets it.
 
 ## Practice together
 
@@ -227,17 +241,19 @@ and is not a paid trial dependency.
 - In Azure, create Document Intelligence with **Free F0**, not Standard S0.
   Verify the tier in the resource's pricing settings before copying its endpoint
   and a key from **Keys and Endpoint**. Do not create paid supporting services.
-- For Compose, put `OCR_AZURE_ENDPOINT` and `OCR_AZURE_KEY` in the ignored `.env`
-  file, then recreate the container with `docker compose up -d`.
-- For local development, export those variables in the same terminal before
-  starting `npm run dev`. On PowerShell, use masked input for the key:
+- Put the endpoint and key in the ignored **`.env` beside `package.json`**.
+  Start with `Copy-Item .env.example .env` only if that file does not already exist,
+  then edit these entries locally:
 
-  ```powershell
-  $env:OCR_AZURE_ENDPOINT = 'https://your-resource.cognitiveservices.azure.com'
-  $env:OCR_AZURE_KEY = Read-Host 'Azure Free/F0 API key' -MaskInput
-  npm run dev
+  ```dotenv
+  OCR_AZURE_ENDPOINT=https://your-resource.cognitiveservices.azure.com
+  OCR_AZURE_KEY=your-free-f0-resource-key
+  OCR_MONTHLY_LIMIT=450
   ```
 
+- For local development, run `npm run dev`; no PowerShell environment exports
+  are needed. Restart the API after editing `.env`. For Compose, recreate the
+  container with `docker compose up -d` after editing the file.
 - Do not paste the key into chat, commit it, use a `VITE_` variable, or put it in
   client code. Never configure an S0/paid resource. The app does not provision
   resources, upgrade tiers, retry with a paid provider, or use paid OCR add-ons.
