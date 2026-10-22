@@ -214,10 +214,13 @@ Never put the parent account password in `.env`; the secure browser form sets it
 1. Add the **correct spelling** of a tricky word and choose Deutsch or English.
    Duplicate words in the same account and language are rejected
    (case-insensitive); different accounts can practice the same word independently.
-2. Open **Let's practice**, choose a language and category, and **Start round**.
-   Each matching word appears once in a shuffled, numbered list of up to 100 words.
-   If more than 100 words match, the round selects 100 at random; use category
-   filters for a smaller round. The round is saved before dictation begins.
+2. Open **Let's practice**, choose a language and category, then choose a round
+   size: **10, 15, 20, or 25 words** (default 10). These are size presets, not
+   learning categories. Each round randomly selects distinct matching words;
+   when fewer match than requested, all matching words are used. The button shows
+   the actual number that will be dictated. **Start round** saves that numbered
+   word list before dictation begins. Resuming an existing round keeps its
+   original words and length, regardless of the current size setting.
 3. Tap **Listen** and write the answer on paper, numbered **1, 2, 3...**.
    Spelling stays concealed, including from the accessibility tree, throughout
    dictation. Tap **Written — next word** to save your position.

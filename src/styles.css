@@ -202,7 +202,7 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .session-summary { max-width: 700px; margin: 10px auto; text-align: center; background: #fffef9; border: 1px solid var(--line); border-radius: 14px; padding: 45px; }
 .summary-flower { display: block; font-size: 5rem; color: #829669; margin-bottom: 18px; }
 .photo-mode-button { margin-top: 12px; }
-.round-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+.round-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin: 24px 0; }
 .round-statistics { padding: 26px 28px; border: 1px solid var(--line); border-radius: 12px; background: #f0f1e6; margin: 20px 0; }
 .round-statistics > .eyebrow { font-size: .62rem; }
 .round-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
