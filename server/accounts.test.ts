@@ -58,6 +58,37 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
 describe('independent private accounts', () => {
+  it('exports one coherent complete account snapshot without credentials or another account’s data', async () => {
+    await request(app).get('/api/export').expect(401)
+    await store.reviewPhotoRound(first.id, round.id, [true])
+    const response = await request(app).get('/api/export').query({ accountId: second.id }).set('Cookie', first.cookie).expect(200)
+    expect(response.headers['content-disposition']).toMatch(/^attachment; filename="worttrainer-\d{4}-\d{2}-\d{2}\.json"$/)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.body).toMatchObject({
+      format: 'worttrainer-account-export', schemaVersion: 1,
+      account: { id: first.id, email: first.email },
+      words: [{ id: word.id, text: word.text, category: 'plus' }],
+      rounds: [{ id: round.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
+      statistics: { correct: 1, incorrect: 0, accuracy: 100 },
+    })
+    expect(Number.isFinite(Date.parse(response.body.exportedAt))).toBe(true)
+    expect(response.body.attempts).toHaveLength(2)
+    expect(response.body.attempts[1]).toMatchObject({ wordId: word.id, id: round.words[0].attemptId, correct: true })
+    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'exportedAt', 'format', 'rounds', 'schemaVersion', 'statistics', 'words'])
+    expect(Object.keys(response.body.account).sort()).toEqual(['email', 'id'])
+    for (const secret of [credentials.salt, credentials.passwordHash, first.stored.tokenHash, second.email, second.id]) {
+      expect(response.text).not.toContain(secret)
+    }
+    const own = await request(app).get('/api/export').set('Cookie', second.cookie).expect(200)
+    expect(own.body).toMatchObject({ account: { id: second.id }, words: [], attempts: [], rounds: [], statistics: { accuracy: null } })
+    expect(own.text).not.toContain(first.email)
+    const snapshot = store.exportData(first.id)
+    snapshot.words[0].text = 'changed copy'
+    expect(store.words(first.id)[0].text).toBe(word.text)
+    await store.removeSession(first.stored.tokenHash)
+    await request(app).get('/api/export').set('Cookie', first.cookie).expect(401)
+  })
+
   it('registers a new empty collection without changing any existing account', async () => {
     const original = store.words(first.id)
     const response = await post('/api/signup', { email: ' NEW@example.com ', password }, '').expect(201)

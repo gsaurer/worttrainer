@@ -161,6 +161,29 @@ Both commands read the new password privately from the terminal, not an argument
 or environment variable. If needed, **Change password** in the app changes it
 without stopping the server and signs that account's other devices out.
 
+## Export your data for analysis
+
+When signed in, choose **Export my data (JSON)** in the page footer. This downloads
+a UTF-8 file named `worttrainer-YYYY-MM-DD.json` for use in other analysis tools.
+The authenticated `GET /api/export` endpoint serves the same account-scoped data.
+
+The export has `format: "worttrainer-account-export"`, `schemaVersion: 1`, and a
+UTC `exportedAt` timestamp. It includes the account identifier and parent email
+(or legacy username), all currently stored words and category progress, individual
+attempts with their timestamps, complete and unfinished rounds with ordered word
+snapshots, recognized text, parent-confirmed results, and round summary statistics.
+Join `attempts.wordId` to `words.id`, and round word `attemptId` to `attempts.id`.
+Dates inside the data are ISO timestamps in UTC; displayed app dates use local time.
+Historical individual answers are included even when they have no associated round.
+
+Only the signed-in account is exported. Passwords/hashes, salts, session tokens,
+API keys, other accounts, and the installation-wide OCR counter are excluded.
+Original uploaded photos are not stored and therefore cannot be exported.
+Deleted records cannot be recovered through this export. Protect the downloaded
+file: it contains private words, email, and any recognized handwriting.
+This is an analysis format, **not** a server backup or a supported import/restore
+format; continue backing up the data volume for recovery.
+
 ## Configuration
 
 | Variable | Development default | Container / production |

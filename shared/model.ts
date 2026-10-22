@@ -43,6 +43,17 @@ export type RoundStatus = {
 
 export type PhotoStatus = RoundStatus
 
+export type AccountDataExport = {
+  format: 'worttrainer-account-export'
+  schemaVersion: 1
+  exportedAt: string
+  account: { id: string } & ({ email: string } | { username: string })
+  words: Word[]
+  attempts: { id: string; wordId: string; correct: boolean; createdAt: string }[]
+  rounds: PracticeRound[]
+  statistics: ReturnType<typeof roundStatistics>
+}
+
 export function roundStatistics(rounds: PracticeRound[]) {
   let completed = 0
   let correct = 0

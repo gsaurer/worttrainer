@@ -3,7 +3,7 @@ import { constants } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { nextProgress, validateWord, type Language, type Word } from '../shared/model.js'
+import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type Word } from '../shared/model.js'
 import { HttpError } from './errors.js'
 import { photoRoundSchema, recognitionSchema } from './photo-schema.js'
 import type { PhotoRecognition, PhotoRound } from '../shared/model.js'
@@ -135,6 +135,16 @@ export class FileStore {
   }
   words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
   photoRounds(accountId: string): PhotoRound[] { return structuredClone(owned(this.state, accountId).photoRounds) }
+
+  exportData(accountId: string): AccountDataExport {
+    const data = owned(this.state, accountId)
+    return structuredClone({
+      format: 'worttrainer-account-export', schemaVersion: 1, exportedAt: new Date().toISOString(),
+      account: { id: data.id, ...('email' in data.account ? { email: data.account.email } : { username: data.account.username }) },
+      words: data.words, attempts: data.attempts, rounds: data.photoRounds,
+      statistics: roundStatistics(data.photoRounds),
+    })
+  }
 
   photoRound(accountId: string, id: string): PhotoRound {
     const round = owned(this.state, accountId).photoRounds.find(round => round.id === id)

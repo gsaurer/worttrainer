@@ -1,4 +1,4 @@
-import type { AuthState, Language, PhotoRound, PhotoStatus, Word } from '../../shared/model'
+import type { AccountDataExport, AuthState, Language, PhotoRound, PhotoStatus, Word } from '../../shared/model'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -32,6 +32,7 @@ export const api = {
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),
   words: () => request<Word[]>('/words', 'GET', undefined, true),
+  exportData: () => request<AccountDataExport>('/export', 'GET', undefined, true),
   addWord: (text: string, language: Language) => request<Word>('/words', 'POST', { text, language }, true),
   deleteWord: (id: string) => request<void>(`/words/${encodeURIComponent(id)}`, 'DELETE', {}, true),
   mark: (wordId: string, correct: boolean, attemptId: string) => request<Word>('/practice', 'POST', { wordId, correct, attemptId }, true),
