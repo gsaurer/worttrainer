@@ -57,10 +57,10 @@ export function Auth({ setupRequired, setupCode, emailMigrationRequired = false,
         <p className="eyebrow">YOUR FAMILY’S WORD COLLECTION</p>
         <h2 id="signin-title">{setupRequired ? 'A home for your words.' : 'Welcome back, grown-up.'}</h2>
         <p>{setupRequired ? 'Create your shared parent account. One login keeps your family’s words and progress together on every device.' : 'Sign in to your parent account. Your little word collection is right where you left it.'}</p>
-        {setupRequired && <div className="setup-notice"><strong>A one-time welcome.</strong><p>{code ? 'Your private setup link is ready. Enter a parent’s email and choose a strong password below.' : 'Open the private setup link printed in the server terminal, or paste its setup code below. The link expires after 15 minutes; restart the server for a new one.'}</p></div>}
+        {setupRequired && <div className="setup-notice"><strong>A one-time welcome.</strong><p>Enter SETUP_TOKEN from your server’s .env configuration, or use the private setup link from its logs. Generated links expire after 15 minutes; a configured token works until the first account is created.</p></div>}
         {emailMigrationRequired && <div className="setup-notice"><strong>Use your parent email from now on.</strong><p>Enter the email you want to use and your existing password. This replaces the old username without changing your words or progress. Other devices will need to sign in again.</p></div>}
         <form onSubmit={submit}>
-          {setupRequired && !setupCode && <><label htmlFor="setup-code">One-time setup code</label><input id="setup-code" type="password" value={code} onChange={e => setCode(e.target.value)} required disabled={busy} autoComplete="off" /></>}
+          {setupRequired && <><label htmlFor="setup-code">One-time setup code</label><input id="setup-code" type="password" value={code} onChange={e => setCode(e.target.value)} required maxLength={128} disabled={busy} autoComplete="off" /></>}
           <label htmlFor="email">Parent email</label>
           <input id="email" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={254} placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={busy} />
           <label htmlFor="password">Password</label>
