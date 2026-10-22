@@ -2,7 +2,7 @@
 
 A small, self-hosted family spelling workshop. German and English words, spoken
 dictation, paper answers, and parent-marked progress. One shared parent
-username/password account, a Node.js backend, and **real JSON storage on disk**.
+email/password account, a Node.js backend, and **real JSON storage on disk**.
 No cloud service, email provider, child profiles, or database provisioning needed.
 
 React + TypeScript + Vite for the interface, Express for the same-origin API.
@@ -19,7 +19,7 @@ npm run dev
 
 Open **http://localhost:5173**. The API runs on `127.0.0.1:3001`; Vite proxies
 `/api` to it. On the first run, the API prints a **private setup link** in the
-terminal. Open that link to choose the shared parent username and password
+terminal. Open that link to enter the shared parent email and choose a password
 (12–128 characters). The one-time setup code expires after 15 minutes; restart
 the API to renew it. There is no default password, open signup, or mock login.
 
@@ -27,6 +27,18 @@ Data is created in `data/store.json`, ignored by Git. Restarting the app preserv
 the account, words, progress, and unexpired sessions. On another device, sign in
 with the same parent credentials once the app is hosted at a reachable URL.
 The development server is loopback-only by default.
+
+The parent email is a case-insensitive sign-in identifier, not an email delivery
+service: no verification messages, magic links, or email password resets are sent.
+
+### Upgrading an existing username account
+
+Existing JSON files remain supported. On the next sign-in, enter the parent email
+you want to use and the **existing password** in the email-upgrade form. Only after
+the password is verified is the username replaced by that email. Words, practice
+history, progress, and the password are preserved; other sessions are revoked.
+Afterward, sign in on every device with that email and the same password.
+Do not delete the data file or create a fresh account to make this change.
 
 ## Deploy as a container (including on Proxmox)
 
@@ -167,8 +179,9 @@ the server receives them. Deleting a word deletes its attempt history.
   setup, and password changes are rate-limited; expensive password hashing is
   concurrency-limited. No permissive CORS or public account registration.
 - No child identity, age, handwriting, photo, microphone recording, or analytics
-  is collected. No email address is needed. The single parent account owns the
-  family's one shared collection.
+  is collected. Only the parent's email is stored as the sign-in identifier; no
+  email service is contacted. The single parent account owns the family's one
+  shared collection.
 - Deleting `data/store.json` **while the app is stopped** removes the account,
   words, history, and sessions; back it up first if needed. The next start
   generates a fresh private setup link.
@@ -195,7 +208,8 @@ npm run build
 Tests exercise the real Express API and real temporary JSON files: initial setup,
 password authentication, cookies, session invalidation, CSRF, input validation,
 all category transitions, concurrent answers, idempotent retries, fresh-store
-restarts, deletion, and corrupt-file protection. UI tests cover concealed
+restarts, deletion, corrupt-file protection, email normalization/validation, and
+non-destructive username-to-email upgrades. UI tests cover concealed
 dictation, parent marking, retry behavior, language voices, and account forms.
 No authentication/storage mocks are used by the running app.
 

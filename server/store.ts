@@ -5,11 +5,16 @@ import { z } from 'zod'
 import { nextProgress, validateWord, type Language, type Word } from '../shared/model.js'
 import { HttpError } from './errors.js'
 
-const accountSchema = z.object({
-  username: z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),
+export const parentEmailSchema = z.string().trim().toLowerCase().email('Enter a valid parent email address.').max(254)
+const credentialsSchema = z.object({
   salt: z.string().regex(/^[0-9a-f]{32}$/),
   passwordHash: z.string().regex(/^[0-9a-f]{128}$/),
+})
+const emailAccountSchema = credentialsSchema.extend({ email: parentEmailSchema }).strict()
+const legacyAccountSchema = credentialsSchema.extend({
+  username: z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),
 }).strict()
+const accountSchema = z.union([emailAccountSchema, legacyAccountSchema])
 const wordSchema = z.object({
   id: z.uuid(),
   text: z.string().refine(value => validateWord(value) === null && value.trim() === value),
@@ -91,7 +96,7 @@ export class FileStore {
     return operation
   }
 
-  initialize(account: Account, session: StoredSession) {
+  initialize(account: z.infer<typeof emailAccountSchema>, session: StoredSession) {
     return this.transaction(state => {
       if (state.account) throw new HttpError(409, 'The parent account is already configured.')
       state.account = account
@@ -112,10 +117,19 @@ export class FileStore {
     })
   }
 
-  changePassword(account: Account, session: StoredSession, expectedPasswordHash: string) {
+  migrateEmail(email: string, session: StoredSession, expectedPasswordHash: string) {
     return this.transaction(state => {
       if (state.account?.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
-      state.account = account
+      if ('email' in state.account) throw new HttpError(409, 'The parent email has already been set. Sign in again with that email.')
+      state.account = { email, salt: state.account.salt, passwordHash: state.account.passwordHash }
+      state.sessions = [session]
+    })
+  }
+
+  changePassword(credentials: z.infer<typeof credentialsSchema>, session: StoredSession, expectedPasswordHash: string) {
+    return this.transaction(state => {
+      if (state.account?.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
+      state.account = { ...state.account, ...credentials }
       state.sessions = [session]
     })
   }

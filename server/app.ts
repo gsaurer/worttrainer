@@ -4,7 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { validateWord, type AuthState } from '../shared/model.js'
-import { FileStore } from './store.js'
+import { FileStore, parentEmailSchema } from './store.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { HttpError } from './errors.js'
 
@@ -20,7 +20,6 @@ export type AppOptions = {
 
 const cookieName = 'worttrainer_session'
 const maxAgeSeconds = 7 * 24 * 60 * 60
-const username = z.string().trim().regex(/^[a-zA-Z0-9._-]{3,40}$/, 'Use 3–40 letters, numbers, dots, underscores or hyphens.')
 const password = z.string().min(12, 'Use a password with at least 12 characters.').max(128, 'Keep the password to 128 characters or fewer.')
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 
@@ -82,34 +81,41 @@ export function createApp(options: AppOptions) {
   }
   function authState(req: Request): AuthState {
     const signedIn = authenticated(req)
-    return { authenticated: signedIn, setupRequired: !store.account, username: signedIn ? store.account?.username ?? null : null }
+    const account = store.account
+    return {
+      authenticated: signedIn,
+      setupRequired: !account,
+      emailMigrationRequired: !!account && !('email' in account),
+      email: signedIn && account && 'email' in account ? account.email : null,
+    }
   }
 
   app.get('/api/health', (_req, res) => { res.json({ ok: true }) })
   app.get('/api/session', (req, res) => { res.json(authState(req)) })
   app.post('/api/setup', authLimiter, async (req, res) => {
     if (store.account) throw new HttpError(409, 'The parent account is already configured.')
-    const input = parse(z.object({ username, password, setupToken: z.string().max(128) }).strict(), req.body)
+    const input = parse(z.object({ email: parentEmailSchema, password, setupToken: z.string().max(128) }).strict(), req.body)
     if (Date.now() > options.setupExpiresAt ||
         !timingSafeEqual(Buffer.from(digest(input.setupToken), 'hex'), Buffer.from(digest(options.setupToken), 'hex'))) {
       throw new HttpError(403, 'Invalid or expired setup code. Use the setup link printed by the server, or restart it for a fresh link.')
     }
-    const account = { username: input.username, ...await withPasswordWork(() => hashPassword(input.password)) }
+    const account = { email: input.email, ...await withPasswordWork(() => hashPassword(input.password)) }
     const session = newSession()
     await store.initialize(account, session.stored)
     setCookie(res, session.token)
-    res.status(201).json({ authenticated: true, setupRequired: false, username: account.username } satisfies AuthState)
+    res.status(201).json({ authenticated: true, setupRequired: false, emailMigrationRequired: false, email: account.email } satisfies AuthState)
   })
   app.post('/api/login', authLimiter, async (req, res) => {
-    const input = parse(z.object({ username, password: z.string().min(1).max(128) }).strict(), req.body)
+    const input = parse(z.object({ email: parentEmailSchema, password: z.string().min(1).max(128) }).strict(), req.body)
     const account = store.account
     if (!account) throw new HttpError(409, 'Create the parent account with the server’s setup link first.')
     const validPassword = await withPasswordWork(() => verifyPassword(input.password, account))
-    if (!validPassword || input.username !== account.username) throw new HttpError(401, 'The username or password is incorrect.')
+    if (!validPassword || ('email' in account && input.email !== account.email)) throw new HttpError(401, 'The email or password is incorrect.')
     const session = newSession()
-    await store.addSession(session.stored, account.passwordHash)
+    if ('email' in account) await store.addSession(session.stored, account.passwordHash)
+    else await store.migrateEmail(input.email, session.stored, account.passwordHash)
     setCookie(res, session.token)
-    res.json({ authenticated: true, setupRequired: false, username: account.username } satisfies AuthState)
+    res.json({ authenticated: true, setupRequired: false, emailMigrationRequired: false, email: input.email } satisfies AuthState)
   })
   app.post('/api/logout', async (req, res) => {
     const token = sessionToken(req)
@@ -122,7 +128,7 @@ export function createApp(options: AppOptions) {
     const account = store.account!
     const updated = await withPasswordWork(async () => {
       if (!await verifyPassword(input.currentPassword, account)) throw new HttpError(401, 'The current password is incorrect.')
-      return { username: account.username, ...await hashPassword(input.newPassword) }
+      return hashPassword(input.newPassword)
     })
     const session = newSession()
     await store.changePassword(updated, session.stored, account.passwordHash)

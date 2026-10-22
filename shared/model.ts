@@ -14,7 +14,8 @@ export type Word = {
 export type AuthState = {
   authenticated: boolean
   setupRequired: boolean
-  username: string | null
+  emailMigrationRequired: boolean
+  email: string | null
 }
 
 export function validateWord(value: string): string | null {
