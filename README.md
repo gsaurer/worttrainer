@@ -30,7 +30,33 @@ Open **http://localhost:5173**. The API runs on `127.0.0.1:3001`; Vite proxies
 `/api` to it. On the first run, the API prints a **private setup link** in the
 terminal. Open that link to enter the shared parent email and choose a password
 (12–128 characters). The one-time setup code expires after 15 minutes; restart
-the API to renew it. There is no default password, open signup, or mock login.
+the API to renew it. Alternatively, configure your own first-install secret as
+described below. There is no default password, open signup, or mock login.
+
+### Set the first-install secret in `.env`
+
+For a public self-hosted deployment, the initial secret prevents an unrelated
+visitor from claiming your family account before you do. You can keep that
+protection without copying an expiring link from container logs:
+
+1. Generate a private random token on your machine, for example with
+   `openssl rand -hex 32`. It must contain 32–128 letters, digits, `_`, or `-`.
+   Do not use a sample value or a memorable password.
+2. Add `SETUP_TOKEN=YOUR_GENERATED_VALUE` to the ignored root `.env`.
+3. Recreate the container with `docker compose up -d --build` (or restart the
+   local Node server) to load the configuration.
+4. Open your app's normal URL. Paste that value into **One-time setup code**,
+   then choose your parent email and password. No `#setup=` link is required.
+5. Once the account exists, setup is permanently closed while that data is
+   retained, even if `SETUP_TOKEN` is still configured. Remove it from `.env`
+   and recreate/restart the server after successful setup.
+
+A configured `SETUP_TOKEN` stays the same across restarts and has no clock
+expiry **until the first parent account is created**. It is not the account
+password and cannot reset, replace, or log in to an existing account.
+Do not expose it in client variables, source control, screenshots, or chat.
+Without this optional setting, the generated 15-minute setup links still work.
+The configured token is not printed in startup logs or returned by the API.
 
 Data is created in `data/store.json`, ignored by Git. Restarting the app preserves
 the account, words, progress, and unexpired sessions. On another device, sign in
@@ -145,6 +171,7 @@ without stopping the server and signs other devices out.
 | `DATA_FILE` | `data/store.json` | `/app/data/store.json` |
 | `COOKIE_SECURE` | `false` | `true`; Compose overrides to false only for its local HTTP default |
 | `TRUST_PROXY` | `0` | Set `1` only behind exactly one trusted proxy |
+| `SETUP_TOKEN` | Unset: generated 15-minute setup link | Optional private random first-install token (32–128 letters/digits/`_`/`-`); valid only until account creation |
 | `OCR_AZURE_ENDPOINT` | Unset | Optional HTTPS resource root, e.g. `https://your-resource.cognitiveservices.azure.com` |
 | `OCR_AZURE_KEY` | Unset | Server-only API key for a **Free/F0** Document Intelligence resource |
 | `OCR_MONTHLY_LIMIT` | `450` | Integer 1–450; reserved single-photo analyses per UTC calendar month |
@@ -282,6 +309,10 @@ restoring an older backup or deleting it also rolls back that local counter.
   (`Secure` over HTTPS). Only their SHA-256 hashes are stored on disk. Sessions
   expire after seven days; at most 20 sessions are retained. Logout revokes that
   device's session; changing/recovering the password revokes other sessions.
+- First account creation requires either the optional configured `SETUP_TOKEN`
+  or a fresh generated setup link. There is no unauthenticated "claim first
+  account" bypass. Configured tokens are validated at startup, never stored in
+  the family's JSON, and cannot reopen setup once the account has been created.
 - Mutations require JSON content (or JPEG/PNG for the single photo route) and the exact allowed browser Origin. Login,
   setup, and password changes are rate-limited; expensive password hashing is
   concurrency-limited. No permissive CORS or public account registration.

@@ -15,7 +15,7 @@ export type AppOptions = {
   secureCookie: boolean
   production?: boolean
   setupToken: string
-  setupExpiresAt: number
+  setupExpiresAt: number | null
   trustProxy?: boolean
   ocr?: OcrOptions
 }
@@ -100,9 +100,9 @@ export function createApp(options: AppOptions) {
   app.post('/api/setup', authLimiter, async (req, res) => {
     if (store.account) throw new HttpError(409, 'The parent account is already configured.')
     const input = parse(z.object({ email: parentEmailSchema, password, setupToken: z.string().max(128) }).strict(), req.body)
-    if (Date.now() > options.setupExpiresAt ||
+    if ((options.setupExpiresAt !== null && Date.now() > options.setupExpiresAt) ||
         !timingSafeEqual(Buffer.from(digest(input.setupToken), 'hex'), Buffer.from(digest(options.setupToken), 'hex'))) {
-      throw new HttpError(403, 'Invalid or expired setup code. Use the setup link printed by the server, or restart it for a fresh link.')
+      throw new HttpError(403, 'Invalid or expired setup code. Use SETUP_TOKEN from the server configuration, or the latest generated setup link from the server logs.')
     }
     const account = { email: input.email, ...await withPasswordWork(() => hashPassword(input.password)) }
     const session = newSession()
