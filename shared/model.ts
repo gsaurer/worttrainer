@@ -22,7 +22,7 @@ export type PhotoRecognition = {
   warnings: string[]
 }
 
-export type PhotoRound = {
+export type PracticeRound = {
   id: string
   startedAt: string
   writtenAt: string | null
@@ -33,9 +33,32 @@ export type PhotoRound = {
   results: boolean[] | null
 }
 
-export type PhotoStatus = {
-  rounds: PhotoRound[]
+// Preserve compatibility with the existing storage and photo-reading API.
+export type PhotoRound = PracticeRound
+
+export type RoundStatus = {
+  rounds: PracticeRound[]
   ocr: { enabled: boolean; month: string; used: number; limit: number }
+}
+
+export type PhotoStatus = RoundStatus
+
+export function roundStatistics(rounds: PracticeRound[]) {
+  let completed = 0
+  let correct = 0
+  let incorrect = 0
+  let unmarked = 0
+  for (const round of rounds) {
+    if (round.reviewedAt !== null && round.results !== null) {
+      completed++
+      correct += round.results.filter(Boolean).length
+      incorrect += round.results.filter(result => !result).length
+    } else {
+      unmarked += round.words.length
+    }
+  }
+  const reviewed = correct + incorrect
+  return { started: rounds.length, completed, pending: rounds.length - completed, correct, incorrect, unmarked, reviewed, accuracy: reviewed ? Math.round(correct / reviewed * 100) : null }
 }
 
 export function suggestedResult(expected: string, text: string | null, confidence: number | null): boolean | null {

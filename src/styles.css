@@ -200,6 +200,29 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .session-summary { max-width: 700px; margin: 10px auto; text-align: center; background: #fffef9; border: 1px solid var(--line); border-radius: 14px; padding: 45px; }
 .summary-flower { display: block; font-size: 5rem; color: #829669; margin-bottom: 18px; }
 .photo-mode-button { margin-top: 12px; }
+.round-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+.round-statistics { padding: 26px 28px; border: 1px solid var(--line); border-radius: 12px; background: #f0f1e6; margin: 20px 0; }
+.round-statistics > .eyebrow { font-size: .62rem; }
+.round-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+.round-stats-grid > div { display: flex; flex-direction: column; gap: 9px; }
+.round-stats-grid strong { font-family: var(--serif); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 500; }
+.round-stats-grid strong small { font-size: 1rem; color: var(--muted); }
+.round-stats-grid span { font-size: .75rem; line-height: 1.5; }
+.round-stat-correct strong { color: var(--green); }
+.round-stat-incorrect strong { color: #96562f; }
+.round-result-bar { height: 9px; background: #d49a71; border-radius: 8px; overflow: hidden; margin: 24px 0 14px; }
+.round-result-bar > span { display: block; height: 100%; background: var(--green); }
+.round-statistics > .fine-print { margin: 18px 0 0; }
+.round-history-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.round-history-heading h3 { margin-bottom: 0; }
+.round-history-heading .eyebrow { font-size: .62rem; margin-bottom: 10px; }
+.round-id { font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .round-filters { grid-template-columns: 1fr; gap: 16px; }
+  .round-statistics { padding: 24px 18px; }
+  .round-stats-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
+  .round-history-heading { flex-wrap: wrap; }
+}
 .photo-practice { max-width: 900px; margin: 12px auto; }
 .photo-intro, .photo-history, .photo-review { padding: 28px; background: #fffef9; border: 1px solid var(--line); border-radius: 12px; margin: 20px 0; }
 .photo-intro h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); }
