@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Category, Database, Language, Word } from '../database.types'
+import type { Category, Language, Word } from '../../shared/model'
 import { categories, errorMessage, languages, validateWord } from '../lib/words'
+import { api } from '../lib/api'
 
-export function Collection({ client, words, loading, category, onCategory, refresh, onPractice }: {
-  client: SupabaseClient<Database>
+export function Collection({ words, loading, category, onCategory, refresh, onPractice }: {
   words: Word[]
   loading: boolean
   category: Category | 'all'
@@ -30,8 +29,7 @@ export function Collection({ client, words, loading, category, onCategory, refre
     if (validation) { setError(validation); return }
     setSaving(true)
     try {
-      const { error } = await client.from('words').insert({ text: text.trim(), language: newLanguage })
-      if (error) throw new Error(error.code === '23505' ? 'That word is already in this language’s collection.' : error.message)
+      await api.addWord(text.trim(), newLanguage)
       setText('')
       setNotice('Word added to New. Its first practice is a fresh start.')
       await refresh()
@@ -47,8 +45,7 @@ export function Collection({ client, words, loading, category, onCategory, refre
     setError('')
     setNotice('')
     try {
-      const { error } = await client.from('words').delete().eq('id', id)
-      if (error) throw error
+      await api.deleteWord(id)
       setConfirmDelete(null)
       setNotice('Word and its practice history deleted.')
       await refresh()

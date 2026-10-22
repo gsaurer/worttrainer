@@ -5,7 +5,7 @@ import hooks from 'eslint-plugin-react-hooks'
 import refresh from 'eslint-plugin-react-refresh'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage'] },
+  { ignores: ['dist', 'dist-server', 'coverage'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -15,6 +15,7 @@ export default tseslint.config(
     rules: {
       ...hooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
 )

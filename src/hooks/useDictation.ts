@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Language } from '../database.types'
+import type { Language } from '../../shared/model'
 import { languages } from '../lib/words'
 
 export function useDictation() {

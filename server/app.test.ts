@@ -1,0 +1,178 @@
+// @vitest-environment node
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { createHash, randomUUID } from 'node:crypto'
+import request from 'supertest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createApp } from './app.js'
+import { FileStore } from './store.js'
+import { hashPassword } from './passwords.js'
+import type { Word } from '../shared/model.js'
+
+const origin = 'http://localhost:5173'
+const setupToken = 'test-only-private-setup-token'
+const password = 'a long private test passphrase'
+let directory: string
+let store: FileStore
+let app: ReturnType<typeof createApp>
+let cookie: string
+
+function cookieFrom(response: request.Response) {
+  const cookies: unknown = response.headers['set-cookie']
+  if (!Array.isArray(cookies) || typeof cookies[0] !== 'string') throw new Error('Expected a session cookie.')
+  return cookies[0].split(';')[0]
+}
+
+const options = () => ({ store, origin, secureCookie: false, setupToken, setupExpiresAt: Date.now() + 60_000 })
+const post = (path: string, body: object, session = cookie) => request(app).post(path).set('Origin', origin).set('Cookie', session ?? '').send(body)
+
+async function add(text = 'Schmetterling', language = 'de'): Promise<Word> {
+  const response = await post('/api/words', { text, language }).expect(201)
+  return response.body as Word
+}
+
+async function mark(wordId: string, correct: boolean, attemptId = randomUUID()): Promise<Word> {
+  return (await post('/api/practice', { wordId, correct, attemptId }).expect(200)).body as Word
+}
+
+beforeAll(async () => {
+  directory = await mkdtemp(join(tmpdir(), 'worttrainer-'))
+  store = await FileStore.open(join(directory, 'store.json'))
+  app = createApp(options())
+}, 15_000)
+afterAll(async () => { await rm(directory, { recursive: true, force: true }) })
+
+describe('real self-hosted authentication and JSON persistence', () => {
+  it('requires private first-run setup and protects all collection endpoints', async () => {
+    expect((await request(app).get('/api/session')).body).toEqual({ authenticated: false, setupRequired: true, username: null })
+    await request(app).get('/api/words').expect(401)
+    await post('/api/words', { text: 'word', language: 'en' }, '').expect(401)
+    await post('/api/setup', { username: 'parent', password, setupToken: 'wrong' }, '').expect(403)
+    expect(store.account).toBeNull()
+    const response = await post('/api/setup', { username: 'parent', password, setupToken }, '').expect(201)
+    cookie = cookieFrom(response)
+    expect(response.headers['set-cookie'][0]).toContain('HttpOnly')
+    expect(response.headers['set-cookie'][0]).toContain('SameSite=Strict')
+    expect(response.body).toEqual({ authenticated: true, setupRequired: false, username: 'parent' })
+    const saved = await readFile(join(directory, 'store.json'), 'utf8')
+    expect(saved).not.toContain(password)
+    expect(saved).not.toContain(cookie.split('=')[1])
+    expect(saved).toContain('passwordHash')
+    await post('/api/setup', { username: 'another', password, setupToken }).expect(409)
+  }, 15_000)
+
+  it('validates passwords, persists sessions, and logs out only that session', async () => {
+    await post('/api/login', { username: 'parent', password: 'incorrect' }, '').expect(401)
+    await post('/api/login', { username: 'stranger', password }, '').expect(401)
+    const response = await post('/api/login', { username: 'parent', password }, '').expect(200)
+    const second = cookieFrom(response)
+    await request(app).get('/api/session').set('Cookie', second).expect(200).expect(({ body }) => { expect(body.authenticated).toBe(true) })
+    await post('/api/logout', {}, second).expect(204)
+    await request(app).get('/api/words').set('Cookie', second).expect(401)
+    await request(app).get('/api/words').set('Cookie', cookie).expect(200)
+    const tokenHash = createHash('sha256').update(cookie.split('=')[1]).digest('hex')
+    expect(store.hasSession(tokenHash)).toBe(true)
+    expect(store.hasSession(tokenHash, Date.now() + 8 * 24 * 60 * 60 * 1000)).toBe(false)
+  }, 15_000)
+
+  it('rejects cross-origin writes, malformed JSON, oversized bodies, and forged fields', async () => {
+    await request(app).post('/api/words').set('Cookie', cookie).set('Origin', 'https://untrusted.example').send({ text: 'bad', language: 'en' }).expect(403)
+    await request(app).post('/api/words').set('Cookie', cookie).send({ text: 'bad', language: 'en' }).expect(403)
+    await request(app).post('/api/words').set('Origin', origin).set('Cookie', cookie).set('Content-Type', 'text/plain').send('word').expect(415)
+    await request(app).post('/api/words').set('Origin', origin).set('Cookie', cookie).set('Content-Type', 'application/json').send('{broken').expect(400)
+    await post('/api/words', { text: 'a'.repeat(20_000), language: 'en' }).expect(413)
+    await post('/api/words', { text: 'word', language: 'en', category: 'plus' }).expect(400)
+    await post('/api/words', { text: 'word', language: 'fr' }).expect(400)
+    for (const text of ['', ' ', 'a\nb', 'a'.repeat(81)]) await post('/api/words', { text, language: 'en' }).expect(400)
+  })
+
+  it('starts words in New with no attempt, normalizes edges and prevents same-language duplicates', async () => {
+    const word = await add('  Schmetterling  ')
+    expect(word).toMatchObject({ text: 'Schmetterling', category: 'new', consecutive_mistakes: 0, last_practiced_at: null })
+    await post('/api/words', { text: 'schmetterling', language: 'de' }).expect(409)
+    await add('Schmetterling', 'en')
+    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: unknown[] }
+    expect(saved.attempts).toHaveLength(0)
+  })
+
+  it('applies every confirmed category transition, including first mistake while in plus', async () => {
+    const word = await add('Straße')
+    expect(await mark(word.id, false)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    expect(await mark(word.id, true)).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(await mark(word.id, true)).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+  })
+
+  it('serializes simultaneous device answers and deduplicates simultaneous retries', async () => {
+    const word = await add('concurrent', 'en')
+    await Promise.all([mark(word.id, false), mark(word.id, false)])
+    expect(store.words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    await mark(word.id, true)
+    const attemptId = randomUUID()
+    await Promise.all([mark(word.id, false, attemptId), mark(word.id, false, attemptId)])
+    expect(store.words.find(item => item.id === word.id)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    await post('/api/practice', { wordId: word.id, correct: true, attemptId }).expect(409)
+  })
+
+  it('keeps words, outcomes, hashed sessions, and retry identifiers across a fresh server/store instance', async () => {
+    const word = await add('persistent', 'en')
+    const attemptId = randomUUID()
+    await mark(word.id, false, attemptId)
+    store = await FileStore.open(join(directory, 'store.json'))
+    app = createApp(options())
+    await request(app).get('/api/words').set('Cookie', cookie).expect(200)
+    expect(await mark(word.id, false, attemptId)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { words: Word[] }
+    expect(disk.words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+  })
+
+  it('removes attempt history when a word is deleted and rejects further marks', async () => {
+    const word = await add('delete me', 'en')
+    await mark(word.id, false)
+    await request(app).delete(`/api/words/${word.id}`).set('Origin', origin).set('Cookie', cookie).send({}).expect(204)
+    await post('/api/practice', { wordId: word.id, correct: true, attemptId: randomUUID() }).expect(404)
+    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: { wordId: string }[] }
+    expect(disk.attempts.some(attempt => attempt.wordId === word.id)).toBe(false)
+  })
+
+  it('changes password, rotates the cookie, and revokes old sessions and old credentials', async () => {
+    const response = await post('/api/password', { currentPassword: password, newPassword: 'a different strong passphrase' }).expect(204)
+    await request(app).get('/api/words').set('Cookie', cookie).expect(401)
+    cookie = cookieFrom(response)
+    await request(app).get('/api/words').set('Cookie', cookie).expect(200)
+    await post('/api/login', { username: 'parent', password }, '').expect(401)
+    await post('/api/login', { username: 'parent', password: 'a different strong passphrase' }, '').expect(200)
+  }, 15_000)
+
+  it('never overwrites a corrupt or unsupported store with an empty collection', async () => {
+    const file = join(directory, 'broken.json')
+    await writeFile(file, '{not valid JSON')
+    await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
+    expect(await readFile(file, 'utf8')).toBe('{not valid JSON')
+    await writeFile(file, '{"version":99}')
+    await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
+  })
+
+  it('recovers a forgotten password without deleting words or leaving active sessions', async () => {
+    const wordsBefore = store.words
+    await store.recoverPassword(await hashPassword('a recovered secure passphrase'))
+    expect(store.words).toEqual(wordsBefore)
+    await request(app).get('/api/words').set('Cookie', cookie).expect(401)
+    await post('/api/login', { username: 'parent', password: 'a recovered secure passphrase' }, '').expect(200)
+  }, 15_000)
+
+  it('rejects expired setup links and rate-limits repeated login attempts', async () => {
+    const fresh = await FileStore.open(join(directory, 'fresh.json'))
+    const expired = createApp({ ...options(), store: fresh, setupExpiresAt: Date.now() - 1 })
+    await request(expired).post('/api/setup').set('Origin', origin).send({ username: 'parent', password, setupToken }).expect(403)
+    const limited = createApp(options())
+    for (let i = 0; i < 10; i++) await request(limited).post('/api/login').set('Origin', origin).send({}).expect(400)
+    await request(limited).post('/api/login').set('Origin', origin).send({}).expect(429)
+  })
+})

@@ -1,27 +1,33 @@
 import { useState, type FormEvent } from 'react'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '../database.types'
+import type { AuthState } from '../../shared/model'
+import { api } from '../lib/api'
 import { errorMessage } from '../lib/words'
 import { ArrowIcon, Brand } from './Icons'
 
-export function Auth({ client, configured = true }: { client: SupabaseClient<Database> | null; configured?: boolean }) {
-  const [email, setEmail] = useState('')
-  const [sentTo, setSentTo] = useState('')
+export function Auth({ setupRequired, setupCode, onAuthenticated }: {
+  setupRequired: boolean
+  setupCode: string
+  onAuthenticated: (state: AuthState) => void
+}) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [code, setCode] = useState(setupCode)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  async function signIn(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!client) return
-    setBusy(true)
     setError('')
+    if (setupRequired && password !== confirmation) { setError('The passwords do not match. Please try again.'); return }
+    setBusy(true)
     try {
-      const { error } = await client.auth.signInWithOtp({
-        email: email.trim(),
-        options: { emailRedirectTo: window.location.origin },
-      })
-      if (error) throw error
-      setSentTo(email.trim())
+      const result = setupRequired
+        ? await api.setup(username.trim(), password, code.trim())
+        : await api.login(username.trim(), password)
+      setPassword('')
+      setConfirmation('')
+      onAuthenticated(result)
     } catch (error) {
       setError(errorMessage(error))
     } finally {
@@ -48,17 +54,20 @@ export function Auth({ client, configured = true }: { client: SupabaseClient<Dat
       </section>
       <section className="auth-card" aria-labelledby="signin-title">
         <p className="eyebrow">YOUR FAMILY’S WORD COLLECTION</p>
-        <h2 id="signin-title">Welcome, grown-up.</h2>
-        <p>Sign in with a parent’s email to keep your words and progress together, on every device.</p>
-        {!configured && <div className="setup-notice" role="status"><strong>Local preview · connection needed</strong><p>The interface is running. Sign-in and saved words need a Supabase project. There is no demo login or simulated sync.</p><details><summary>Connect your project</summary><p>Run the migration in <code>supabase/migrations</code>, set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> in <code>.env.local</code>, and allow this site’s URL in Supabase Authentication. Restart the dev server. See README for the full steps.</p></details></div>}
-        <form onSubmit={signIn}>
-          <label htmlFor="email">Parent’s email address</label>
-          <input id="email" type="email" autoComplete="email" required maxLength={254} placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={busy || !configured} />
-          <button className="button primary wide" disabled={busy || !configured}>{busy ? 'Sending your link…' : sentTo ? 'Send another sign-in link' : 'Email me a sign-in link'}<ArrowIcon /></button>
+        <h2 id="signin-title">{setupRequired ? 'A home for your words.' : 'Welcome back, grown-up.'}</h2>
+        <p>{setupRequired ? 'Create your shared parent account. One login keeps your family’s words and progress together on every device.' : 'Sign in to your parent account. Your little word collection is right where you left it.'}</p>
+        {setupRequired && <div className="setup-notice"><strong>A one-time welcome.</strong><p>{code ? 'Your private setup link is ready. Choose a username and a strong password below.' : 'Open the private setup link printed in the server terminal, or paste its setup code below. The link expires after 15 minutes; restart the server for a new one.'}</p></div>}
+        <form onSubmit={submit}>
+          {setupRequired && !setupCode && <><label htmlFor="setup-code">One-time setup code</label><input id="setup-code" type="password" value={code} onChange={e => setCode(e.target.value)} required disabled={busy} autoComplete="off" /></>}
+          <label htmlFor="username">Parent username</label>
+          <input id="username" autoComplete="username" required minLength={3} maxLength={40} pattern="[a-zA-Z0-9._\-]+" placeholder="e.g. parent" value={username} onChange={e => setUsername(e.target.value)} disabled={busy} />
+          <label htmlFor="password">Password</label>
+          <input id="password" type="password" autoComplete={setupRequired ? 'new-password' : 'current-password'} required minLength={setupRequired ? 12 : 1} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} disabled={busy} aria-describedby={setupRequired ? 'password-hint' : undefined} />
+          {setupRequired && <><p id="password-hint" className="input-hint">At least 12 characters. A memorable passphrase works well.</p><label htmlFor="confirm-password">Confirm password</label><input id="confirm-password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={confirmation} onChange={e => setConfirmation(e.target.value)} disabled={busy} /></>}
+          <button className="button primary wide" disabled={busy}>{busy ? 'Opening your collection…' : setupRequired ? 'Create our parent account' : 'Open our word collection'}<ArrowIcon /></button>
         </form>
         {error && <p role="alert" className="error">{error}</p>}
-        {sentTo && <div role="status" className="notice">Check <strong>{sentTo}</strong> for your link. Open it in this same browser to finish signing in. It may take a minute; check your spam folder too.</div>}
-        <p className="fine-print">No password to remember. No child account or personal details needed. Each parent account has its own private collection.</p>
+        <p className="fine-print">Your family’s own space. No child account, email address, or personal details needed. Words and progress are saved on your server.</p>
       </section>
     </main>
     <footer><span>Less pressure. More practice.</span><span>Your words. Your pace.</span></footer>

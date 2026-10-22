@@ -1,64 +1,133 @@
 # Worttrainer
 
-A private family spelling workshop: German and English word collections, spoken
-word dictation, paper answers, and parent-marked progress synced to a parent account.
-React + TypeScript + Vite, with Supabase Auth and PostgreSQL. No child profile,
-handwriting upload, typed-answer checking, analytics, or sentence dictation.
+A small, self-hosted family spelling workshop. German and English words, spoken
+dictation, paper answers, and parent-marked progress. One shared parent
+username/password account, a Node.js backend, and **real JSON storage on disk**.
+No cloud service, email provider, child profiles, or database provisioning needed.
+
+React + TypeScript + Vite for the interface, Express for the same-origin API.
+The container serves both. Short-sentence dictation is intentionally a later step.
 
 ## Start locally
 
-Requires Node.js 22.12+ and npm.
+Requires Node.js **22.12+** and npm. Docker is not required for local development.
 
 ```powershell
 npm ci
-Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open **http://localhost:5173** (or the URL Vite prints). Without a configured
-Supabase connection, the app shows its real welcome interface with a clear
-setup notice and disabled sign-in. This is a visual preview, not mock
-authentication or simulated persistence. Follow the next section to use it.
+Open **http://localhost:5173**. The API runs on `127.0.0.1:3001`; Vite proxies
+`/api` to it. On the first run, the API prints a **private setup link** in the
+terminal. Open that link to choose the shared parent username and password
+(12–128 characters). The one-time setup code expires after 15 minutes; restart
+the API to renew it. There is no default password, open signup, or mock login.
 
-## Connect real authentication and storage
+Data is created in `data/store.json`, ignored by Git. Restarting the app preserves
+the account, words, progress, and unexpired sessions. On another device, sign in
+with the same parent credentials once the app is hosted at a reachable URL.
+The development server is loopback-only by default.
 
-1. Create a Supabase project in an account you control. Do not put database
-   passwords or service-role/secret keys in the frontend, repository, or chat.
-2. Run `supabase/migrations/202610220001_initial_words.sql` in the project's SQL
-   Editor, or use the Supabase CLI (`supabase link --project-ref YOUR_REF`, then
-   `supabase db push`). The migration creates tables, ownership policies, restricted
-   grants, and the atomic practice function. Do not just create empty tables.
-3. In `.env.local`, set `VITE_SUPABASE_URL` to the project URL and
-   `VITE_SUPABASE_PUBLISHABLE_KEY` to its **publishable key** (or legacy **anon**
-   key). These two values are public client configuration; database authorization
-   is enforced by row-level security, not by hiding this key.
-4. In Supabase **Authentication → URL Configuration**, allow
-   `http://localhost:5173` and `http://127.0.0.1:5173` as redirect URLs. Set the Site
-   URL to your actual production URL when deployed. Add the exact local origin
-   if you use a different port. Avoid broad production redirect wildcards.
-5. Enable the email provider and email signups. Keep email confirmations on.
-   The default magic-link email template works. For reliable real-family use,
-   configure custom SMTP; Supabase's built-in sender has recipient restrictions
-   and tight rate limits. For a closed family installation, invite the parent's
-   email first, then disable new signups in Supabase.
-6. Restart the dev server after changing environment values. Enter the parent's
-   email, request a link, and open the email link in **the same browser** where it
-   was requested (PKCE). Sign in separately on each device with the same parent
-   account to share its collection. Separate accounts have separate collections.
+## Deploy as a container (including on Proxmox)
 
-**Required external setup:** a Supabase project with the migration applied,
-email delivery configured, allowed redirect URLs, and the two public environment
-values. Until configured, real login and cross-device operation are unavailable.
-This repository does not provision a hosted database or deploy a site automatically.
+Run Docker/Compose inside a Linux VM in your Proxmox cluster. A single application
+container and persistent volume are all that is needed; no Supabase or other
+external backend is used.
 
-### Optional fully local backend
+For a local container preview:
 
-With Docker and the Supabase CLI installed, run `supabase start` in this directory,
-then `supabase db reset` to apply the migration to the local stack. Use the local
-API URL and anon key printed by `supabase status` for `.env.local`. The local
-mail viewer is at `http://localhost:54324`. Do not use `db reset` against a
-database with data you want to keep. A local-only backend is useful for development
-but does **not** provide internet-accessible multi-device sync.
+```sh
+docker compose up --build -d
+docker compose logs worttrainer
+```
+
+Open the setup link from the logs at **http://localhost:3000** and create the
+account. Compose defaults bind to host loopback and allow HTTP cookies **only for
+this local preview**.
+
+For a real installation:
+
+1. Copy `.env.example` to `.env`, set `APP_ORIGIN` to the final HTTPS origin
+   (for example `https://words.example.com`, no trailing slash), and leave
+   `COOKIE_SECURE=true`.
+2. Put an HTTPS reverse proxy in front of port 3000. If the proxy is on another
+   machine/container, change the Compose port binding appropriately and firewall
+   it so only the proxy can reach the backend. Do not publicly expose the backend
+   directly.
+3. `TRUST_PROXY=1` trusts exactly one proxy hop for rate-limiting client IPs. Use
+   it only when direct access is restricted to that trusted proxy. Otherwise leave
+   it `0`; authentication limits then apply to the connecting address.
+4. Run `docker compose up --build -d`. Obtain the first-run setup link with
+   `docker compose logs worttrainer`, then create the account in your browser.
+5. Keep the `worttrainer-data` volume mounted at `/app/data`. The container runs
+   as the unprivileged `node` user (UID/GID 1000); bind mounts must be writable by
+   that user. The included named volume gets the correct ownership automatically.
+
+For an explicitly trusted LAN-only HTTP installation, use its exact
+`http://host:port` as `APP_ORIGIN`, set `COOKIE_SECURE=false`, and bind the port to
+the appropriate LAN interface. HTTP does not encrypt passwords or sessions;
+HTTPS is strongly recommended even on the LAN.
+
+### Important JSON storage boundary
+
+**Run exactly one backend process / one container replica per data volume.**
+Writes are serialized within that process, flushed to a temporary file in the
+same directory, and atomically renamed before success is returned. Distinct
+device answers cannot overwrite each other; retry IDs are persisted and never
+counted twice. Bad or unsupported stored JSON causes startup to fail explicitly,
+not silently reset the collection.
+
+This is appropriate for a small family app, not active-active cluster replicas.
+Use a local filesystem with atomic rename support, not a shared network filesystem.
+In Proxmox, move/restore the app **with its volume**, rather than running replicas
+against the same file. Multiple replicas or a much larger collection should use
+SQLite/PostgreSQL instead. The app loads the family's JSON into memory; each
+mutation rewrites that file. A container's writable layer is **not** the data backup.
+
+### Back up and restore
+
+Use Proxmox/volume backups, or stop the app briefly and copy its JSON file:
+
+```sh
+docker compose stop worttrainer
+mkdir -p backups
+docker compose cp worttrainer:/app/data/store.json ./backups/store.json
+docker compose start worttrainer
+```
+
+Protect backups: they contain password hashes, private words, and hashed session
+identifiers. Restore with the app stopped, correct ownership, and the same volume
+path, then restart. Keep a copy before upgrades or manual recovery. Do not run
+`docker compose down -v` unless you intend to delete the family's data.
+
+If the parent password is forgotten, stop the backend, back up the file, and use
+the interactive recovery command; it preserves words and revokes all sessions:
+
+```sh
+docker compose stop worttrainer
+docker compose run --rm worttrainer node dist-server/server/reset-password.js
+docker compose start worttrainer
+```
+
+For local development, stop `npm run dev` and run `npm run reset-password`.
+Both commands read the new password privately from the terminal, not an argument
+or environment variable. If needed, **Change password** in the app changes it
+without stopping the server and signs other devices out.
+
+## Configuration
+
+| Variable | Development default | Container / production |
+| --- | --- | --- |
+| `APP_ORIGIN` | `http://localhost:5173` | Required exact origin; used for CSRF checks and setup link |
+| `PORT` | `3001` | `3000` |
+| `HOST` | `127.0.0.1` | `0.0.0.0` inside container |
+| `DATA_FILE` | `data/store.json` | `/app/data/store.json` |
+| `COOKIE_SECURE` | `false` | `true`; Compose overrides to false only for its local HTTP default |
+| `TRUST_PROXY` | `0` | Set `1` only behind exactly one trusted proxy |
+
+Compose reads `.env`. Plain `npm run dev` uses the defaults, or environment
+variables exported in your shell; no environment file is required. Never put
+passwords in `.env`. The secure first-run browser form sets them.
 
 ## Practice together
 
@@ -66,11 +135,11 @@ but does **not** provide internet-accessible multi-device sync.
    Duplicate words in the same language are rejected (case-insensitive).
 2. Open **Let's practice**, choose a language and category, and begin a shuffled
    round. Each matching word appears once. End early whenever you like.
-3. Tap **Listen**. The word is concealed, including from the page's accessibility
-   tree, until the parent explicitly reveals it. The child writes on paper.
+3. Tap **Listen**. The word is concealed, including from the accessibility tree,
+   until the parent explicitly reveals it. The child writes on paper.
 4. Reveal for checking, then mark **Spelled correctly** or **Not quite yet**.
-   Advance only after the server confirms the save. A failed/uncertain save can
-   be retried with the same attempt ID without counting it twice.
+   Advance after the server confirms the save. A failed/uncertain save can be
+   retried without counting it twice.
 
 | Practice result | Category and consecutive-mistake count |
 | --- | --- |
@@ -80,41 +149,41 @@ but does **not** provide internet-accessible multi-device sync.
 | Second consecutive incorrect answer | −, count 2 |
 | More incorrect answers while in − | Remain −, count stays at 2 |
 
-Words and outcomes live in PostgreSQL. The collection refreshes after mutations,
-when the page regains focus, and every 30 seconds while visible; **Sync** refreshes
-manually. An active practice round is a snapshot, but each mark applies atomically
-to current server progress. Two devices' distinct answers are serialized by a row
-lock, in the order the server receives them. Retrying an already-saved attempt
-never reapplies it. A deleted word cannot receive more marks.
+The collection refreshes after mutations, on focus, and every 30 seconds while
+visible; **Sync** refreshes manually. Practice rounds are snapshots, but each mark
+uses current server progress. Two devices' distinct answers apply in the order
+the server receives them. Deleting a word deletes its attempt history.
 
-### Speech support
+## Authentication and privacy
 
-Uses the browser's Web Speech API, with a German or English voice selected to
-match each word. Locally installed voices are preferred. Enable the corresponding
-language speech packs in your device settings. If no matching voice is available,
-the app reports it instead of falling back to the wrong language. Listen is a
-deliberate tap for mobile compatibility; playback stops on reveal, navigation,
-or hiding the page. Chrome, Edge, and Safari support varies by OS and installed
-voices. Real-device listening is still necessary to check pronunciation and audio.
-Some browser speech voices send text to the platform's online speech provider.
+- Passwords use Node's asynchronous **scrypt** (N=131072, r=8, p=1), random salts,
+  and timing-safe comparison. They are never stored in plaintext. Use a password
+  manager or a memorable, unique family passphrase.
+- Sessions are random 256-bit tokens in `HttpOnly`, `SameSite=Strict` cookies
+  (`Secure` over HTTPS). Only their SHA-256 hashes are stored on disk. Sessions
+  expire after seven days; at most 20 sessions are retained. Logout revokes that
+  device's session; changing/recovering the password revokes other sessions.
+- Mutations require JSON content and the exact allowed browser Origin. Login,
+  setup, and password changes are rate-limited; expensive password hashing is
+  concurrency-limited. No permissive CORS or public account registration.
+- No child identity, age, handwriting, photo, microphone recording, or analytics
+  is collected. No email address is needed. The single parent account owns the
+  family's one shared collection.
+- Deleting `data/store.json` **while the app is stopped** removes the account,
+  words, history, and sessions; back it up first if needed. The next start
+  generates a fresh private setup link.
 
-## Privacy and data lifecycle
+Speech uses the browser's Web Speech API. German and English voices must be
+installed/enabled on each device. Locally installed voices are preferred; some
+platform voices send text to an online speech provider. If the language voice is
+missing, the app reports it instead of choosing the wrong language. Playback
+stops on reveal, navigation, or hiding the page. Check actual audio/pronunciation
+on your target phone; browser/OS speech support varies.
 
-Only a parent's auth email, entered words, language, categories, and practice
-outcomes are stored. There are no child names, ages, photos, handwriting,
-microphone recordings, or third-party analytics. Supabase Auth persists the login
-session in browser storage; word/progress persistence is server-side. Use **Sign
-out** on shared devices; it signs out this device, not all other devices.
+The interface loads Google Fonts; local font fallbacks work if blocked. There
+are no application analytics or third-party authentication services.
 
-Deleting a word deletes its attempt history. For complete account/data deletion,
-delete the auth user in the Supabase dashboard; foreign keys cascade to all owned
-data. The frontend intentionally cannot assign ownership or directly edit
-progress. Read/delete policies isolate accounts; only the authorized
-`record_practice` function can write outcomes. Browser speech providers and the
-Google Fonts stylesheet have their own network/privacy behavior; system/Georgia
-font fallbacks keep the app usable when fonts cannot load.
-
-## Checks
+## Checks and production build
 
 ```powershell
 npm run typecheck
@@ -123,22 +192,14 @@ npm test
 npm run build
 ```
 
-Tests cover concealed/revealed dictation, parent marking, idempotent client retries,
-speech errors, email-link requests, setup state, and word validation. Database
-tests execute the actual migration against an embedded PostgreSQL engine with
-test-only auth scaffolding to exercise category transitions, grants, isolation,
-and duplicate attempts. They do not replace checking the hosted project's
-email delivery, redirect configuration, or installed device voices.
+Tests exercise the real Express API and real temporary JSON files: initial setup,
+password authentication, cookies, session invalidation, CSRF, input validation,
+all category transitions, concurrent answers, idempotent retries, fresh-store
+restarts, deletion, and corrupt-file protection. UI tests cover concealed
+dictation, parent marking, retry behavior, language voices, and account forms.
+No authentication/storage mocks are used by the running app.
 
-## Deployment
-
-Build with `npm ci && npm run build`, then serve `dist` on any static HTTPS host
-(for example Cloudflare Pages, Netlify, or Vercel; build command `npm run build`,
-output `dist`). Set both `VITE_SUPABASE_*` variables in that host's build
-environment before building. Allow the final origin in Supabase auth redirects.
-The app uses a single root URL, so no client-route rewrite is required. Never
-deploy the Vite development server as production hosting.
-
-Smoke-check the deployed app with two different parent accounts (private lists),
-then the same account on two devices (synced progress). Test German and English
-Listen → Reveal → Mark on an actual phone, including a failed-save retry.
+For non-container production, run the compiled Node server with `NODE_ENV=production`,
+`APP_ORIGIN` set, and a persistent `DATA_FILE`, after `npm run build`. It serves
+`dist` plus `/api`. Static-only hosting is not sufficient anymore. CI also builds
+the Docker image. Run the Node server as a single supervised process.

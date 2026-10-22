@@ -1,27 +1,46 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../database.types'
+import { api } from '../lib/api'
 import { Auth } from './Auth'
 
-describe('parent authentication', () => {
-  it('shows honest setup state with no pretend login', () => {
-    render(<Auth client={null} configured={false} />)
-    expect(screen.getByText(/local preview · connection needed/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /email me/i })).toBeDisabled()
-    expect(screen.getByRole('textbox', { name: /parent’s email/i })).toBeDisabled()
+describe('shared parent authentication', () => {
+  it('creates a real server account using the private setup code, without child data', async () => {
+    const state = { authenticated: true, setupRequired: false, username: 'parent' }
+    const setup = vi.spyOn(api, 'setup').mockResolvedValue(state)
+    const authenticated = vi.fn()
+    const user = userEvent.setup()
+    render(<Auth setupRequired setupCode="private-test-code" onAuthenticated={authenticated} />)
+    await user.type(screen.getByLabelText('Parent username'), 'parent')
+    await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
+    await user.type(screen.getByLabelText('Confirm password'), 'a long test passphrase')
+    await user.click(screen.getByRole('button', { name: 'Create our parent account' }))
+    expect(setup).toHaveBeenCalledWith('parent', 'a long test passphrase', 'private-test-code')
+    expect(authenticated).toHaveBeenCalledWith(state)
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 
-  it('requests a real Supabase magic link without collecting child data', async () => {
-    const client = createClient<Database>('https://example.supabase.co', 'public-test-key', { auth: { persistSession: false } })
-    const sendLink = vi.spyOn(client.auth, 'signInWithOtp').mockResolvedValue({ data: { user: null, session: null }, error: null })
+  it('does not create an account when password confirmation differs', async () => {
+    const setup = vi.spyOn(api, 'setup')
     const user = userEvent.setup()
-    render(<Auth client={client} />)
-    await user.type(screen.getByRole('textbox', { name: /parent’s email/i }), 'parent@example.com')
-    await user.click(screen.getByRole('button', { name: /email me/i }))
-    expect(sendLink).toHaveBeenCalledWith({ email: 'parent@example.com', options: { emailRedirectTo: window.location.origin } })
-    expect(await screen.findByRole('status')).toHaveTextContent('same browser')
-    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    render(<Auth setupRequired setupCode="private-test-code" onAuthenticated={vi.fn()} />)
+    await user.type(screen.getByLabelText('Parent username'), 'parent')
+    await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
+    await user.type(screen.getByLabelText('Confirm password'), 'a different test passphrase')
+    await user.click(screen.getByRole('button', { name: 'Create our parent account' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('do not match')
+    expect(setup).not.toHaveBeenCalled()
+  })
+
+  it('shows failed real-login errors without treating them as success', async () => {
+    vi.spyOn(api, 'login').mockRejectedValue(new Error('The username or password is incorrect.'))
+    const authenticated = vi.fn()
+    const user = userEvent.setup()
+    render(<Auth setupRequired={false} setupCode="" onAuthenticated={authenticated} />)
+    await user.type(screen.getByLabelText('Parent username'), 'parent')
+    await user.type(screen.getByLabelText('Password', { exact: true }), 'incorrect')
+    await user.click(screen.getByRole('button', { name: 'Open our word collection' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('incorrect')
+    expect(authenticated).not.toHaveBeenCalled()
   })
 })

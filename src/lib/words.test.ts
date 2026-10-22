@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { shuffled, validateWord } from './words'
-import type { Word } from '../database.types'
+import type { Word } from '../../shared/model'
 
 describe('word validation', () => {
   it.each(['Schmetterling', 'beautiful', 'Straße', 'groß', ' ice-cream ', 'a'.repeat(80)])('accepts %s', word => {

@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Category, Database, Language, Word } from '../database.types'
+import type { Category, Language, Word } from '../../shared/model'
 import { categories, errorMessage, languages, shuffled } from '../lib/words'
 import { useDictation } from '../hooks/useDictation'
 import { createAttemptId } from '../lib/attempts'
+import { api } from '../lib/api'
 import { ArrowIcon, SpeakerIcon } from './Icons'
 
-export function Practice({ words, client, onUpdated, loading }: {
+export function Practice({ words, onUpdated, loading }: {
   words: Word[]
-  client: SupabaseClient<Database>
   onUpdated: () => Promise<void>
   loading: boolean
 }) {
@@ -49,12 +48,7 @@ export function Practice({ words, client, onUpdated, loading }: {
     setPendingAnswer(correct)
     setError('')
     try {
-      const { data, error } = await client.rpc('record_practice', {
-        p_word_id: word.id,
-        p_correct: correct,
-        p_attempt_id: attemptId.current,
-      })
-      if (error) throw error
+      const data = await api.mark(word.id, correct, attemptId.current)
       if (!data) throw new Error('No progress was returned. Please retry saving this answer.')
       setSaved(data)
       if (correct) setCorrectCount(count => count + 1)

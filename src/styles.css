@@ -142,6 +142,11 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .setup-notice p { margin: 8px 0 0; }
 .setup-notice summary { cursor: pointer; font-weight: 600; margin-top: 10px; }
 .setup-notice code { overflow-wrap: anywhere; }
+.input-hint { font-size: .72rem; color: var(--muted); margin: 8px 0; }
+.password-settings { position: relative; font-size: .72rem; }
+.password-settings > summary { cursor: pointer; padding: 10px 0; }
+.password-settings > form { position: absolute; right: 0; top: 34px; width: 280px; background: #fffef9; border: 1px solid var(--line); border-radius: 10px; padding: 22px; z-index: 5; box-shadow: 0 12px 30px #263e3420; }
+.password-settings > .error, .password-settings > .notice { max-width: 280px; }
 .paper-illustration { position: relative; max-width: 375px; padding: 30px 35px 20px; margin: 42px 20px 34px; background: repeating-linear-gradient(#fffef9, #fffef9 44px, #e5e6da 45px, #fffef9 46px); border: 1px solid #e2dfd0; box-shadow: 4px 7px 0 #ece7d9; transform: rotate(-4deg); border-radius: 3px; }
 .paper-tab { position: absolute; top: -14px; left: 70px; padding: 8px 17px; background: #e6c67dc4; transform: rotate(2deg); font-size: .6rem; letter-spacing: .05em; }
 .paper-line { font-family: var(--serif); font-size: 1.75rem; font-style: italic; line-height: 1.7; color: #627c5e; }

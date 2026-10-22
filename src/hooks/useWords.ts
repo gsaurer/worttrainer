@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, Word } from '../database.types'
+import type { Word } from '../../shared/model'
 import { errorMessage } from '../lib/words'
+import { api } from '../lib/api'
 
-export function useWords(client: SupabaseClient<Database>) {
+export function useWords() {
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -12,17 +12,7 @@ export function useWords(client: SupabaseClient<Database>) {
   const load = useCallback(async () => {
     const request = ++requests.current.generation
     try {
-      const data: Word[] = []
-      const pageSize = 500
-      for (let offset = 0; ; offset += pageSize) {
-        const result = await client.from('words').select('*')
-          .order('created_at', { ascending: false }).order('id', { ascending: false })
-          .range(offset, offset + pageSize - 1)
-        if (result.error) throw result.error
-        if (requests.current.generation !== request) return
-        data.push(...result.data)
-        if (result.data.length < pageSize) break
-      }
+      const data = await api.words()
       if (requests.current.generation === request) {
         setWords(data)
         setError('')
@@ -32,7 +22,7 @@ export function useWords(client: SupabaseClient<Database>) {
     } finally {
       if (requests.current.generation === request) setLoading(false)
     }
-  }, [client])
+  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true)
