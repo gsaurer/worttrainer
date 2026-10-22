@@ -131,6 +131,8 @@ form .button { margin-top: 24px; }
 .empty-symbol > span { font-family: "DM Sans", sans-serif; font-size: 1.3rem; position: absolute; right: -18px; top: 0; color: #b68047; }
 footer { display: flex; justify-content: space-between; gap: 20px; padding: 30px 0; margin-top: 48px; border-top: 1px solid var(--line); color: #7a806e; font-size: .67rem; }
 footer > span:first-child { font-family: var(--serif); font-style: italic; font-size: .86rem; }
+.data-export { max-width: 340px; }
+.data-export p { margin: 8px 0 0; line-height: 1.6; }
 .welcome-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 85px; align-items: center; padding: 65px 0 30px; }
 .welcome-story .lede { max-width: 440px; color: #707866; font-size: .91rem; margin: 25px 0; }
 .auth-card { background: #fffef9; border: 1px solid var(--line); border-radius: 14px; padding: 37px 34px; box-shadow: 0 14px 50px #3e4c2b06; }

@@ -8,6 +8,7 @@ import { Brand } from './components/Icons'
 import { Collection } from './components/Collection'
 import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
+import { DataExport } from './components/DataExport'
 
 function removeSetupFragment() {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
@@ -78,6 +79,6 @@ function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => v
       {tab === 'collection' && <section className="category-grid" aria-label="Word categories">{(Object.keys(categories) as Category[]).map(key => <button key={key} className={`category-card ${key} ${category === key ? 'active' : ''}`} aria-pressed={category === key} onClick={() => setCategory(category === key ? 'all' : key)}><span className="category-sign">{categories[key].label}</span><span className="category-copy"><strong>{key === 'new' ? 'New beginnings' : key === 'plus' ? 'Finding their feet' : 'Worth another try'}</strong><span>{categories[key].description}</span></span><span className="category-count">{words.filter(w => w.category === key).length}</span></button>)}</section>}
       {tab === 'collection' ? <Collection words={words} loading={loading} category={category} onCategory={setCategory} refresh={refresh} onPractice={() => setTab('practice')} /> : <Practice words={words} loading={loading} onUpdated={refresh} />}
     </main>
-    <footer><span>Little by little is a lot.</span><span>Deutsch & English · Made for learning together</span></footer>
+    <footer><span>Little by little is a lot.</span><DataExport /><span>Deutsch & English · Made for learning together</span></footer>
   </div>
 }

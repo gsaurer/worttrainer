@@ -99,6 +99,11 @@ export function createApp(options: AppOptions) {
 
   app.get('/api/health', (_req, res) => { res.json({ ok: true }) })
   app.get('/api/session', (req, res) => { res.json(authState(req)) })
+  app.get('/api/export', requireAuth, (req, res) => {
+    const data = store.exportData(accountId(req))
+    res.setHeader('Content-Disposition', `attachment; filename="worttrainer-${data.exportedAt.slice(0, 10)}.json"`)
+    res.json(data)
+  })
   app.post('/api/setup', (_req, _res) => {
     throw new HttpError(410, 'Setup tokens are no longer needed. Reload the app and choose Create account.')
   })
