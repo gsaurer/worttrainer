@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PhotoRound, PhotoStatus, Word } from '../../shared/model'
 import { api } from '../lib/api'
-import { PhotoPractice } from './PhotoPractice'
+import { RoundPractice } from './RoundPractice'
 
 const word: Word = { id: '11111111-1111-4111-8111-111111111111', text: 'Schmetterling', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
 const round: PhotoRound = { id: '22222222-2222-4222-8222-222222222222', startedAt: '2026-10-22T12:00:00Z', writtenAt: null, reviewedAt: null, nextIndex: 0, words: [{ id: word.id, text: word.text, language: word.language, attemptId: '33333333-3333-4333-8333-333333333333' }], recognition: null, results: null }
@@ -18,15 +18,15 @@ beforeEach(() => {
   })
   vi.spyOn(api, 'photoStatus').mockResolvedValue(status)
 })
-describe('one-photo practice', () => {
+describe('persisted whole-round practice', () => {
   it('conceals spelling while writing, persists position, and only saves after a complete manual parent review', async () => {
     const user = userEvent.setup()
     vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
     const advance = vi.spyOn(api, 'advancePhotoRound').mockResolvedValue(written)
     const review = vi.spyOn(api, 'reviewPhotoRound').mockResolvedValue({ ...written, reviewedAt: '2026-10-22T12:02:00Z', results: [true] })
     const refresh = vi.fn().mockResolvedValue(undefined)
-    render(<PhotoPractice words={[word]} onUpdated={refresh} onClose={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: /start numbered round/i }))
+    render(<RoundPractice words={[word]} onUpdated={refresh} />)
+    await user.click(await screen.findByRole('button', { name: /start round/i }))
     expect(document.body).not.toHaveTextContent(word.text)
     expect(screen.queryByText(/expected spelling/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /all written/i }))
@@ -45,7 +45,7 @@ describe('one-photo practice', () => {
   it('shows unconfigured recognition explicitly and resumes the saved numbered position', async () => {
     const user = userEvent.setup()
     vi.spyOn(api, 'photoStatus').mockResolvedValue({ ...status, rounds: [round] })
-    render(<PhotoPractice words={[]} onUpdated={vi.fn()} onClose={vi.fn()} />)
+    render(<RoundPractice words={[]} onUpdated={vi.fn()} />)
     expect(await screen.findByText(/automatic reading is not configured/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Continue round' }))
     expect(document.body).not.toHaveTextContent(word.text)
@@ -56,7 +56,7 @@ describe('one-photo practice', () => {
     vi.spyOn(api, 'photoStatus').mockResolvedValue({ ...status, rounds: [written], ocr: { ...status.ocr, enabled: true } })
     const read = vi.spyOn(api, 'readPhoto').mockResolvedValue({ ...written, recognition: { answers: [{ number: 1, text: 'Schmeterling', confidence: 0.6 }], warnings: ['Check this answer.'] } })
     const review = vi.spyOn(api, 'reviewPhotoRound').mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValueOnce({ ...written, results: [false], reviewedAt: '2026-10-22T12:02:00Z' })
-    render(<PhotoPractice words={[]} onUpdated={vi.fn()} onClose={vi.fn()} />)
+    render(<RoundPractice words={[]} onUpdated={vi.fn()} />)
     await user.click(await screen.findByRole('button', { name: 'Continue round' }))
     const file = new File(['test-photo'], 'answers.png', { type: 'image/png' })
     await user.upload(screen.getByLabelText(/one photo of the numbered answers/i), file)
@@ -72,5 +72,32 @@ describe('one-photo practice', () => {
     expect(screen.getByRole('combobox')).toBeDisabled()
     await user.click(screen.getByRole('button', { name: /retry confirming/i }))
     expect(review.mock.calls).toEqual([[round.id, [false]], [round.id, [false]]])
+  })
+
+  it('shows reviewed statistics and exact historical word results without recording another attempt', async () => {
+    const user = userEvent.setup()
+    const reviewed = { ...written, reviewedAt: '2026-10-22T12:02:00Z', results: [false] }
+    vi.spyOn(api, 'photoStatus').mockResolvedValue({ ...status, rounds: [{ ...round, id: '44444444-4444-4444-8444-444444444444' }, reviewed] })
+    const review = vi.spyOn(api, 'reviewPhotoRound')
+    render(<RoundPractice words={[]} onUpdated={vi.fn()} />)
+    const stats = await screen.findByRole('region', { name: 'Round statistics' })
+    expect(stats).toHaveTextContent('1 / 2')
+    expect(stats).toHaveTextContent('1Incorrect answers')
+    expect(stats).toHaveTextContent('0%')
+    expect(stats).toHaveTextContent('1 unfinished round · 1 unmarked word')
+    await user.click(screen.getByRole('button', { name: 'View results' }))
+    expect(screen.getByText(word.text)).toBeInTheDocument()
+    expect(screen.getByText('Keep practicing')).toBeInTheDocument()
+    expect(review).not.toHaveBeenCalled()
+  })
+
+  it('does not count OCR suggestions or unfinished rounds as incorrect answers', async () => {
+    vi.spyOn(api, 'photoStatus').mockResolvedValue({ ...status, rounds: [{ ...written, recognition: { answers: [{ number: 1, text: 'wrong', confidence: 0.99 }], warnings: [] } }] })
+    render(<RoundPractice words={[]} onUpdated={vi.fn()} />)
+    const stats = await screen.findByRole('region', { name: 'Round statistics' })
+    expect(stats).toHaveTextContent('0Correct answers')
+    expect(stats).toHaveTextContent('0Incorrect answers')
+    expect(stats).toHaveTextContent('—Accuracy')
+    expect(within(stats).queryByRole('img')).not.toBeInTheDocument()
   })
 })

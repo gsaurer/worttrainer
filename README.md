@@ -191,13 +191,22 @@ Never put the parent account password in `.env`; the secure browser form sets it
 1. Add the **correct spelling** of a tricky word and choose Deutsch or English.
    Duplicate words in the same account and language are rejected
    (case-insensitive); different accounts can practice the same word independently.
-2. Open **Let's practice**, choose a language and category, and begin a shuffled
-   round. Each matching word appears once. End early whenever you like.
-3. Tap **Listen**. The word is concealed, including from the accessibility tree,
-   until the parent explicitly reveals it. The child writes on paper.
-4. Reveal for checking, then mark **Spelled correctly** or **Not quite yet**.
-   Advance after the server confirms the save. A failed/uncertain save can be
-   retried without counting it twice.
+2. Open **Let's practice**, choose a language and category, and **Start round**.
+   Each matching word appears once in a shuffled, numbered list of up to 100 words.
+   If more than 100 words match, the round selects 100 at random; use category
+   filters for a smaller round. The round is saved before dictation begins.
+3. Tap **Listen** and write the answer on paper, numbered **1, 2, 3...**.
+   Spelling stays concealed, including from the accessibility tree, throughout
+   dictation. Tap **Written — next word** to save your position.
+4. After the whole round is written, choose **Review the sheet manually** or
+   upload one photo for recognition suggestions. Mark each answer, then
+   **Confirm all results**. No results change progress until this confirmation.
+   A failed/uncertain save can be retried without counting it twice.
+
+**Pause and return to rounds** retains the numbered list and writing position.
+Use **Continue round** on any signed-in device to resume. There is no timer, and
+pausing never marks unanswered words incorrect. Checking each word immediately
+is no longer a separate practice mode; all practice now uses saved rounds.
 
 | Practice result | Category and consecutive-mistake count |
 | --- | --- |
@@ -208,20 +217,44 @@ Never put the parent account password in `.env`; the secure browser form sets it
 | More incorrect answers while in − | Remain −, count stays at 2 |
 
 The collection refreshes after mutations, on focus, and every 30 seconds while
-visible; **Sync** refreshes manually. Practice rounds are snapshots, but each mark
-uses current server progress. Two devices' distinct answers apply in the order
-the server receives them. Deleting a word deletes its attempt history.
+visible; **Sync** refreshes manually. Rounds preserve the dictated word snapshots,
+but confirmed answers use current server progress. Two devices' distinct rounds
+apply in the order the server receives them. Deleting a word deletes its attempt
+history and saved rounds containing it, including their round statistics.
 
-### Check one photo at the end
+### Round history and statistics
 
-Choose the language/category as usual, then **One photo at the end**:
+The practice notebook lists each saved round's identifier, language, word count,
+start time, writing progress, and review time. **View results** shows the exact
+ordered word list and parent-confirmed correct/incorrect result for each word.
+Reopening a reviewed round never records another attempt.
+
+Statistics show reviewed versus started rounds, correct and incorrect answers,
+and accuracy: **correct answers / all reviewed answers**. Overall accuracy is
+weighted by answer counts, not the average of round percentages. Pending rounds,
+unmarked answers, and unconfirmed OCR suggestions do not count as successes or
+failures. Without any reviewed answers, accuracy is shown as unavailable, not 0%.
+Dates are shown in the viewing device's local time zone. History refreshes on
+focus; **Refresh rounds** also reloads it explicitly.
+
+Existing saved photo rounds are included automatically with no storage migration.
+Older standalone practice attempts retain their progress and timestamps, but
+cannot be reliably reconstructed into rounds and are excluded from these
+round-based statistics. Statistics cover **currently saved rounds**, across both
+languages. Removing a round removes it from statistics but does not undo recorded
+word progress; deleting a word also removes rounds containing it. Both actions
+show a confirmation explaining this effect.
+
+### Check one photo at the end (optional)
+
+All rounds support manual review without OCR configuration. To use one photo:
 
 1. Start a numbered round. Each word is dictated without displaying its spelling.
    Write one answer per line, numbered **1, 2, 3...** in dictation order. A sheet
    supports 1–100 words; a short round is much easier to photograph/read.
 2. Tap **Written — next word**. The server saves the ordered word snapshots,
    current position, start time, and writing-finished time. Pause and reopen
-   **Saved photo rounds** on either device to continue.
+   **Round history** on either device to continue.
 3. At the end, photograph the entire numbered sheet clearly, upright, flat,
    without shadows, names, faces, or other personal information. Upload one
    **JPEG or PNG, up to 4 MiB and 24 megapixels**. HEIC, PDFs, and multi-page
@@ -248,10 +281,10 @@ fails, or once a free quota is exhausted.
 
 Writing-position timestamps indicate when **Written** was tapped, not when the
 pencil physically touched paper. Each practice attempt and the word's
-`last_practiced_at` record the **parent confirmation time**. Saved photo rounds
+`last_practiced_at` record the **parent confirmation time**. Saved rounds
 show their start, writing-finished, and review times; there are no separate child
-identities or child-specific statistics. Original per-word practice continues
-to record marking timestamps without creating a photo-round record. The word
+identities or child-specific statistics. Historical per-word attempts still
+retain their marking timestamps without fabricated round assignments. The word
 collection shows the last-practiced **date and time** in the viewing device's
 local time zone.
 
@@ -327,7 +360,7 @@ restoring an older backup or deleting it also rolls back that local counter.
 - Photos are processed in memory, re-encoded as JPEG with metadata (including
   EXIF/GPS) stripped, and **never saved on the app's disk**. Recognized text,
   word snapshots, timestamps, and parent-confirmed results are stored in JSON.
-  Backups therefore also contain recognized text. **Remove sheet** deletes that
+  Backups therefore also contain recognized text. **Remove round** deletes that
   round's snapshots/recognition, retaining recorded practice progress/attempts.
   Deleting a word also deletes all saved sheets containing it and that word's
   attempts. Other words' progress is not undone.
@@ -372,8 +405,8 @@ timestamps, atomic/idempotent batch review, free-budget reservations/restarts,
 image validation/metadata removal, explicit numbering, recognition uncertainty,
 and provider errors. Provider responses in tests are fixtures, not live Azure
 recognition or an accuracy guarantee for children's handwriting. UI tests cover
-concealed dictation, end-of-sheet review, explicit uploads, retry behavior,
-language voices, and account forms.
+concealed whole-round dictation, end-of-sheet review, explicit uploads, retry
+behavior, weighted statistics, unmarked answers, language voices, and account forms.
 No authentication/storage mocks are used by the running app.
 
 For non-container production, run the compiled Node server with `NODE_ENV=production`,

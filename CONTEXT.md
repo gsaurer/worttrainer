@@ -17,9 +17,12 @@ language and current learning category.
 A parent-confirmed correct or incorrect result for one word. Adding a word,
 listening to dictation, and reading a photo are not practice attempts.
 
-**Photo round**:
-An ordered, numbered set of words dictated before one end-of-round parent review.
+**Practice round**:
+An ordered, numbered set of words with a recorded start and writing position.
+All words are dictated before a parent reviews the answers manually or with
+photo-reading suggestions. Only confirmed results count toward round statistics.
 The round and any recognized handwriting belong to the parent account.
+_Avoid_: Photo round, test score for the child
 
 **Learning category**:
 New, +, or −: a word's current practice position, determined by confirmed
