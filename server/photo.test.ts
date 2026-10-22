@@ -2,7 +2,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import request from 'supertest'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,7 +18,8 @@ let app: ReturnType<typeof createApp>
 let cookie: string
 let ids: string[]
 let photo: Buffer
-const options = () => ({ store, origin, secureCookie: false, setupToken: 'test-only', setupExpiresAt: Date.now() + 60_000, ocr })
+let accountId: string
+const options = () => ({ store, origin, secureCookie: false, ocr })
 const post = (path: string, body: object) => request(app).post(path).set('Origin', origin).set('Cookie', cookie).send(body)
 const upload = (id: string, bytes = photo) => request(app).post(`/api/photo-rounds/${id}/photo`).set('Origin', origin).set('Cookie', cookie).set('Content-Type', 'image/png').send(bytes)
 async function newRound() {
@@ -32,8 +33,9 @@ beforeEach(async () => {
   store = await FileStore.open(join(directory, 'store.json'))
   const token = randomBytes(32).toString('base64url')
   cookie = `worttrainer_session=${token}`
-  await store.initialize({ email: 'parent@example.com', salt: '00'.repeat(16), passwordHash: 'aa'.repeat(64) }, { tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 60_000 })
-  ids = [ (await store.addWord('Straße', 'de')).id, (await store.addWord('Schmetterling', 'de')).id ]
+  accountId = randomUUID()
+  await store.register({ email: 'parent@example.com', salt: '00'.repeat(16), passwordHash: 'aa'.repeat(64) }, { accountId, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 60_000 })
+  ids = [ (await store.addWord(accountId, 'Straße', 'de')).id, (await store.addWord(accountId, 'Schmetterling', 'de')).id ]
   app = createApp(options())
   photo = await sharp({ create: { width: 30, height: 40, channels: 3, background: '#ffffff' } }).png().toBuffer()
 })
@@ -63,34 +65,34 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     const round = await newRound()
     await post(`/api/photo-rounds/${round.id}/advance`, { nextIndex: 1 }).expect(200)
     store = await FileStore.open(join(directory, 'store.json'))
-    expect(store.photoRound(round.id)).toMatchObject({ nextIndex: 1, writtenAt: null, reviewedAt: null })
-    expect(store.photoRound(round.id).words.map(word => word.id)).toEqual(ids)
-    expect(store.words.every(word => word.last_practiced_at === null)).toBe(true)
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: unknown[] }
-    expect(saved.attempts).toHaveLength(0)
+    expect(store.photoRound(accountId, round.id)).toMatchObject({ nextIndex: 1, writtenAt: null, reviewedAt: null })
+    expect(store.photoRound(accountId, round.id).words.map(word => word.id)).toEqual(ids)
+    expect(store.words(accountId).every(word => word.last_practiced_at === null)).toBe(true)
+    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: unknown[] }[] }
+    expect(saved.accounts[0].attempts).toHaveLength(0)
   })
   it('saves a reviewed batch atomically and deduplicates simultaneous retries across restart', async () => {
     const round = await newRound()
     await finish(round)
     await post(`/api/photo-rounds/${round.id}/review`, { results: [true] }).expect(400)
-    expect(store.words.every(word => word.category === 'new')).toBe(true)
+    expect(store.words(accountId).every(word => word.category === 'new')).toBe(true)
     const path = `/api/photo-rounds/${round.id}/review`
     const responses = await Promise.all([post(path, { results: [true, false] }), post(path, { results: [true, false] })])
     expect(responses.map(response => response.status)).toEqual([200, 200])
-    expect(store.words.find(word => word.id === ids[0])).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
-    expect(store.words.find(word => word.id === ids[1])).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
+    expect(store.words(accountId).find(word => word.id === ids[0])).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
+    expect(store.words(accountId).find(word => word.id === ids[1])).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     await post(path, { results: [false, false] }).expect(409)
     store = await FileStore.open(join(directory, 'store.json'))
     app = createApp(options())
     await post(path, { results: [true, false] }).expect(200)
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: { createdAt: string }[] }
-    expect(saved.attempts).toHaveLength(2)
-    expect(saved.attempts.every(attempt => attempt.createdAt === store.photoRound(round.id).reviewedAt)).toBe(true)
+    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: { createdAt: string }[] }[] }
+    expect(saved.accounts[0].attempts).toHaveLength(2)
+    expect(saved.accounts[0].attempts.every(attempt => attempt.createdAt === store.photoRound(accountId, round.id).reviewedAt)).toBe(true)
     const again = await newRound()
     await finish(again)
     await post(`/api/photo-rounds/${again.id}/review`, { results: [false, false] }).expect(200)
-    expect(store.words.find(word => word.id === ids[0])).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
-    expect(store.words.find(word => word.id === ids[1])).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    expect(store.words(accountId).find(word => word.id === ids[0])).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(store.words(accountId).find(word => word.id === ids[1])).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
   })
   it('keeps OCR unavailable explicitly until configured while allowing manual parent review', async () => {
     app = createApp({ ...options(), ocr: undefined })
@@ -111,7 +113,7 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     await upload(round.id).expect(429)
     expect(transport).toHaveBeenCalledTimes(2)
     expect(store.ocrUsage().used).toBe(2)
-    expect(store.words.every(word => word.last_practiced_at === null)).toBe(true)
+    expect(store.words(accountId).every(word => word.last_practiced_at === null)).toBe(true)
     await Promise.all([store.reserveOcr(2, '2099-01'), store.reserveOcr(2, '2099-01')])
     await expect(store.reserveOcr(2, '2099-01')).rejects.toThrow('exhausted')
   })
@@ -126,7 +128,7 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     await finish(round)
     const response = await upload(round.id).expect(200)
     expect(response.body.recognition.answers.map((answer: { text: string }) => answer.text)).toEqual(['Straße', 'Schmeterling'])
-    expect(store.words.every(word => word.last_practiced_at === null)).toBe(true)
+    expect(store.words(accountId).every(word => word.last_practiced_at === null)).toBe(true)
     const saved = await readFile(join(directory, 'store.json'), 'utf8')
     expect(saved).toContain('Schmeterling')
     expect(saved).not.toContain(photo.toString('base64'))
@@ -155,17 +157,17 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     await finish(round)
     await post(`/api/photo-rounds/${round.id}/review`, { results: [true, false] }).expect(200)
     await request(app).delete(`/api/photo-rounds/${round.id}`).set('Cookie', cookie).set('Origin', origin).send({}).expect(204)
-    expect(store.photoRounds).toHaveLength(0)
-    expect(store.words.find(word => word.id === ids[0])?.category).toBe('plus')
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: unknown[] }
-    expect(saved.attempts).toHaveLength(2)
+    expect(store.photoRounds(accountId)).toHaveLength(0)
+    expect(store.words(accountId).find(word => word.id === ids[0])?.category).toBe('plus')
+    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: unknown[] }[] }
+    expect(saved.accounts[0].attempts).toHaveLength(2)
   })
   it('removes stored recognition snapshots on word deletion and does not partially apply a stale batch', async () => {
     const round = await newRound()
     await finish(round)
-    await store.deleteWord(ids[1])
+    await store.deleteWord(accountId, ids[1])
     await post(`/api/photo-rounds/${round.id}/review`, { results: [true, false] }).expect(404)
-    expect(store.words[0].last_practiced_at).toBeNull()
-    expect(store.photoRounds).toHaveLength(0)
+    expect(store.words(accountId)[0].last_practiced_at).toBeNull()
+    expect(store.photoRounds(accountId)).toHaveLength(0)
   })
 })

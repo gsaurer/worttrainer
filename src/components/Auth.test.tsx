@@ -4,39 +4,42 @@ import userEvent from '@testing-library/user-event'
 import { api } from '../lib/api'
 import { Auth } from './Auth'
 
-describe('shared parent authentication', () => {
-  it('creates a real server account using the private setup code, without child data', async () => {
-    const state = { authenticated: true, setupRequired: false, emailMigrationRequired: false, email: 'parent@example.com' }
-    const setup = vi.spyOn(api, 'setup').mockResolvedValue(state)
+describe('private parent authentication', () => {
+  it('registers without any token, invitation, or child data', async () => {
+    const state = { authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' }
+    const signup = vi.spyOn(api, 'signup').mockResolvedValue(state)
     const authenticated = vi.fn()
     const user = userEvent.setup()
-    render(<Auth setupRequired setupCode="private-test-code" onAuthenticated={authenticated} />)
+    render(<Auth onAuthenticated={authenticated} />)
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
     await user.type(screen.getByLabelText('Parent email'), 'parent@example.com')
     await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
     await user.type(screen.getByLabelText('Confirm password'), 'a long test passphrase')
-    await user.click(screen.getByRole('button', { name: 'Create our parent account' }))
-    expect(setup).toHaveBeenCalledWith('parent@example.com', 'a long test passphrase', 'private-test-code')
+    await user.click(screen.getByRole('button', { name: 'Create my account' }))
+    expect(signup).toHaveBeenCalledWith('parent@example.com', 'a long test passphrase')
+    expect(screen.queryByLabelText('One-time setup code')).not.toBeInTheDocument()
     expect(authenticated).toHaveBeenCalledWith(state)
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 
   it('does not create an account when password confirmation differs', async () => {
-    const setup = vi.spyOn(api, 'setup')
+    const signup = vi.spyOn(api, 'signup')
     const user = userEvent.setup()
-    render(<Auth setupRequired setupCode="private-test-code" onAuthenticated={vi.fn()} />)
+    render(<Auth onAuthenticated={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
     await user.type(screen.getByLabelText('Parent email'), 'parent@example.com')
     await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
     await user.type(screen.getByLabelText('Confirm password'), 'a different test passphrase')
-    await user.click(screen.getByRole('button', { name: 'Create our parent account' }))
+    await user.click(screen.getByRole('button', { name: 'Create my account' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('do not match')
-    expect(setup).not.toHaveBeenCalled()
+    expect(signup).not.toHaveBeenCalled()
   })
 
   it('shows failed real-login errors without treating them as success', async () => {
     vi.spyOn(api, 'login').mockRejectedValue(new Error('The email or password is incorrect.'))
     const authenticated = vi.fn()
     const user = userEvent.setup()
-    render(<Auth setupRequired={false} setupCode="" onAuthenticated={authenticated} />)
+    render(<Auth onAuthenticated={authenticated} />)
     await user.type(screen.getByLabelText('Parent email'), 'parent@example.com')
     await user.type(screen.getByLabelText('Password', { exact: true }), 'incorrect')
     await user.click(screen.getByRole('button', { name: 'Open our word collection' }))
@@ -45,11 +48,11 @@ describe('shared parent authentication', () => {
   })
 
   it('clearly asks existing username accounts to adopt a parent email with their existing password', async () => {
-    const state = { authenticated: true, setupRequired: false, emailMigrationRequired: false, email: 'parent@example.com' }
+    const state = { authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' }
     const login = vi.spyOn(api, 'login').mockResolvedValue(state)
     const user = userEvent.setup()
     const authenticated = vi.fn()
-    render(<Auth setupRequired={false} setupCode="" emailMigrationRequired onAuthenticated={authenticated} />)
+    render(<Auth emailMigrationRequired onAuthenticated={authenticated} />)
     expect(screen.getByText(/without changing your words or progress/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Confirm password')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Parent email')).toHaveAttribute('type', 'email')

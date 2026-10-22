@@ -13,7 +13,6 @@ export type Word = {
 
 export type AuthState = {
   authenticated: boolean
-  setupRequired: boolean
   emailMigrationRequired: boolean
   email: string | null
 }

@@ -28,7 +28,7 @@ async function readResponse<T>(response: Response, protectedRequest: boolean): P
 export const api = {
   session: () => request<AuthState>('/session'),
   login: (email: string, password: string) => request<AuthState>('/login', 'POST', { email, password }),
-  setup: (email: string, password: string, setupToken: string) => request<AuthState>('/setup', 'POST', { email, password, setupToken }),
+  signup: (email: string, password: string) => request<AuthState>('/signup', 'POST', { email, password }),
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),
   words: () => request<Word[]>('/words', 'GET', undefined, true),

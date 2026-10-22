@@ -2,7 +2,6 @@ import { resolve } from 'node:path'
 import { createApp } from './app.js'
 import { FileStore } from './store.js'
 import { ocrConfiguration } from './ocr.js'
-import { setupConfiguration } from './setup.js'
 
 const production = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT ?? (production ? 3000 : 3001))
@@ -14,24 +13,15 @@ if (secureSetting && !['true', 'false'].includes(secureSetting)) throw new Error
 const secureCookie = secureSetting ? secureSetting === 'true' : production
 if (secureCookie && !origin.startsWith('https://')) throw new Error('Secure cookies require an HTTPS APP_ORIGIN. Set COOKIE_SECURE=false only for a trusted local HTTP preview.')
 const store = await FileStore.open(resolve(process.env.DATA_FILE ?? 'data/store.json'))
-const setup = setupConfiguration(process.env)
 const app = createApp({
-  store, origin, production, secureCookie, ...setup,
+  store, origin, production, secureCookie,
   trustProxy: process.env.TRUST_PROXY === '1',
   ocr: ocrConfiguration(process.env),
 })
 const host = process.env.HOST ?? (production ? '0.0.0.0' : '127.0.0.1')
 const server = app.listen(port, host, () => {
   console.log(`Worttrainer API listening on ${host}:${port}`)
-  if (!store.account) {
-    if (setup.setupExpiresAt === null) {
-      console.log(`First run: open ${origin}/ and enter SETUP_TOKEN from your server configuration to create the parent account.`)
-      console.log('The configured token remains valid only until the first parent account is created. Keep it private.')
-    } else {
-      console.log(`First run: create your parent account at ${origin}/#setup=${setup.setupToken}`)
-      console.log('This one-time setup link expires in 15 minutes. Restart the server to renew it. Keep it private.')
-    }
-  }
+  console.log(`Sign in or create a private account at ${origin}/`)
 })
 server.on('error', error => { console.error('Cannot start Worttrainer', error); process.exitCode = 1 })
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

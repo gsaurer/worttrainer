@@ -1,8 +1,8 @@
 # Worttrainer
 
 A small, self-hosted family spelling workshop. German and English words, spoken
-dictation, paper answers, and parent-marked progress. One shared parent
-email/password account, a Node.js backend, and **real JSON storage on disk**.
+dictation, paper answers, and parent-marked progress. Independent private
+email/password accounts, a Node.js backend, and **real JSON storage on disk**.
 No cloud service, email provider, child profiles, or database provisioning needed
 for normal practice. Optional end-of-round photo reading uses Azure's Free/F0
 handwriting recognition service and requires separate configuration.
@@ -27,51 +27,50 @@ deployment-specific overrides commented, so copying it preserves local defaults.
 Restart the API after editing `.env` to load the new values.
 
 Open **http://localhost:5173**. The API runs on `127.0.0.1:3001`; Vite proxies
-`/api` to it. On the first run, the API prints a **private setup link** in the
-terminal. Open that link to enter the shared parent email and choose a password
-(12–128 characters). The one-time setup code expires after 15 minutes; restart
-the API to renew it. Alternatively, configure your own first-install secret as
-described below. There is no default password, open signup, or mock login.
-
-### Set the first-install secret in `.env`
-
-For a public self-hosted deployment, the initial secret prevents an unrelated
-visitor from claiming your family account before you do. You can keep that
-protection without copying an expiring link from container logs:
-
-1. Generate a private random token on your machine, for example with
-   `openssl rand -hex 32`. It must contain 32–128 letters, digits, `_`, or `-`.
-   Do not use a sample value or a memorable password.
-2. Add `SETUP_TOKEN=YOUR_GENERATED_VALUE` to the ignored root `.env`.
-3. Recreate the container with `docker compose up -d --build` (or restart the
-   local Node server) to load the configuration.
-4. Open your app's normal URL. Paste that value into **One-time setup code**,
-   then choose your parent email and password. No `#setup=` link is required.
-5. Once the account exists, setup is permanently closed while that data is
-   retained, even if `SETUP_TOKEN` is still configured. Remove it from `.env`
-   and recreate/restart the server after successful setup.
-
-A configured `SETUP_TOKEN` stays the same across restarts and has no clock
-expiry **until the first parent account is created**. It is not the account
-password and cannot reset, replace, or log in to an existing account.
-Do not expose it in client variables, source control, screenshots, or chat.
-Without this optional setting, the generated 15-minute setup links still work.
-The configured token is not printed in startup logs or returned by the API.
+`/api` to it. Choose **Create account**, enter your parent email, and choose a
+password (12–128 characters). There is no setup token, invitation, default
+password, or mock login. Registration is public wherever the app is reachable.
+Every new account starts with an empty private collection; signing in to the
+same account on another device syncs that account's words and progress.
 
 Data is created in `data/store.json`, ignored by Git. Restarting the app preserves
-the account, words, progress, and unexpired sessions. On another device, sign in
+all accounts, words, progress, and unexpired sessions. On another device, sign in
 with the same parent credentials once the app is hosted at a reachable URL.
 The development server is loopback-only by default.
 
 The parent email is a case-insensitive sign-in identifier, not an email delivery
 service: no verification messages, magic links, or email password resets are sent.
+Email ownership is not verified. Forgotten passwords require the server
+operator's interactive recovery command.
+
+### Upgrading from the single-account version
+
+Keep the existing data volume and deploy the updated application. On startup,
+version-1 JSON is validated, backed up as **`store.json.v1.bak`** beside the
+original file with restrictive permissions, and atomically migrated to version 2.
+The original account retains its password, words, practice history, saved photo
+rounds, and unexpired sessions. New registrations never receive those records.
+The shared OCR counter is preserved. No account is made an installation admin.
+
+An existing backup is never overwritten. A matching backup permits a migration
+retry; a different backup stops startup so you can preserve both files before
+moving the older backup. Unsupported or inconsistent data also stops startup
+without replacing the original file. Protect and retain the migration backup
+with your other backups; it contains the original private data and credentials.
+Old application versions cannot read version 2: stop the app and restore a
+compatible backup before rolling back, accepting loss of changes since that backup.
+
+`SETUP_TOKEN` is no longer used and can be removed from `.env`. Existing emails
+and passwords still work through **Sign in**. A retired setup link is harmless
+and its secret fragment is removed from the browser URL.
 
 ### Upgrading an existing username account
 
 Existing JSON files remain supported. On the next sign-in, enter the parent email
-you want to use and the **existing password** in the email-upgrade form. Only after
+you want to use and the **existing password** through **Sign in**. Only after
 the password is verified is the username replaced by that email. Words, practice
-history, progress, and the password are preserved; other sessions are revoked.
+history, progress, and the password are preserved; that account's other sessions
+are revoked. Other accounts are unaffected. Use an email not already registered.
 Afterward, sign in on every device with that email and the same password.
 Do not delete the data file or create a fresh account to make this change.
 
@@ -88,8 +87,8 @@ docker compose up --build -d
 docker compose logs worttrainer
 ```
 
-Open the setup link from the logs at **http://localhost:3000** and create the
-account. Compose defaults bind to host loopback and allow HTTP cookies **only for
+Open **http://localhost:3000**, choose **Create account**, and register.
+Compose defaults bind to host loopback and allow HTTP cookies **only for
 this local preview**.
 
 For a real installation:
@@ -104,8 +103,8 @@ For a real installation:
 3. `TRUST_PROXY=1` trusts exactly one proxy hop for rate-limiting client IPs. Use
    it only when direct access is restricted to that trusted proxy. Otherwise leave
    it `0`; authentication limits then apply to the connecting address.
-4. Run `docker compose up --build -d`. Obtain the first-run setup link with
-   `docker compose logs worttrainer`, then create the account in your browser.
+4. Run `docker compose up --build -d`. Open the final URL and choose
+   **Create account**, or **Sign in** for an existing account.
 5. Keep the `worttrainer-data` volume mounted at `/app/data`. The container runs
    as the unprivileged `node` user (UID/GID 1000); bind mounts must be writable by
    that user. The included named volume gets the correct ownership automatically.
@@ -128,7 +127,7 @@ This is appropriate for a small family app, not active-active cluster replicas.
 Use a local filesystem with atomic rename support, not a shared network filesystem.
 In Proxmox, move/restore the app **with its volume**, rather than running replicas
 against the same file. Multiple replicas or a much larger collection should use
-SQLite/PostgreSQL instead. The app loads the family's JSON into memory; each
+SQLite/PostgreSQL instead. The app loads all accounts' JSON into memory; each
 mutation rewrites that file. A container's writable layer is **not** the data backup.
 
 ### Back up and restore
@@ -145,10 +144,11 @@ docker compose start worttrainer
 Protect backups: they contain password hashes, private words, and hashed session
 identifiers. Restore with the app stopped, correct ownership, and the same volume
 path, then restart. Keep a copy before upgrades or manual recovery. Do not run
-`docker compose down -v` unless you intend to delete the family's data.
+`docker compose down -v` unless you intend to delete every account's data.
 
-If the parent password is forgotten, stop the backend, back up the file, and use
-the interactive recovery command; it preserves words and revokes all sessions:
+If a parent password is forgotten, stop the backend, back up the file, and use
+the interactive recovery command. Select the target account by email (or old
+username); it preserves all words and revokes **only that account's sessions**:
 
 ```sh
 docker compose stop worttrainer
@@ -159,22 +159,21 @@ docker compose start worttrainer
 For local development, stop `npm run dev` and run `npm run reset-password`.
 Both commands read the new password privately from the terminal, not an argument
 or environment variable. If needed, **Change password** in the app changes it
-without stopping the server and signs other devices out.
+without stopping the server and signs that account's other devices out.
 
 ## Configuration
 
 | Variable | Development default | Container / production |
 | --- | --- | --- |
-| `APP_ORIGIN` | `http://localhost:5173` | Required exact origin; used for CSRF checks and setup link |
+| `APP_ORIGIN` | `http://localhost:5173` | Required exact origin; used for CSRF checks |
 | `PORT` | `3001` | `3000` |
 | `HOST` | `127.0.0.1` | `0.0.0.0` inside container |
 | `DATA_FILE` | `data/store.json` | `/app/data/store.json` |
 | `COOKIE_SECURE` | `false` | `true`; Compose overrides to false only for its local HTTP default |
 | `TRUST_PROXY` | `0` | Set `1` only behind exactly one trusted proxy |
-| `SETUP_TOKEN` | Unset: generated 15-minute setup link | Optional private random first-install token (32–128 letters/digits/`_`/`-`); valid only until account creation |
 | `OCR_AZURE_ENDPOINT` | Unset | Optional HTTPS resource root, e.g. `https://your-resource.cognitiveservices.azure.com` |
 | `OCR_AZURE_KEY` | Unset | Server-only API key for a **Free/F0** Document Intelligence resource |
-| `OCR_MONTHLY_LIMIT` | `450` | Integer 1–450; reserved single-photo analyses per UTC calendar month |
+| `OCR_MONTHLY_LIMIT` | `450` | Integer 1–450; shared server-wide analyses per UTC calendar month |
 
 `npm run dev`, `npm run dev:api`, `npm start`, and `npm run reset-password`
 automatically load the root **`.env`** using Node's built-in environment-file
@@ -190,7 +189,8 @@ Never put the parent account password in `.env`; the secure browser form sets it
 ## Practice together
 
 1. Add the **correct spelling** of a tricky word and choose Deutsch or English.
-   Duplicate words in the same language are rejected (case-insensitive).
+   Duplicate words in the same account and language are rejected
+   (case-insensitive); different accounts can practice the same word independently.
 2. Open **Let's practice**, choose a language and category, and begin a shuffled
    round. Each matching word appears once. End early whenever you like.
 3. Tap **Listen**. The word is concealed, including from the accessibility tree,
@@ -294,7 +294,10 @@ repository and no working external recognition until these are configured.
 The app reserves one analysis **before** each provider submission, persisted in
 the same JSON file. Failed/uncertain requests and explicit re-uploads still count.
 The default hard ceiling is **450 per UTC calendar month**, adjustable downward
-only (1–450). Single-image inputs analyze only page 1. There is no automatic retry
+only (1–450), **shared across all accounts on the server**, not 450 per account.
+Round contents and recognized text remain private; authenticated users can see
+the shared counter. Public signup means any registered account can consume this
+shared allowance. Single-image inputs analyze only page 1. There is no automatic retry
 of analysis submissions. Azure throttling/quota errors are shown explicitly; use
 manual review instead. The local budget is an additional guard, not a measurement
 of Azure's billing period or other clients' usage. Keep the data volume intact:
@@ -307,20 +310,20 @@ restoring an older backup or deleting it also rolls back that local counter.
   manager or a memorable, unique family passphrase.
 - Sessions are random 256-bit tokens in `HttpOnly`, `SameSite=Strict` cookies
   (`Secure` over HTTPS). Only their SHA-256 hashes are stored on disk. Sessions
-  expire after seven days; at most 20 sessions are retained. Logout revokes that
-  device's session; changing/recovering the password revokes other sessions.
-- First account creation requires either the optional configured `SETUP_TOKEN`
-  or a fresh generated setup link. There is no unauthenticated "claim first
-  account" bypass. Configured tokens are validated at startup, never stored in
-  the family's JSON, and cannot reopen setup once the account has been created.
+  expire after seven days; at most 20 sessions are retained per account. Logout
+  revokes that device's session; changing/recovering a password revokes only
+  the relevant account's sessions.
+- Each account owns its words, attempts, and photo rounds. The server determines
+  ownership from the session, never a client-supplied account ID. Foreign word
+  and round IDs are treated as missing. Separate registrations are not members
+  of a shared family space; using the same account intentionally shares its data.
 - Mutations require JSON content (or JPEG/PNG for the single photo route) and the exact allowed browser Origin. Login,
-  setup, and password changes are rate-limited; expensive password hashing is
-  concurrency-limited. No permissive CORS or public account registration.
+  signup, and password changes are rate-limited; expensive password hashing is
+  concurrency-limited. There is no permissive CORS.
 - No child identity, age, microphone recording, or analytics is collected.
   Optional photo mode processes handwriting only after an explicit parent upload.
   Only the parent's email is stored as the sign-in identifier; no
-  email service is contacted. The single parent account owns the family's one
-  shared collection.
+  email service is contacted.
 - Photos are processed in memory, re-encoded as JPEG with metadata (including
   EXIF/GPS) stripped, and **never saved on the app's disk**. Recognized text,
   word snapshots, timestamps, and parent-confirmed results are stored in JSON.
@@ -335,9 +338,10 @@ restoring an older backup or deleting it also rolls back that local counter.
   a polling failure. Cleanup failures are logged without image content or keys;
   Azure's retention policy still applies. No provider training/privacy promises
   beyond those published terms are assumed.
-- Deleting `data/store.json` **while the app is stopped** removes the account,
-  words, history, and sessions; back it up first if needed. The next start
-  generates a fresh private setup link.
+- Deleting `data/store.json` **while the app is stopped** removes every account,
+  collection, history, and session, and resets the shared OCR counter. Back it up
+  first if needed. Existing migration/volume backups are separate copies and
+  still contain private data until the operator removes them.
 
 Speech uses the browser's Web Speech API. German and English voices must be
 installed/enabled on each device. Locally installed voices are preferred; some
@@ -358,11 +362,12 @@ npm test
 npm run build
 ```
 
-Tests exercise the real Express API and real temporary JSON files: initial setup,
+Tests exercise the real Express API and real temporary JSON files: public signup,
 password authentication, cookies, session invalidation, CSRF, input validation,
 all category transitions, concurrent answers, idempotent retries, fresh-store
 restarts, deletion, corrupt-file protection, email normalization/validation, and
-non-destructive username-to-email upgrades. Photo tests cover saved ordering and
+non-destructive storage/username upgrades, independent private accounts,
+cross-account request isolation, and targeted password recovery. Photo tests cover saved ordering and
 timestamps, atomic/idempotent batch review, free-budget reservations/restarts,
 image validation/metadata removal, explicit numbering, recognition uncertainty,
 and provider errors. Provider responses in tests are fixtures, not live Azure
