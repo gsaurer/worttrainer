@@ -1,4 +1,5 @@
-import { mkdir, open, readFile, rename, rm } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
@@ -26,17 +27,15 @@ const wordSchema = z.object({
   created_at: z.string().datetime(),
   last_practiced_at: z.string().datetime().nullable(),
 }).strict().refine(word => (word.category === 'minus') === (word.consecutive_mistakes === 2))
-const sessionSchema = z.object({ tokenHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.number().int().positive() }).strict()
-const storeSchema = z.object({
-  version: z.literal(1),
-  account: accountSchema.nullable(),
+const oldSessionSchema = z.object({ tokenHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.number().int().positive() }).strict()
+const sessionSchema = oldSessionSchema.extend({ accountId: z.uuid() }).strict()
+const collectionShape = {
   words: z.array(wordSchema),
   attempts: z.array(z.object({ id: z.uuid(), wordId: z.uuid(), correct: z.boolean(), createdAt: z.string().datetime() }).strict()),
-  sessions: z.array(sessionSchema),
-  // Absent only in files written before photo rounds were introduced.
   photoRounds: z.array(photoRoundSchema).default([]),
-  ocrUsage: z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).nullable(), used: z.number().int().min(0) }).strict().default({ month: null, used: 0 }),
-}).strict().superRefine((data, context) => {
+}
+const usageSchema = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).nullable(), used: z.number().int().min(0) }).strict().default({ month: null, used: 0 })
+function validateCollection(data: { words: Word[]; attempts: { id: string; wordId: string }[]; photoRounds: PhotoRound[] }, context: z.RefinementCtx) {
   const wordIds = new Set(data.words.map(word => word.id))
   if (wordIds.size !== data.words.length ||
       new Set(data.words.map(word => `${word.language}:${word.text.toLowerCase()}`)).size !== data.words.length ||
@@ -44,15 +43,43 @@ const storeSchema = z.object({
       data.attempts.some(attempt => !wordIds.has(attempt.wordId)) ||
       new Set(data.photoRounds.map(round => round.id)).size !== data.photoRounds.length ||
       data.photoRounds.some(round => round.words.some(word => !wordIds.has(word.id))) ||
-      new Set(data.photoRounds.flatMap(round => round.words.map(word => word.attemptId))).size !== data.photoRounds.reduce((count, round) => count + round.words.length, 0) ||
-      (!data.account && (data.words.length || data.attempts.length || data.sessions.length || data.photoRounds.length || data.ocrUsage.used))) {
+      new Set(data.photoRounds.flatMap(round => round.words.map(word => word.attemptId))).size !== data.photoRounds.reduce((count, round) => count + round.words.length, 0)) {
     context.addIssue({ code: 'custom', message: 'Inconsistent stored data.' })
+  }
+}
+const legacyStoreSchema = z.object({
+  version: z.literal(1), account: accountSchema.nullable(), ...collectionShape,
+  sessions: z.array(oldSessionSchema), ocrUsage: usageSchema,
+}).strict().superRefine((data, context) => {
+  validateCollection(data, context)
+  if (!data.account && (data.words.length || data.attempts.length || data.sessions.length || data.photoRounds.length || data.ocrUsage.used)) {
+    context.addIssue({ code: 'custom', message: 'Unowned stored data.' })
+  }
+})
+const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, ...collectionShape }).strict().superRefine(validateCollection)
+const storeSchema = z.object({
+  version: z.literal(2), accounts: z.array(accountDataSchema), sessions: z.array(sessionSchema), ocrUsage: usageSchema,
+}).strict().superRefine((data, context) => {
+  const ids = new Set(data.accounts.map(account => account.id))
+  const emails = data.accounts.flatMap(item => 'email' in item.account ? [item.account.email] : [])
+  if (ids.size !== data.accounts.length || new Set(emails).size !== emails.length ||
+      data.accounts.filter(item => 'username' in item.account).length > 1 ||
+      data.sessions.some(session => !ids.has(session.accountId)) ||
+      new Set(data.sessions.map(session => session.tokenHash)).size !== data.sessions.length) {
+    context.addIssue({ code: 'custom', message: 'Inconsistent account ownership.' })
   }
 })
 
 export type Account = z.infer<typeof accountSchema>
 export type StoredSession = z.infer<typeof sessionSchema>
 type State = z.infer<typeof storeSchema>
+type AccountData = z.infer<typeof accountDataSchema>
+
+function owned(state: State, accountId: string): AccountData {
+  const account = state.accounts.find(account => account.id === accountId)
+  if (!account) throw new HttpError(401, 'This account is unavailable. Please sign in again.')
+  return account
+}
 
 export class FileStore {
   private tail: Promise<void> = Promise.resolve()
@@ -60,23 +87,57 @@ export class FileStore {
 
   static async open(file: string) {
     await mkdir(dirname(file), { recursive: true, mode: 0o700 })
-    try {
-      const text = await readFile(file, 'utf8')
-      return new FileStore(file, storeSchema.parse(JSON.parse(text)))
-    } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
-        throw new Error(`Cannot read data store ${file}. Restore a valid backup; the file has not been overwritten.`, { cause: error })
+    let text: string
+    try { text = await readFile(file, 'utf8') }
+    catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        return new FileStore(file, { version: 2, accounts: [], sessions: [], ocrUsage: { month: null, used: 0 } })
       }
-      return new FileStore(file, { version: 1, account: null, words: [], attempts: [], sessions: [], photoRounds: [], ocrUsage: { month: null, used: 0 } })
+      throw new Error(`Cannot read data store ${file}. Restore a valid backup; the file has not been overwritten.`, { cause: error })
+    }
+    try {
+      const raw: unknown = JSON.parse(text)
+      if (typeof raw === 'object' && raw !== null && 'version' in raw && raw.version === 1) {
+        const old = legacyStoreSchema.parse(raw)
+        const id = randomUUID()
+        const state = storeSchema.parse({
+          version: 2,
+          accounts: old.account ? [{ id, account: old.account, words: old.words, attempts: old.attempts, photoRounds: old.photoRounds }] : [],
+          sessions: old.sessions.map(session => ({ ...session, accountId: id })),
+          ocrUsage: old.ocrUsage,
+        })
+        try { await copyFile(file, `${file}.v1.bak`, constants.COPYFILE_EXCL) }
+        catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
+          if (await readFile(`${file}.v1.bak`, 'utf8') !== text) throw new Error('The existing version-1 backup differs from the source. Preserve both files and move the old backup before retrying migration.')
+          console.info('Existing version-1 backup retained:', `${file}.v1.bak`)
+        }
+        await chmod(`${file}.v1.bak`, 0o600)
+        const store = new FileStore(file, state)
+        await store.transaction(() => undefined)
+        console.info('Migrated private account storage; original backup:', `${file}.v1.bak`)
+        return store
+      }
+      return new FileStore(file, storeSchema.parse(raw))
+    } catch (error) {
+      throw new Error(`Cannot read data store ${file}. Restore a valid backup; the file has not been overwritten.`, { cause: error })
     }
   }
 
-  get account() { return this.state.account ? { ...this.state.account } : null }
-  get words(): Word[] { return structuredClone(this.state.words) }
-  get photoRounds(): PhotoRound[] { return structuredClone(this.state.photoRounds) }
+  account(accountId: string) { return { ...owned(this.state, accountId).account } }
+  findAccount(email: string) {
+    const item = this.state.accounts.find(item => 'email' in item.account && item.account.email === email)
+    return item ? { id: item.id, account: { ...item.account } } : null
+  }
+  get legacyAccount() {
+    const item = this.state.accounts.find(item => 'username' in item.account)
+    return item ? { id: item.id, account: { ...item.account } } : null
+  }
+  words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
+  photoRounds(accountId: string): PhotoRound[] { return structuredClone(owned(this.state, accountId).photoRounds) }
 
-  photoRound(id: string): PhotoRound {
-    const round = this.state.photoRounds.find(round => round.id === id)
+  photoRound(accountId: string, id: string): PhotoRound {
+    const round = owned(this.state, accountId).photoRounds.find(round => round.id === id)
     if (!round) throw new HttpError(404, 'Photo round not found.')
     return structuredClone(round)
   }
@@ -94,8 +155,8 @@ export class FileStore {
     })
   }
 
-  createPhotoRound(wordIds: string[]) {
-    return this.transaction(state => {
+  createPhotoRound(accountId: string, wordIds: string[]) {
+    return this.accountTransaction(accountId, state => {
       if (!wordIds.length || wordIds.length > 100 || new Set(wordIds).size !== wordIds.length) {
         throw new HttpError(400, 'Choose 1–100 distinct words for one numbered sheet.')
       }
@@ -111,8 +172,8 @@ export class FileStore {
     })
   }
 
-  advancePhotoRound(id: string, nextIndex: number) {
-    return this.transaction(state => {
+  advancePhotoRound(accountId: string, id: string, nextIndex: number) {
+    return this.accountTransaction(accountId, state => {
       const round = state.photoRounds.find(round => round.id === id)
       if (!round) throw new HttpError(404, 'Photo round not found.')
       if (nextIndex === round.nextIndex) return round
@@ -123,8 +184,8 @@ export class FileStore {
     })
   }
 
-  saveRecognition(id: string, recognition: PhotoRecognition) {
-    return this.transaction(state => {
+  saveRecognition(accountId: string, id: string, recognition: PhotoRecognition) {
+    return this.accountTransaction(accountId, state => {
       const round = state.photoRounds.find(round => round.id === id)
       if (!round) throw new HttpError(404, 'Photo round not found.')
       if (!round.writtenAt || round.reviewedAt) throw new HttpError(409, 'Finish writing before reading a photo; reviewed sheets cannot be changed.')
@@ -133,8 +194,8 @@ export class FileStore {
     })
   }
 
-  reviewPhotoRound(id: string, results: boolean[]) {
-    return this.transaction(state => {
+  reviewPhotoRound(accountId: string, id: string, results: boolean[]) {
+    return this.accountTransaction(accountId, state => {
       const round = state.photoRounds.find(round => round.id === id)
       if (!round) throw new HttpError(404, 'Photo round not found.')
       if (!round.writtenAt || results.length !== round.words.length) throw new HttpError(400, 'Finish the sheet and explicitly mark every answer.')
@@ -155,26 +216,31 @@ export class FileStore {
     })
   }
 
-  deletePhotoRound(id: string) {
-    return this.transaction(state => {
+  deletePhotoRound(accountId: string, id: string) {
+    return this.accountTransaction(accountId, state => {
       if (!state.photoRounds.some(round => round.id === id)) throw new HttpError(404, 'Photo round not found.')
       state.photoRounds = state.photoRounds.filter(round => round.id !== id)
     })
   }
 
-  hasSession(tokenHash: string, now = Date.now()) {
-    return this.state.sessions.some(session => session.tokenHash === tokenHash && session.expiresAt > now)
+  sessionAccount(tokenHash: string, now = Date.now()) {
+    return this.state.sessions.find(session => session.tokenHash === tokenHash && session.expiresAt > now)?.accountId ?? null
+  }
+
+  private accountTransaction<T>(accountId: string, change: (account: AccountData) => T) {
+    return this.transaction(state => change(owned(state, accountId)))
   }
 
   private transaction<T>(change: (state: State) => T): Promise<T> {
     const operation = this.tail.then(async () => {
       const draft = structuredClone(this.state)
       const result = change(draft)
+      const checked = storeSchema.parse(draft)
       const temp = `${this.file}.${randomUUID()}.tmp`
       try {
         const handle = await open(temp, 'wx', 0o600)
         try {
-          await handle.writeFile(JSON.stringify(draft, null, 2) + '\n', 'utf8')
+          await handle.writeFile(JSON.stringify(checked, null, 2) + '\n', 'utf8')
           await handle.sync()
         } finally {
           await handle.close()
@@ -184,7 +250,7 @@ export class FileStore {
         await rm(temp, { force: true })
         throw error
       }
-      this.state = draft
+      this.state = checked
       return structuredClone(result)
     })
     // Release the queue after failure; the caller still receives the rejection.
@@ -192,18 +258,19 @@ export class FileStore {
     return operation
   }
 
-  initialize(account: z.infer<typeof emailAccountSchema>, session: StoredSession) {
+  register(account: z.infer<typeof emailAccountSchema>, session: StoredSession) {
     return this.transaction(state => {
-      if (state.account) throw new HttpError(409, 'The parent account is already configured.')
-      state.account = account
-      state.sessions = [session]
+      if (state.accounts.some(item => 'email' in item.account && item.account.email === account.email)) throw new HttpError(409, 'This email is already registered. Sign in instead.')
+      state.accounts.push({ id: session.accountId, account, words: [], attempts: [], photoRounds: [] })
+      state.sessions.push(session)
     })
   }
 
   addSession(session: StoredSession, expectedPasswordHash: string) {
     return this.transaction(state => {
-      if (state.account?.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
-      state.sessions = [...state.sessions.filter(item => item.expiresAt > Date.now()).slice(-19), session]
+      if (owned(state, session.accountId).account.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
+      const active = state.sessions.filter(item => item.expiresAt > Date.now())
+      state.sessions = [...active.filter(item => item.accountId !== session.accountId), ...active.filter(item => item.accountId === session.accountId).slice(-19), session]
     })
   }
 
@@ -215,31 +282,34 @@ export class FileStore {
 
   migrateEmail(email: string, session: StoredSession, expectedPasswordHash: string) {
     return this.transaction(state => {
-      if (state.account?.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
-      if ('email' in state.account) throw new HttpError(409, 'The parent email has already been set. Sign in again with that email.')
-      state.account = { email, salt: state.account.salt, passwordHash: state.account.passwordHash }
-      state.sessions = [session]
+      const data = owned(state, session.accountId)
+      if (data.account.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
+      if ('email' in data.account) throw new HttpError(409, 'The parent email has already been set. Sign in again with that email.')
+      if (state.accounts.some(item => 'email' in item.account && item.account.email === email)) throw new HttpError(409, 'This email is already registered. Choose a different email for the older account.')
+      data.account = { email, salt: data.account.salt, passwordHash: data.account.passwordHash }
+      state.sessions = [...state.sessions.filter(item => item.accountId !== data.id), session]
     })
   }
 
   changePassword(credentials: z.infer<typeof credentialsSchema>, session: StoredSession, expectedPasswordHash: string) {
     return this.transaction(state => {
-      if (state.account?.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
-      state.account = { ...state.account, ...credentials }
-      state.sessions = [session]
+      const data = owned(state, session.accountId)
+      if (data.account.passwordHash !== expectedPasswordHash) throw new HttpError(401, 'Credentials changed. Please sign in again.')
+      data.account = { ...data.account, ...credentials }
+      state.sessions = [...state.sessions.filter(item => item.accountId !== data.id), session]
     })
   }
 
-  recoverPassword(credentials: { salt: string; passwordHash: string }) {
+  recoverPassword(accountId: string, credentials: { salt: string; passwordHash: string }) {
     return this.transaction(state => {
-      if (!state.account) throw new Error('No parent account is configured.')
-      state.account = { ...state.account, ...credentials }
-      state.sessions = []
+      const data = owned(state, accountId)
+      data.account = { ...data.account, ...credentials }
+      state.sessions = state.sessions.filter(item => item.accountId !== accountId)
     })
   }
 
-  addWord(text: string, language: Language) {
-    return this.transaction(state => {
+  addWord(accountId: string, text: string, language: Language) {
+    return this.accountTransaction(accountId, state => {
       if (state.words.some(word => word.language === language && word.text.toLowerCase() === text.toLowerCase())) {
         throw new HttpError(409, 'That word is already in this language’s collection.')
       }
@@ -249,8 +319,8 @@ export class FileStore {
     })
   }
 
-  deleteWord(id: string) {
-    return this.transaction(state => {
+  deleteWord(accountId: string, id: string) {
+    return this.accountTransaction(accountId, state => {
       if (!state.words.some(word => word.id === id)) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
       state.words = state.words.filter(word => word.id !== id)
       state.attempts = state.attempts.filter(attempt => attempt.wordId !== id)
@@ -259,8 +329,8 @@ export class FileStore {
     })
   }
 
-  mark(wordId: string, correct: boolean, attemptId: string) {
-    return this.transaction(state => {
+  mark(accountId: string, wordId: string, correct: boolean, attemptId: string) {
+    return this.accountTransaction(accountId, state => {
       const word = state.words.find(word => word.id === wordId)
       if (!word) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
       const existing = state.attempts.find(attempt => attempt.id === attemptId)

@@ -1,6 +1,6 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
 import { rateLimit } from 'express-rate-limit'
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { validateWord, type AuthState } from '../shared/model.js'
@@ -14,8 +14,6 @@ export type AppOptions = {
   origin: string
   secureCookie: boolean
   production?: boolean
-  setupToken: string
-  setupExpiresAt: number | null
   trustProxy?: boolean
   ocr?: OcrOptions
 }
@@ -72,7 +70,12 @@ export function createApp(options: AppOptions) {
 
   function authenticated(req: Request) {
     const token = sessionToken(req)
-    return !!token && store.hasSession(digest(token))
+    return token ? store.sessionAccount(digest(token)) : null
+  }
+  function accountId(req: Request) {
+    const id = authenticated(req)
+    if (!id) throw new HttpError(401, 'Please sign in to your account.')
+    return id
   }
   const requireAuth: express.RequestHandler = (req, _res, next) => {
     next(authenticated(req) ? undefined : new HttpError(401, 'Please sign in to your parent account.'))
@@ -80,16 +83,15 @@ export function createApp(options: AppOptions) {
   function setCookie(res: Response, token: string, maxAge = maxAgeSeconds) {
     res.setHeader('Set-Cookie', `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${options.secureCookie ? '; Secure' : ''}`)
   }
-  function newSession() {
+  function newSession(accountId: string = randomUUID()) {
     const token = randomBytes(32).toString('base64url')
-    return { token, stored: { tokenHash: digest(token), expiresAt: Date.now() + maxAgeSeconds * 1000 } }
+    return { token, stored: { tokenHash: digest(token), accountId, expiresAt: Date.now() + maxAgeSeconds * 1000 } }
   }
   function authState(req: Request): AuthState {
     const signedIn = authenticated(req)
-    const account = store.account
+    const account = signedIn ? store.account(signedIn) : null
     return {
-      authenticated: signedIn,
-      setupRequired: !account,
+      authenticated: !!signedIn,
       emailMigrationRequired: !!account && !('email' in account),
       email: signedIn && account && 'email' in account ? account.email : null,
     }
@@ -97,30 +99,28 @@ export function createApp(options: AppOptions) {
 
   app.get('/api/health', (_req, res) => { res.json({ ok: true }) })
   app.get('/api/session', (req, res) => { res.json(authState(req)) })
-  app.post('/api/setup', authLimiter, async (req, res) => {
-    if (store.account) throw new HttpError(409, 'The parent account is already configured.')
-    const input = parse(z.object({ email: parentEmailSchema, password, setupToken: z.string().max(128) }).strict(), req.body)
-    if ((options.setupExpiresAt !== null && Date.now() > options.setupExpiresAt) ||
-        !timingSafeEqual(Buffer.from(digest(input.setupToken), 'hex'), Buffer.from(digest(options.setupToken), 'hex'))) {
-      throw new HttpError(403, 'Invalid or expired setup code. Use SETUP_TOKEN from the server configuration, or the latest generated setup link from the server logs.')
-    }
+  app.post('/api/setup', (_req, _res) => {
+    throw new HttpError(410, 'Setup tokens are no longer needed. Reload the app and choose Create account.')
+  })
+  app.post('/api/signup', authLimiter, async (req, res) => {
+    const input = parse(z.object({ email: parentEmailSchema, password }).strict(), req.body)
     const account = { email: input.email, ...await withPasswordWork(() => hashPassword(input.password)) }
     const session = newSession()
-    await store.initialize(account, session.stored)
+    await store.register(account, session.stored)
     setCookie(res, session.token)
-    res.status(201).json({ authenticated: true, setupRequired: false, emailMigrationRequired: false, email: account.email } satisfies AuthState)
+    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email } satisfies AuthState)
   })
   app.post('/api/login', authLimiter, async (req, res) => {
     const input = parse(z.object({ email: parentEmailSchema, password: z.string().min(1).max(128) }).strict(), req.body)
-    const account = store.account
-    if (!account) throw new HttpError(409, 'Create the parent account with the server’s setup link first.')
-    const validPassword = await withPasswordWork(() => verifyPassword(input.password, account))
-    if (!validPassword || ('email' in account && input.email !== account.email)) throw new HttpError(401, 'The email or password is incorrect.')
-    const session = newSession()
-    if ('email' in account) await store.addSession(session.stored, account.passwordHash)
-    else await store.migrateEmail(input.email, session.stored, account.passwordHash)
+    const record = store.findAccount(input.email) ?? store.legacyAccount
+    const credentials = record?.account ?? { salt: '00'.repeat(16), passwordHash: '00'.repeat(64) }
+    const validPassword = await withPasswordWork(() => verifyPassword(input.password, credentials))
+    if (!record || !validPassword) throw new HttpError(401, 'The email or password is incorrect.')
+    const session = newSession(record.id)
+    if ('email' in record.account) await store.addSession(session.stored, record.account.passwordHash)
+    else await store.migrateEmail(input.email, session.stored, record.account.passwordHash)
     setCookie(res, session.token)
-    res.json({ authenticated: true, setupRequired: false, emailMigrationRequired: false, email: input.email } satisfies AuthState)
+    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email } satisfies AuthState)
   })
   app.post('/api/logout', async (req, res) => {
     const token = sessionToken(req)
@@ -130,45 +130,45 @@ export function createApp(options: AppOptions) {
   })
   app.post('/api/password', requireAuth, authLimiter, async (req, res) => {
     const input = parse(z.object({ currentPassword: z.string().min(1).max(128), newPassword: password }).strict(), req.body)
-    const account = store.account!
+    const account = store.account(accountId(req))
     const updated = await withPasswordWork(async () => {
       if (!await verifyPassword(input.currentPassword, account)) throw new HttpError(401, 'The current password is incorrect.')
       return hashPassword(input.newPassword)
     })
-    const session = newSession()
+    const session = newSession(accountId(req))
     await store.changePassword(updated, session.stored, account.passwordHash)
     setCookie(res, session.token)
     res.status(204).end()
   })
 
-  app.get('/api/words', requireAuth, (_req, res) => { res.json(store.words) })
+  app.get('/api/words', requireAuth, (req, res) => { res.json(store.words(accountId(req))) })
   app.post('/api/words', requireAuth, async (req, res) => {
     const input = parse(z.object({
       text: z.string().refine(value => validateWord(value) === null, 'Enter a word with 1–80 characters and no line breaks or control characters.').transform(value => value.trim()),
       language: z.enum(['de', 'en']),
     }).strict(), req.body)
-    res.status(201).json(await store.addWord(input.text, input.language))
+    res.status(201).json(await store.addWord(accountId(req), input.text, input.language))
   })
   app.delete('/api/words/:id', requireAuth, async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
-    await store.deleteWord(id)
+    await store.deleteWord(accountId(req), id)
     res.status(204).end()
   })
   app.post('/api/practice', requireAuth, async (req, res) => {
     const input = parse(z.object({ wordId: z.uuid(), correct: z.boolean(), attemptId: z.uuid() }).strict(), req.body)
-    res.json(await store.mark(input.wordId, input.correct, input.attemptId))
+    res.json(await store.mark(accountId(req), input.wordId, input.correct, input.attemptId))
   })
-  app.get('/api/photo-rounds', requireAuth, (_req, res) => {
-    res.json({ rounds: store.photoRounds, ocr: { enabled: !!options.ocr, ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
+  app.get('/api/photo-rounds', requireAuth, (req, res) => {
+    res.json({ rounds: store.photoRounds(accountId(req)), ocr: { enabled: !!options.ocr, ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
   })
   app.post('/api/photo-rounds', requireAuth, async (req, res) => {
     const input = parse(z.object({ wordIds: z.array(z.uuid()).min(1).max(100, 'Use at most 100 words on one numbered sheet.') }).strict(), req.body)
-    res.status(201).json(await store.createPhotoRound(input.wordIds))
+    res.status(201).json(await store.createPhotoRound(accountId(req), input.wordIds))
   })
   app.post('/api/photo-rounds/:id/advance', requireAuth, async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
     const input = parse(z.object({ nextIndex: z.number().int().min(1).max(100) }).strict(), req.body)
-    res.json(await store.advancePhotoRound(id, input.nextIndex))
+    res.json(await store.advancePhotoRound(accountId(req), id, input.nextIndex))
   })
   let photoReading = false
   const photoLimiter = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Please wait a minute before sending another photo.' } })
@@ -177,7 +177,8 @@ export function createApp(options: AppOptions) {
   }
   app.post('/api/photo-rounds/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb' }), async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
-    const round = store.photoRound(id)
+    const owner = accountId(req)
+    const round = store.photoRound(owner, id)
     if (!round.writtenAt || round.reviewedAt) throw new HttpError(409, 'Finish writing first. A reviewed sheet cannot be read again.')
     if (photoReading) throw new HttpError(429, 'Another photo is being read. Please wait and try again.')
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Choose a JPEG or PNG photo first.')
@@ -186,16 +187,16 @@ export function createApp(options: AppOptions) {
       const image = await normalizePhoto(req.body)
       await store.reserveOcr(options.ocr!.monthlyLimit)
       const recognition = await readAzurePhoto(image, round.words[0].language, round.words.length, options.ocr!)
-      res.json(await store.saveRecognition(id, recognition))
+      res.json(await store.saveRecognition(owner, id, recognition))
     } finally { photoReading = false }
   })
   app.post('/api/photo-rounds/:id/review', requireAuth, async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
     const input = parse(z.object({ results: z.array(z.boolean()).min(1).max(100) }).strict(), req.body)
-    res.json(await store.reviewPhotoRound(id, input.results))
+    res.json(await store.reviewPhotoRound(accountId(req), id, input.results))
   })
   app.delete('/api/photo-rounds/:id', requireAuth, async (req, res) => {
-    await store.deletePhotoRound(parse(z.uuid(), req.params.id))
+    await store.deletePhotoRound(accountId(req), parse(z.uuid(), req.params.id))
     res.status(204).end()
   })
   app.use('/api', (_req, _res, next) => { next(new HttpError(404, 'Unknown API endpoint.')) })

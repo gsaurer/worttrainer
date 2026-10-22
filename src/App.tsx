@@ -9,7 +9,7 @@ import { Collection } from './components/Collection'
 import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
 
-function consumeSetupLink() {
+function removeSetupFragment() {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
   const code = fragment.get('setup')
   if (code !== null) {
@@ -18,13 +18,11 @@ function consumeSetupLink() {
     url.hash = fragment.toString()
     window.history.replaceState(null, '', url)
   }
-  return code
 }
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null)
   const [error, setError] = useState('')
-  const [setupCode, setSetupCode] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('setup') ?? '')
 
   async function reconnect() {
     setError('')
@@ -34,33 +32,25 @@ export default function App() {
 
   useEffect(() => {
     let active = true
-    consumeSetupLink()
+    removeSetupFragment()
     const expired = () => {
-      setAuth({ authenticated: false, setupRequired: false, emailMigrationRequired: false, email: null })
+      setAuth({ authenticated: false, emailMigrationRequired: false, email: null })
       setError('Your session has ended. Please sign in again.')
     }
     const refresh = () => {
       void api.session().then(state => { if (active) { setAuth(state); setError('') } })
         .catch(error => { if (active) setError(`Could not connect to the server: ${errorMessage(error)}`) })
     }
-    const setupLinkChanged = () => {
-      const code = consumeSetupLink()
-      if (code !== null) {
-        setSetupCode(code)
-        setError('')
-        refresh()
-      }
-    }
     refresh()
     window.addEventListener('auth-expired', expired)
     window.addEventListener('focus', refresh)
-    window.addEventListener('hashchange', setupLinkChanged)
-    return () => { active = false; window.removeEventListener('auth-expired', expired); window.removeEventListener('focus', refresh); window.removeEventListener('hashchange', setupLinkChanged) }
+    window.addEventListener('hashchange', removeSetupFragment)
+    return () => { active = false; window.removeEventListener('auth-expired', expired); window.removeEventListener('focus', refresh); window.removeEventListener('hashchange', removeSetupFragment) }
   }, [])
 
   if (!auth) return <main className="loading-screen"><Brand />{error ? <><p className="error" role="alert">{error}</p><button className="button primary" onClick={() => void reconnect()}>Retry connection</button></> : <p role="status">Opening your little word collection…</p>}</main>
-  if (auth.authenticated && !auth.emailMigrationRequired) return <FamilyApp onSignedOut={() => setAuth({ authenticated: false, setupRequired: false, emailMigrationRequired: false, email: null })} email={auth.email ?? 'Parent'} />
-  return <>{error && <div className="auth-error error" role="alert">{error}<button className="text-button" onClick={() => setError('')}>Dismiss</button></div>}<Auth key={setupCode} setupRequired={auth.setupRequired} setupCode={setupCode} emailMigrationRequired={auth.emailMigrationRequired} onAuthenticated={state => { setError(''); setAuth(state) }} /></>
+  if (auth.authenticated && !auth.emailMigrationRequired) return <FamilyApp key={auth.email} onSignedOut={() => setAuth({ authenticated: false, emailMigrationRequired: false, email: null })} email={auth.email ?? 'Parent'} />
+  return <>{error && <div className="auth-error error" role="alert">{error}<button className="text-button" onClick={() => setError('')}>Dismiss</button></div>}<Auth emailMigrationRequired={auth.emailMigrationRequired} onAuthenticated={state => { setError(''); setAuth(state) }} /></>
 }
 
 function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => void }) {

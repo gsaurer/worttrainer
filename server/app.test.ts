@@ -4,19 +4,19 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash, randomUUID } from 'node:crypto'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { FileStore } from './store.js'
 import { hashPassword } from './passwords.js'
 import type { Word } from '../shared/model.js'
 
 const origin = 'http://localhost:5173'
-const setupToken = 'test-only-private-setup-token'
 const password = 'a long private test passphrase'
 let directory: string
 let store: FileStore
 let app: ReturnType<typeof createApp>
 let cookie: string
+let accountId: string
 
 function cookieFrom(response: request.Response) {
   const cookies: unknown = response.headers['set-cookie']
@@ -24,7 +24,7 @@ function cookieFrom(response: request.Response) {
   return cookies[0].split(';')[0]
 }
 
-const options = () => ({ store, origin, secureCookie: false, setupToken, setupExpiresAt: Date.now() + 60_000 })
+const options = () => ({ store, origin, secureCookie: false })
 const post = (path: string, body: object, session = cookie) => request(app).post(path).set('Origin', origin).set('Cookie', session ?? '').send(body)
 
 async function add(text = 'Schmetterling', language = 'de'): Promise<Word> {
@@ -42,24 +42,27 @@ beforeAll(async () => {
   app = createApp(options())
 }, 15_000)
 afterAll(async () => { await rm(directory, { recursive: true, force: true }) })
+beforeEach(() => { app = createApp(options()) })
 
 describe('real self-hosted authentication and JSON persistence', () => {
-  it('requires private first-run setup and protects all collection endpoints', async () => {
-    expect((await request(app).get('/api/session')).body).toEqual({ authenticated: false, setupRequired: true, emailMigrationRequired: false, email: null })
+  it('allows normal signup without a setup token and protects all collection endpoints', async () => {
+    expect((await request(app).get('/api/session')).body).toEqual({ authenticated: false, emailMigrationRequired: false, email: null })
     await request(app).get('/api/words').expect(401)
     await post('/api/words', { text: 'word', language: 'en' }, '').expect(401)
-    await post('/api/setup', { email: 'parent@example.com', password, setupToken: 'wrong' }, '').expect(403)
-    expect(store.account).toBeNull()
-    const response = await post('/api/setup', { email: ' Parent@Example.com ', password, setupToken }, '').expect(201)
+    await post('/api/setup', {}, '').expect(410)
+    const response = await post('/api/signup', { email: ' Parent@Example.com ', password }, '').expect(201)
+    const account = store.findAccount('parent@example.com')
+    if (!account) throw new Error('Expected registered account.')
+    accountId = account.id
     cookie = cookieFrom(response)
     expect(response.headers['set-cookie'][0]).toContain('HttpOnly')
     expect(response.headers['set-cookie'][0]).toContain('SameSite=Strict')
-    expect(response.body).toEqual({ authenticated: true, setupRequired: false, emailMigrationRequired: false, email: 'parent@example.com' })
+    expect(response.body).toEqual({ authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' })
     const saved = await readFile(join(directory, 'store.json'), 'utf8')
     expect(saved).not.toContain(password)
     expect(saved).not.toContain(cookie.split('=')[1])
     expect(saved).toContain('passwordHash')
-    await post('/api/setup', { email: 'another@example.com', password, setupToken }).expect(409)
+    await post('/api/signup', { email: 'PARENT@example.com', password }).expect(409)
   }, 15_000)
 
   it('validates passwords, persists sessions, and logs out only that session', async () => {
@@ -72,8 +75,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await request(app).get('/api/words').set('Cookie', second).expect(401)
     await request(app).get('/api/words').set('Cookie', cookie).expect(200)
     const tokenHash = createHash('sha256').update(cookie.split('=')[1]).digest('hex')
-    expect(store.hasSession(tokenHash)).toBe(true)
-    expect(store.hasSession(tokenHash, Date.now() + 8 * 24 * 60 * 60 * 1000)).toBe(false)
+    expect(store.sessionAccount(tokenHash)).toBe(accountId)
+    expect(store.sessionAccount(tokenHash, Date.now() + 8 * 24 * 60 * 60 * 1000)).toBeNull()
   }, 15_000)
 
   it('rejects cross-origin writes, malformed JSON, oversized bodies, and forged fields', async () => {
@@ -92,8 +95,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     expect(word).toMatchObject({ text: 'Schmetterling', category: 'new', consecutive_mistakes: 0, last_practiced_at: null })
     await post('/api/words', { text: 'schmetterling', language: 'de' }).expect(409)
     await add('Schmetterling', 'en')
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: unknown[] }
-    expect(saved.attempts).toHaveLength(0)
+    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: unknown[] }[] }
+    expect(saved.accounts[0].attempts).toHaveLength(0)
   })
 
   it('applies every confirmed category transition, including first mistake while in plus', async () => {
@@ -111,11 +114,11 @@ describe('real self-hosted authentication and JSON persistence', () => {
   it('serializes simultaneous device answers and deduplicates simultaneous retries', async () => {
     const word = await add('concurrent', 'en')
     await Promise.all([mark(word.id, false), mark(word.id, false)])
-    expect(store.words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
     await mark(word.id, true)
     const attemptId = randomUUID()
     await Promise.all([mark(word.id, false, attemptId), mark(word.id, false, attemptId)])
-    expect(store.words.find(item => item.id === word.id)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
     await post('/api/practice', { wordId: word.id, correct: true, attemptId }).expect(409)
   })
 
@@ -128,8 +131,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await request(app).get('/api/words').set('Cookie', cookie).expect(200)
     expect(await mark(word.id, false, attemptId)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
-    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { words: Word[] }
-    expect(disk.words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { words: Word[] }[] }
+    expect(disk.accounts[0].words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
   })
 
   it('removes attempt history when a word is deleted and rejects further marks', async () => {
@@ -137,8 +140,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await mark(word.id, false)
     await request(app).delete(`/api/words/${word.id}`).set('Origin', origin).set('Cookie', cookie).send({}).expect(204)
     await post('/api/practice', { wordId: word.id, correct: true, attemptId: randomUUID() }).expect(404)
-    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { attempts: { wordId: string }[] }
-    expect(disk.attempts.some(attempt => attempt.wordId === word.id)).toBe(false)
+    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: { wordId: string }[] }[] }
+    expect(disk.accounts[0].attempts.some(attempt => attempt.wordId === word.id)).toBe(false)
   })
 
   it('changes password, rotates the cookie, and revokes old sessions and old credentials', async () => {
@@ -148,7 +151,7 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await request(app).get('/api/words').set('Cookie', cookie).expect(200)
     await post('/api/login', { email: 'parent@example.com', password }, '').expect(401)
     await post('/api/login', { email: 'parent@example.com', password: 'a different strong passphrase' }, '').expect(200)
-    expect(store.account).toHaveProperty('email', 'parent@example.com')
+    expect(store.account(accountId)).toHaveProperty('email', 'parent@example.com')
   }, 15_000)
 
   it('never overwrites a corrupt or unsupported store with an empty collection', async () => {
@@ -161,59 +164,67 @@ describe('real self-hosted authentication and JSON persistence', () => {
   })
 
   it('recovers a forgotten password without deleting words or leaving active sessions', async () => {
-    const wordsBefore = store.words
-    await store.recoverPassword(await hashPassword('a recovered secure passphrase'))
-    expect(store.words).toEqual(wordsBefore)
+    const wordsBefore = store.words(accountId)
+    await store.recoverPassword(accountId, await hashPassword('a recovered secure passphrase'))
+    expect(store.words(accountId)).toEqual(wordsBefore)
     await request(app).get('/api/words').set('Cookie', cookie).expect(401)
     await post('/api/login', { email: 'parent@example.com', password: 'a recovered secure passphrase' }, '').expect(200)
   }, 15_000)
 
-  it('rejects expired setup links and rate-limits repeated login attempts', async () => {
-    const fresh = await FileStore.open(join(directory, 'fresh.json'))
-    const expired = createApp({ ...options(), store: fresh, setupExpiresAt: Date.now() - 1 })
-    await request(expired).post('/api/setup').set('Origin', origin).send({ email: 'parent@example.com', password, setupToken }).expect(403)
+  it('rate-limits repeated login attempts', async () => {
     const limited = createApp(options())
     for (let i = 0; i < 10; i++) await request(limited).post('/api/login').set('Origin', origin).send({}).expect(400)
     await request(limited).post('/api/login').set('Origin', origin).send({}).expect(429)
   })
 
-  it('rejects malformed emails for setup and sign-in without creating an account', async () => {
+  it('rejects malformed emails for signup and sign-in without creating an account', async () => {
     const fresh = await FileStore.open(join(directory, 'email-validation.json'))
     const validationApp = createApp({ ...options(), store: fresh })
     for (const email of ['parent', 'parent@', 'a'.repeat(255) + '@example.com']) {
-      await request(validationApp).post('/api/setup').set('Origin', origin).send({ email, password, setupToken }).expect(400)
+      await request(validationApp).post('/api/signup').set('Origin', origin).send({ email, password }).expect(400)
       await request(validationApp).post('/api/login').set('Origin', origin).send({ email, password }).expect(400)
     }
-    expect(fresh.account).toBeNull()
+    expect(fresh.findAccount('parent@example.com')).toBeNull()
   })
 
   it('migrates an existing username only after password verification, preserving data and revoking old sessions', async () => {
     const file = join(directory, 'legacy.json')
     const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8'))
-    disk.sessions = [{ tokenHash: createHash('sha256').update(cookie.split('=')[1]).digest('hex'), expiresAt: Date.now() + 60_000 }]
-    const account = store.account!
-    await writeFile(file, JSON.stringify({ ...disk, account: { username: 'old-parent', salt: account.salt, passwordHash: account.passwordHash } }))
+    const oldSessions = [{ tokenHash: createHash('sha256').update(cookie.split('=')[1]).digest('hex'), expiresAt: Date.now() + 60_000 }]
+    const account = store.account(accountId)
+    const data = disk.accounts[0]
+    await writeFile(file, JSON.stringify({ version: 1, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds, ocrUsage: disk.ocrUsage, sessions: oldSessions, account: { username: 'old-parent', salt: account.salt, passwordHash: account.passwordHash } }))
     const legacy = await FileStore.open(file)
     const legacyApp = createApp({ ...options(), store: legacy })
-    expect((await request(legacyApp).get('/api/session')).body).toEqual({ authenticated: false, setupRequired: false, emailMigrationRequired: true, email: null })
+    expect((await request(legacyApp).get('/api/session')).body).toEqual({ authenticated: false, emailMigrationRequired: false, email: null })
+    const legacyId = legacy.sessionAccount(oldSessions[0].tokenHash)
+    if (!legacyId) throw new Error('Expected migrated legacy session.')
+    expect((await request(legacyApp).get('/api/session').set('Cookie', cookie)).body).toEqual({ authenticated: true, emailMigrationRequired: true, email: null })
     await request(legacyApp).get('/api/words').set('Cookie', cookie).expect(200)
+    const newcomer = await request(legacyApp).post('/api/signup').set('Origin', origin)
+      .send({ email: 'new@example.com', password: 'another independent account passphrase' }).expect(201)
+    expect((await request(legacyApp).get('/api/words').set('Cookie', cookieFrom(newcomer)).expect(200)).body).toEqual([])
+    expect(legacy.words(legacyId)).toEqual(data.words)
     await request(legacyApp).post('/api/login').set('Origin', origin).send({ email: 'parent@example.com', password: 'incorrect' }).expect(401)
-    expect(legacy.account).toHaveProperty('username', 'old-parent')
+    expect(legacy.account(legacyId)).toHaveProperty('username', 'old-parent')
     const response = await request(legacyApp).post('/api/login').set('Origin', origin)
       .send({ email: ' Parent@Example.com ', password: 'a recovered secure passphrase' }).expect(200)
-    expect(response.body).toEqual({ authenticated: true, setupRequired: false, emailMigrationRequired: false, email: 'parent@example.com' })
+    expect(response.body).toEqual({ authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' })
     const saved = JSON.parse(await readFile(file, 'utf8'))
-    expect(saved.words).toEqual(disk.words)
-    expect(saved.attempts).toEqual(disk.attempts)
-    expect(saved.account).not.toHaveProperty('username')
-    expect(saved.account.passwordHash).toBe(account.passwordHash)
-    expect(saved.sessions).toHaveLength(1)
-    expect(saved.sessions[0]).not.toEqual(disk.sessions[0])
+    expect(saved.accounts[0].words).toEqual(data.words)
+    expect(saved.accounts[0].attempts).toEqual(data.attempts)
+    expect(saved.accounts[0].account).not.toHaveProperty('username')
+    expect(saved.accounts[0].account.passwordHash).toBe(account.passwordHash)
+    expect(saved.sessions).toHaveLength(2)
+    const migratedSession = saved.sessions.find((session: { accountId: string }) => session.accountId === legacyId)
+    if (!migratedSession) throw new Error('Expected the original account’s replacement session.')
+    expect(migratedSession.tokenHash).not.toEqual(oldSessions[0].tokenHash)
     await request(legacyApp).get('/api/words').set('Cookie', cookie).expect(401)
     const restored = await FileStore.open(file)
-    expect(restored.account).toHaveProperty('email', 'parent@example.com')
-    expect(restored.words).toEqual(store.words)
+    expect(restored.account(legacyId)).toHaveProperty('email', 'parent@example.com')
+    expect(restored.words(legacyId)).toEqual(store.words(accountId))
     await request(legacyApp).get('/api/words').set('Cookie', cookieFrom(response)).expect(200)
-    await expect(legacy.migrateEmail('different@example.com', saved.sessions[0], account.passwordHash)).rejects.toThrow('already been set')
+    expect((await request(legacyApp).get('/api/words').set('Cookie', cookieFrom(newcomer)).expect(200)).body).toEqual([])
+    await expect(legacy.migrateEmail('different@example.com', migratedSession, account.passwordHash)).rejects.toThrow('already been set')
   }, 15_000)
 })

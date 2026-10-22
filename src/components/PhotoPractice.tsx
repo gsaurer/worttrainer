@@ -93,7 +93,7 @@ export function PhotoPractice({ words, onUpdated, onClose }: {
         <button className="button primary" disabled={busy || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).map(word => word.id))) })}>Start numbered round ({words.length} words)</button>
         {!words.length && <p className="notice">Choose words in the practice filters before starting a new round.</p>}
         {!speech.supported && <p className="error">This browser does not support dictation. Use a current Chrome, Edge, or Safari browser.</p>}
-        {status && <p className="notice">{status.ocr.enabled ? `Photo reading configured. ${status.ocr.used} of ${status.ocr.limit} reserved readings used in ${status.ocr.month} (UTC).` : 'Automatic reading is not configured yet. Set an Azure Free/F0 endpoint and key on the server; manual end-of-sheet review already works.'}</p>}
+        {status && <p className="notice">{status.ocr.enabled ? `Photo reading configured. Shared server budget: ${status.ocr.used} of ${status.ocr.limit} reserved readings used in ${status.ocr.month} (UTC). Your sheets and results remain private.` : 'Automatic reading is not configured yet. Set an Azure Free/F0 endpoint and key on the server; manual end-of-sheet review already works.'}</p>}
         {!status && <button className="text-button" disabled={busy} onClick={() => void run(async () => { setStatus(await api.photoStatus()) })}>Reload saved rounds</button>}
       </div>
       {!!status?.rounds.length && <div className="photo-history"><h3>Saved photo rounds</h3><p className="fine-print">Writing progress and review times sync across devices. Opening a round does not record another attempt.</p>
