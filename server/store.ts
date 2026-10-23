@@ -4,9 +4,9 @@ import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type Word } from '../shared/model.js'
+import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type WebsiteLanguage, type Word } from '../shared/model.js'
 import { initialLanguagePreferences } from '../shared/languages.js'
-import { languagePreferencesSchema, languageSchema } from './languages.js'
+import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
 import { HttpError } from './errors.js'
 import { photoRoundSchema, recognitionSchema } from './photo-schema.js'
 import type { PhotoRecognition, PhotoRound } from '../shared/model.js'
@@ -59,7 +59,7 @@ const legacyStoreSchema = z.object({
     context.addIssue({ code: 'custom', message: 'Unowned stored data.' })
   }
 })
-const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
+const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, websiteLanguage: websiteLanguageSchema.default('en'), languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
 function validateOwnership(data: { accounts: { id: string; account: Account }[]; sessions: StoredSession[] }, context: z.RefinementCtx) {
   const ids = new Set(data.accounts.map(account => account.id))
   const emails = data.accounts.flatMap(item => 'email' in item.account ? [item.account.email] : [])
@@ -82,6 +82,7 @@ const indexSchema = z.object({
 const accountFileSchema = z.object({
   format: z.literal('worttrainer-account-data'), schemaVersion: z.literal(1),
   accountId: z.uuid(), languagePreferences: languagePreferencesSchema,
+  websiteLanguage: websiteLanguageSchema.default('en'),
   ...collectionShape,
 }).strict().superRefine(validateCollection)
 
@@ -102,6 +103,7 @@ function privateData(data: AccountData): z.infer<typeof accountFileSchema> {
   return {
     format: 'worttrainer-account-data', schemaVersion: 1, accountId: data.id,
     languagePreferences: data.languagePreferences,
+    websiteLanguage: data.websiteLanguage,
     words: data.words, attempts: data.attempts, photoRounds: data.photoRounds,
   }
 }
@@ -223,7 +225,7 @@ export class FileStore {
         } catch (error) {
           throw new Error(`Cannot read private account data ${target}. Restore its matching backup.`, { cause: error })
         }
-        accounts.push({ ...identity, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds })
+        accounts.push({ ...identity, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds })
       }
       return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage }))
     } catch (error) {
@@ -243,6 +245,14 @@ export class FileStore {
   words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
   photoRounds(accountId: string): PhotoRound[] { return structuredClone(owned(this.state, accountId).photoRounds) }
   languagePreferences(accountId: string): LanguagePreferences { return structuredClone(owned(this.state, accountId).languagePreferences) }
+  websiteLanguage(accountId: string): WebsiteLanguage { return owned(this.state, accountId).websiteLanguage }
+
+  setWebsiteLanguage(accountId: string, language: WebsiteLanguage) {
+    return this.accountTransaction(accountId, state => {
+      state.websiteLanguage = websiteLanguageSchema.parse(language)
+      return state.websiteLanguage
+    })
+  }
 
   setLanguagePreferences(accountId: string, preferences: LanguagePreferences) {
     return this.accountTransaction(accountId, state => {
@@ -254,9 +264,9 @@ export class FileStore {
   exportData(accountId: string): AccountDataExport {
     const data = owned(this.state, accountId)
     return structuredClone({
-      format: 'worttrainer-account-export', schemaVersion: 2, exportedAt: new Date().toISOString(),
+      format: 'worttrainer-account-export', schemaVersion: 3, exportedAt: new Date().toISOString(),
       account: { id: data.id, ...('email' in data.account ? { email: data.account.email } : { username: data.account.username }) },
-      languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, rounds: data.photoRounds,
+      websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, rounds: data.photoRounds,
       statistics: roundStatistics(data.photoRounds),
     })
   }
@@ -372,10 +382,10 @@ export class FileStore {
     return operation
   }
 
-  register(account: z.infer<typeof emailAccountSchema>, session: StoredSession) {
+  register(account: z.infer<typeof emailAccountSchema>, session: StoredSession, websiteLanguage: WebsiteLanguage = 'en') {
     return this.transaction(state => {
       if (state.accounts.some(item => 'email' in item.account && item.account.email === account.email)) throw new HttpError(409, 'This email is already registered. Sign in instead.')
-      state.accounts.push({ id: session.accountId, account, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], photoRounds: [] })
+      state.accounts.push({ id: session.accountId, account, websiteLanguage, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], photoRounds: [] })
       state.sessions.push(session)
     }, async state => {
       await ensureAccountFile(this.file, owned(state, session.accountId))

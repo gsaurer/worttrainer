@@ -8,7 +8,7 @@ import { FileStore, parentEmailSchema } from './store.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { HttpError } from './errors.js'
 import { normalizePhoto, readAzurePhoto, type OcrOptions } from './ocr.js'
-import { languagePreferencesSchema, languageSchema } from './languages.js'
+import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
 
 export type AppOptions = {
   store: FileStore
@@ -95,6 +95,7 @@ export function createApp(options: AppOptions) {
       authenticated: !!signedIn,
       emailMigrationRequired: !!account && !('email' in account),
       email: signedIn && account && 'email' in account ? account.email : null,
+      ...(signedIn ? { websiteLanguage: store.websiteLanguage(signedIn) } : {}),
     }
   }
 
@@ -109,12 +110,12 @@ export function createApp(options: AppOptions) {
     throw new HttpError(410, 'Setup tokens are no longer needed. Reload the app and choose Create account.')
   })
   app.post('/api/signup', authLimiter, async (req, res) => {
-    const input = parse(z.object({ email: parentEmailSchema, password }).strict(), req.body)
+    const input = parse(z.object({ email: parentEmailSchema, password, websiteLanguage: websiteLanguageSchema.default('en') }).strict(), req.body)
     const account = { email: input.email, ...await withPasswordWork(() => hashPassword(input.password)) }
     const session = newSession()
-    await store.register(account, session.stored)
+    await store.register(account, session.stored, input.websiteLanguage)
     setCookie(res, session.token)
-    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email } satisfies AuthState)
+    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email, websiteLanguage: input.websiteLanguage } satisfies AuthState)
   })
   app.post('/api/login', authLimiter, async (req, res) => {
     const input = parse(z.object({ email: parentEmailSchema, password: z.string().min(1).max(128) }).strict(), req.body)
@@ -126,7 +127,7 @@ export function createApp(options: AppOptions) {
     if ('email' in record.account) await store.addSession(session.stored, record.account.passwordHash)
     else await store.migrateEmail(input.email, session.stored, record.account.passwordHash)
     setCookie(res, session.token)
-    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email } satisfies AuthState)
+    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email, websiteLanguage: store.websiteLanguage(record.id) } satisfies AuthState)
   })
   app.post('/api/logout', async (req, res) => {
     const token = sessionToken(req)
@@ -148,6 +149,10 @@ export function createApp(options: AppOptions) {
   })
 
   app.get('/api/languages', requireAuth, (req, res) => { res.json(store.languagePreferences(accountId(req))) })
+  app.post('/api/website-language', requireAuth, async (req, res) => {
+    const input = parse(z.object({ websiteLanguage: websiteLanguageSchema }).strict(), req.body)
+    res.json({ websiteLanguage: await store.setWebsiteLanguage(accountId(req), input.websiteLanguage) })
+  })
   app.post('/api/languages', requireAuth, async (req, res) => {
     res.json(await store.setLanguagePreferences(accountId(req), parse(languagePreferencesSchema, req.body)))
   })

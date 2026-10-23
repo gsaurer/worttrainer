@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { errorMessage } from '../lib/words'
+import { useI18n } from '../i18n/context'
 
 export function DataExport() {
+  const { t, message } = useI18n()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const active = useRef(true)
@@ -31,7 +33,7 @@ export function DataExport() {
         window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       }
     } catch (error) {
-      if (active.current) setError(`Could not export your data: ${errorMessage(error)}`)
+      if (active.current) setError(errorMessage(error))
     } finally {
       working.current = false
       if (active.current) setBusy(false)
@@ -39,8 +41,8 @@ export function DataExport() {
   }
 
   return <div className="data-export">
-    <button className="button secondary wide" disabled={busy} onClick={() => void download()}>{busy ? 'Preparing JSON…' : 'Export my data (JSON)'}</button>
-    <p>Languages, words, and practice history. Keep the file private.</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    <button className="button secondary wide" disabled={busy} onClick={() => void download()}>{t(busy ? 'Preparing JSON…' : 'Export my data (JSON)')}</button>
+    <p>{t('Languages, words, and practice history. Keep the file private.')}</p>
+    {error && <p className="error" role="alert">{t('Could not export your data: {error}', { error: message(error) })}</p>}
   </div>
 }
