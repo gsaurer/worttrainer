@@ -275,7 +275,8 @@ Never put the parent account password in `.env`; the secure browser form sets it
    spaces), and adding is disabled for that language. The server also rejects
    duplicates, including simultaneous additions from another device. Different
    languages and accounts can keep the same spelling independently.
-2. On the same home page, press **10 words**, **15 words**, or **20 Challenge**.
+2. Under **Start a challenge** on the home page, press **10 words**, **15 words**,
+   or **20 words**.
    All three buttons stay visible and start a numbered round with one press.
    Use **Change words** for optional language/category filters. Sizes are
    maximums: if only eight words match, every choice uses those eight, without

@@ -152,7 +152,7 @@ describe('public registration and private account state', () => {
     vi.spyOn(api, 'session').mockResolvedValue(account)
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Start a round' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Start a challenge' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Collection overview' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Collection' }))
     expect(screen.getByRole('region', { name: 'Collection overview' })).toBeInTheDocument()

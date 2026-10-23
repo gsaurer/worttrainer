@@ -110,11 +110,11 @@ export function RoundPractice({ words, onUpdated, loading = false, filters, sele
     {error && <p className="error" role="alert">{error}</p>}
     {!round ? <>
       <div className="photo-intro">
-        <h2>Start a round</h2>
+        <h2>Start a challenge</h2>
         <p className="round-instruction">Listen. Write numbered answers on paper. Check them at the end.</p>
         <p className="selection-summary">{selectionLabel && <>{selectionLabel} · </>}{loading ? 'Syncing…' : `${words.length} available`}</p>
-        <div className="round-starts" role="group" aria-label="Start a practice round">
-          {roundSizes.map((size, index) => <button key={size} className={`button ${index === 0 ? 'primary' : 'secondary'}`} aria-label={size === 20 ? 'Start 20-word challenge' : `Start ${size} words`} aria-describedby={shortRound ? 'round-size-note' : undefined} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, size).map(word => word.id))) })}><strong>{size}</strong><span>{size === 20 ? 'Challenge' : 'words'}</span></button>)}
+        <div className="round-starts" role="group" aria-label="Start a practice challenge">
+          {roundSizes.map((size, index) => <button key={size} className={`button ${index === 0 ? 'primary' : 'secondary'}`} aria-label={`Start ${size} words`} aria-describedby={shortRound ? 'round-size-note' : undefined} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, size).map(word => word.id))) })}><strong>{size}</strong><span>words</span></button>)}
         </div>
         {shortRound && <p className="round-size-note" id="round-size-note">Uses up to {words.length} available {words.length === 1 ? 'word' : 'words'}, without repeats.</p>}
         {filters && <details className="round-options"><summary>Change words</summary><fieldset className="round-filters" disabled={busy || loading}>{filters}</fieldset></details>}
