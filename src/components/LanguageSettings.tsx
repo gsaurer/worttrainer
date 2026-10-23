@@ -33,7 +33,7 @@ export function LanguageSettings({ preferences, onSave, onSaved }: {
   }
 
   return <section className="language-settings word-panel" aria-labelledby="language-settings-title">
-    <h2 id="language-settings-title">Your practice languages</h2>
+    <h2 id="language-settings-title">Languages</h2>
     <p className="fine-print">Keep at least one language. Disabling a language keeps its words and history.</p>
     <form onSubmit={save}>
       <fieldset disabled={busy}>

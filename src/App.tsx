@@ -58,7 +58,7 @@ export default function App() {
 
 function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => void }) {
   const { words, preferences, loading, error, refresh, saveLanguages } = useWords()
-  const [tab, setTab] = useState<'home' | 'collection' | 'languages'>('home')
+  const [tab, setTab] = useState<'home' | 'collection' | 'settings'>('home')
   const [practicing, setPracticing] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -72,14 +72,20 @@ function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => v
   }
 
   return <div className="app-shell">
-    <header className="site-header"><Brand /><div className="account"><span title={email}>{email}</span><PasswordSettings /><button className="text-button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button></div></header>
-    <nav className="main-nav" aria-label="Main navigation"><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { if (tab !== 'home') { setTab('home'); setPracticing(false) } }}>Home</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setTab('collection'); setPracticing(false) }}>Collection</button><button aria-current={tab === 'languages' ? 'page' : undefined} onClick={() => { setTab('languages'); setPracticing(false) }}>Languages</button></nav>
+    <header className="site-header"><Brand /><div className="account"><span title={email}>{email}</span><button className="text-button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button></div></header>
+    <nav className="main-nav" aria-label="Main navigation"><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { if (tab !== 'home') { setTab('home'); setPracticing(false) } }}>Home</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setTab('collection'); setPracticing(false) }}>Collection</button><button aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => { setTab('settings'); setPracticing(false) }}>Settings</button></nav>
     <main>
-      <div className="page-heading"><h1>{tab === 'home' ? 'Let’s practice' : tab === 'collection' ? 'Collection' : 'Languages'}</h1></div>
+      <div className="page-heading"><h1>{tab === 'home' ? 'Let’s practice' : tab === 'collection' ? 'Collection' : 'Settings'}</h1></div>
       {authError && <p className="error" role="alert">{authError}</p>}
       {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>Retry sync</button></div>}
-      {!preferences ? !error && <p role="status">Loading your languages…</p> : tab === 'languages' ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} /> : <div className="home-actions">{!practicing && <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} />}<Practice words={words} loading={loading} onUpdated={refresh} onActiveChange={setPracticing} preferences={preferences} /></div>}
+      {tab === 'settings' ? <div className="settings-layout">
+        <div>{preferences ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : !error && <p role="status">Loading your languages…</p>}</div>
+        <div className="settings-secondary">
+          <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">Your data</h2><DataExport /></section>
+          <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">Account</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
+        </div>
+      </div> : !preferences ? !error && <p role="status">Loading your languages…</p> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} /> : <div className="home-actions">{!practicing && <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} />}<Practice words={words} loading={loading} onUpdated={refresh} onActiveChange={setPracticing} preferences={preferences} /></div>}
     </main>
-    <footer><span>Little by little is a lot.</span><DataExport /><span>Private spelling practice</span></footer>
+    <footer><span>Little by little is a lot.</span><span>Private spelling practice</span></footer>
   </div>
 }

@@ -203,12 +203,13 @@ docker compose start worttrainer
 
 For local development, stop `npm run dev` and run `npm run reset-password`.
 Both commands read the new password privately from the terminal, not an argument
-or environment variable. If needed, **Change password** in the app changes it
-without stopping the server and signs that account's other devices out.
+or environment variable. **Change password** under **Settings → Account**
+changes it without stopping the server and signs
+that account's other devices out.
 
 ## Export your data for analysis
 
-When signed in, choose **Export my data (JSON)** in the page footer. This downloads
+When signed in, open **Settings → Your data** and choose **Export my data (JSON)**. This downloads
 a UTF-8 file named `worttrainer-YYYY-MM-DD.json` for use in other analysis tools.
 The authenticated `GET /api/export` endpoint serves the same account-scoped data.
 
@@ -301,7 +302,7 @@ confirmation. Searches show up to 20 matches; refine the query to find others.
 
 ### Choose your languages
 
-Open **Languages**, enable languages from the built-in catalogue, choose a
+Open **Settings → Languages**, enable languages from the built-in catalogue, choose a
 **Default language**, and **Save languages**. These preferences belong to your
 parent account and sync across devices, including on focus and the normal
 30-second refresh. They are not server `.env` settings.
