@@ -8,7 +8,7 @@ import { SpeakerIcon } from './Icons'
 function RoundStatistics({ rounds }: { rounds: PracticeRound[] }) {
   const stats = roundStatistics(rounds)
   return <section className="round-statistics" aria-label="Round statistics">
-    <p className="eyebrow">PARENT-CONFIRMED, NOT PHOTO-GUESSED</p>
+    <h3>Results</h3>
     <div className="round-stats-grid">
       <div><strong>{stats.completed}<small> / {stats.started}</small></strong><span>Rounds reviewed</span></div>
       <div className="round-stat-correct"><strong>{stats.correct}</strong><span>Correct answers</span></div>
@@ -16,19 +16,20 @@ function RoundStatistics({ rounds }: { rounds: PracticeRound[] }) {
       <div><strong>{stats.accuracy === null ? '—' : `${stats.accuracy}%`}</strong><span>Accuracy · {stats.reviewed} reviewed</span></div>
     </div>
     {stats.reviewed > 0 && <div className="round-result-bar" role="img" aria-label={`${stats.correct} correct and ${stats.incorrect} incorrect answers`}><span style={{ width: `${stats.correct / stats.reviewed * 100}%` }} /></div>}
-    <p className="fine-print">{stats.pending} unfinished {stats.pending === 1 ? 'round' : 'rounds'} · {stats.unmarked} unmarked {stats.unmarked === 1 ? 'word' : 'words'}. Unmarked answers never count as incorrect. Statistics use saved rounds only.</p>
+    <p className="fine-print">{stats.pending} unfinished {stats.pending === 1 ? 'round' : 'rounds'} · {stats.unmarked} unmarked {stats.unmarked === 1 ? 'word' : 'words'}. Only checked answers count.</p>
   </section>
 }
 
-export function RoundPractice({ words, onUpdated, loading = false, filters }: {
+export function RoundPractice({ words, onUpdated, loading = false, filters, selectionLabel, onActiveChange }: {
   words: Word[]
   onUpdated: () => Promise<void>
   loading?: boolean
   filters?: ReactNode
+  selectionLabel?: string
+  onActiveChange?: (active: boolean) => void
 }) {
   const [status, setStatus] = useState<RoundStatus | null>(null)
   const [round, setRound] = useState<PracticeRound | null>(null)
-  const [roundSize, setRoundSize] = useState(10)
   const [answers, setAnswers] = useState<(boolean | null)[]>([])
   const [pendingResults, setPendingResults] = useState<boolean[] | null>(null)
   const [photo, setPhoto] = useState<File | null>(null)
@@ -62,6 +63,7 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
   function openRound(data: PracticeRound, keepPhoto = false) {
     speech.stop()
     setRound(data)
+    onActiveChange?.(true)
     setAnswers(data.results ?? data.words.map((word, index) => {
       const answer = data.recognition?.answers[index]
       return suggestedResult(word.text, answer?.text ?? null, answer?.confidence ?? null)
@@ -80,6 +82,7 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
     void run(async () => {
       setStatus(await api.photoStatus())
       setRound(null)
+      onActiveChange?.(false)
       setPhoto(null)
       setPhotoUrl('')
       setPendingResults(null)
@@ -97,33 +100,35 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
   }
 
   const word = round?.words[round.nextIndex]
-  const selectedCount = Math.min(words.length, roundSize)
+  const roundSizes = [10, 15, 20]
+  const shortRound = !loading && words.length > 0 && words.length < 20
   return <section className="photo-practice" aria-label="Practice rounds">
     {round && <div className="practice-topline">
       <span>Round <span className="round-id" title={round.id}>#{round.id.slice(0, 8)}</span></span>
-      <button className="text-button" disabled={busy} onClick={back}>{round.reviewedAt ? 'Back to round history' : 'Pause and return to rounds'}</button>
+      <button className="text-button" disabled={busy} onClick={back}>{round.reviewedAt ? 'Back to rounds' : 'Pause'}</button>
     </div>}
     {error && <p className="error" role="alert">{error}</p>}
     {!round ? <>
       <div className="photo-intro">
-        <p className="eyebrow">A LITTLE PRACTICE. A RECORD OF PROGRESS.</p>
-        <h2>One round, one step forward.</h2>
-        <p>Choose your words, then listen and write the whole round on paper. Number each answer <strong>1, 2, 3…</strong> in dictation order. At the end, mark the answers manually or upload one photo and check the suggestions.</p>
-        <div className="round-filters">
-          {filters}
-          <div><label htmlFor="round-size">How many words?</label><select id="round-size" value={roundSize} disabled={busy || loading} onChange={event => setRoundSize(Number(event.target.value))}>{[10, 15, 20, 25].map(size => <option key={size} value={size}>{size} words</option>)}</select></div>
+        <h2>Start a challenge</h2>
+        <p className="round-instruction">Listen. Write numbered answers on paper. Check them at the end.</p>
+        <p className="selection-summary">{selectionLabel && <>{selectionLabel} · </>}{loading ? 'Syncing…' : `${words.length} available`}</p>
+        <div className="round-starts" role="group" aria-label="Start a practice challenge">
+          {roundSizes.map((size, index) => <button key={size} className={`button ${index === 0 ? 'primary' : 'secondary'}`} aria-label={`Start ${size} words`} aria-describedby={shortRound ? 'round-size-note' : undefined} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, size).map(word => word.id))) })}><strong>{size}</strong><span>words</span></button>)}
         </div>
-        {words.length > 0 && <p className="fine-print">{selectedCount} of {words.length} matching {words.length === 1 ? 'word' : 'words'} in this round. {words.length < roundSize ? 'Fewer words are available than your chosen size, so all matching words will be used.' : 'Randomly selected, with no repeats within the round.'}</p>}
-        <p className="fine-print">No child account or name is needed. Photograph only the answers, not names, faces, or other personal details. Unclear handwriting never automatically counts as wrong.</p>
-        <button className="button primary" disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, roundSize).map(word => word.id))) })}>Start round ({selectedCount} {selectedCount === 1 ? 'word' : 'words'})</button>
-        {!words.length && <p className="notice">{loading ? 'Syncing your collection…' : 'Add words or choose another language or category before starting a round.'}</p>}
+        {shortRound && <p className="round-size-note" id="round-size-note">Uses up to {words.length} available {words.length === 1 ? 'word' : 'words'}, without repeats.</p>}
+        {filters && <details className="round-options"><summary>Change words</summary><fieldset className="round-filters" disabled={busy || loading}>{filters}</fieldset></details>}
+        {!loading && !words.length && <p className="notice">No matching words. Add a word or change the filters.</p>}
         {!speech.supported && <p className="error">This browser does not support dictation. Use a current Chrome, Edge, or Safari browser.</p>}
-        {status && <p className="notice">{status.ocr.enabled ? `Photo reading configured. Shared server budget: ${status.ocr.used} of ${status.ocr.limit} reserved readings used in ${status.ocr.month} (UTC). Your sheets and results remain private.` : 'Automatic reading is not configured yet. Set an Azure Free/F0 endpoint and key on the server; manual end-of-sheet review already works.'}</p>}
+        <details className="round-options"><summary>Instructions &amp; photo info</summary>
+          <p>Number each paper answer 1, 2, 3… After writing, mark the answers manually or upload one photo. Check every photo suggestion before saving.</p>
+          <p>Photograph answers only, without names or faces. Photos are not stored by the app.</p>
+          {status && <p>{status.ocr.enabled ? `Photo reading: ${status.ocr.used} of ${status.ocr.limit} shared readings used in ${status.ocr.month} (UTC).` : 'Automatic reading is not configured. You can still check answers manually.'}</p>}
+        </details>
         {!status && <button className="text-button" disabled={busy} onClick={() => void run(async () => { setStatus(await api.photoStatus()) })}>Reload saved rounds</button>}
       </div>
-      {status && <RoundStatistics rounds={status.rounds} />}
-      {status && <div className="photo-history"><div className="round-history-heading"><div><p className="eyebrow">YOUR PRACTICE NOTEBOOK</p><h3>Round history</h3></div><button className="text-button" disabled={busy} onClick={() => void run(async () => { setStatus(await api.photoStatus()) })}>Refresh rounds</button></div><p className="fine-print">All saved rounds, across both languages. Opening a round does not record another attempt. Earlier photo rounds are included; older individual answers cannot be reconstructed into rounds.</p>
-        {!status.rounds.length && <p>No rounds yet. Start with a few words; your round and its results will be saved here.</p>}
+      {status && status.rounds.length > 0 && <RoundStatistics rounds={status.rounds} />}
+      {status && status.rounds.length > 0 && <div className="photo-history"><div className="round-history-heading"><h3>Round history</h3><button className="text-button" disabled={busy} onClick={() => void run(async () => { setStatus(await api.photoStatus()) })}>Refresh</button></div>
         {status.rounds.map(item => {
           const stats = roundStatistics([item])
           return <div className="photo-history-row" key={item.id}>
@@ -136,12 +141,10 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
       <progress className="session-progress" value={round.nextIndex} max={round.words.length} aria-label="Numbered answers written" />
       <div className="dictation-card">
         <p className="eyebrow">{languages[word.language].name.toUpperCase()} · WORD {round.nextIndex + 1} OF {round.words.length}</p>
-        <button className={`listen-button ${speech.speaking ? 'speaking' : ''}`} onClick={() => speech.speak(word.text, word.language)} aria-label="Listen to the hidden word"><SpeakerIcon /></button>
         <h2>Write answer number {round.nextIndex + 1}.</h2>
-        <p>Listen, then write the number and word on their own line.<br />The spelling stays hidden until the parent review.</p>
+        <button className={`listen-button ${speech.speaking ? 'speaking' : ''}`} onClick={() => speech.speak(word.text, word.language)} aria-label="Listen to the hidden word"><SpeakerIcon /><span>Listen</span></button>
         {speech.error && <p className="error" role="alert">{speech.error}</p>}
-        <button className="button primary" disabled={busy} onClick={() => { speech.stop(); void run(async () => { setRound(await api.advancePhotoRound(round.id, round.nextIndex + 1)) }) }}>{busy ? 'Saving place…' : round.nextIndex + 1 === round.words.length ? 'All written — check the sheet' : 'Written — next word'}</button>
-        <p className="fine-print">Your place is saved after each word. No spelling result is recorded yet.</p>
+        <button className="button primary" disabled={busy} onClick={() => { speech.stop(); void run(async () => { setRound(await api.advancePhotoRound(round.id, round.nextIndex + 1)) }) }}>{busy ? 'Saving…' : round.nextIndex + 1 === round.words.length ? 'Check answers' : 'Next word'}</button>
       </div>
     </div> : <>
       <div className="photo-intro">
@@ -185,7 +188,7 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
         <ol className="photo-answer-list">{round.words.map((item, index) => {
           const recognized = round.recognition?.answers[index]
           return <li key={item.id}>
-            <div className="photo-answer-spelling"><span className="eyebrow">EXPECTED SPELLING</span><strong lang={item.language}>{item.text}</strong><span>Read: <span lang={item.language}>{recognized?.text ?? 'Not recognized — check the paper'}</span></span>{recognized?.text && <small>{recognized.confidence === null ? 'Confidence unavailable — mark manually' : `Recognition confidence: ${Math.round(recognized.confidence * 100)}%${recognized.confidence < 0.8 ? ' — mark manually' : ''}`}</small>}</div>
+            <div className="photo-answer-spelling"><span className="eyebrow">EXPECTED SPELLING</span><strong lang={item.language} dir="auto">{item.text}</strong><span>Read: <span lang={item.language} dir="auto">{recognized?.text ?? 'Not recognized — check the paper'}</span></span>{recognized?.text && <small>{recognized.confidence === null ? 'Confidence unavailable — mark manually' : `Recognition confidence: ${Math.round(recognized.confidence * 100)}%${recognized.confidence < 0.8 ? ' — mark manually' : ''}`}</small>}</div>
             {round.reviewedAt ? <span className={`badge ${round.results?.[index] ? 'plus' : 'minus'}`}>{round.results?.[index] ? 'Correct' : 'Keep practicing'}</span> : <label htmlFor={`answer-${index}`}>Parent’s result<select id={`answer-${index}`} value={answers[index] === null ? '' : answers[index] ? 'correct' : 'incorrect'} disabled={busy || !!pendingResults} onChange={event => setAnswers(previous => previous.map((answer, position) => position === index ? event.target.value === '' ? null : event.target.value === 'correct' : answer))}><option value="">Choose after checking</option><option value="correct">Spelled correctly</option><option value="incorrect">Not quite yet</option></select></label>}
           </li>
         })}</ol>

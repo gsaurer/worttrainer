@@ -57,7 +57,7 @@ export function Auth({ emailMigrationRequired = false, onAuthenticated }: {
           <span className="pencil" />
           <span className="star-sticker">you’ve<br />got this!</span>
         </div>
-        <div className="language-note"><span>DE</span> Deutsch <span>EN</span> English <i>Made for learning together.</i></div>
+        <div className="language-note">Choose your practice languages after signing in.<i>Made for learning together.</i></div>
       </section>
       <section className="auth-card" aria-labelledby="signin-title">
         <p className="eyebrow">YOUR PRIVATE WORD COLLECTION</p>

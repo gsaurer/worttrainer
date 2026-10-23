@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import type { AuthState, Category } from '../shared/model'
+import type { AuthState } from '../shared/model'
 import { api } from './lib/api'
-import { categories, errorMessage } from './lib/words'
+import { errorMessage } from './lib/words'
 import { useWords } from './hooks/useWords'
 import { Auth } from './components/Auth'
 import { Brand } from './components/Icons'
@@ -9,6 +9,8 @@ import { Collection } from './components/Collection'
 import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
 import { DataExport } from './components/DataExport'
+import { AddWord } from './components/AddWord'
+import { LanguageSettings } from './components/LanguageSettings'
 
 function removeSetupFragment() {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
@@ -55,9 +57,9 @@ export default function App() {
 }
 
 function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => void }) {
-  const { words, loading, error, refresh } = useWords()
-  const [tab, setTab] = useState<'collection' | 'practice'>('collection')
-  const [category, setCategory] = useState<Category | 'all'>('all')
+  const { words, preferences, loading, error, refresh, saveLanguages } = useWords()
+  const [tab, setTab] = useState<'home' | 'collection' | 'settings'>('home')
+  const [practicing, setPracticing] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [authError, setAuthError] = useState('')
 
@@ -70,15 +72,20 @@ function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => v
   }
 
   return <div className="app-shell">
-    <header className="site-header"><Brand /><div className="account"><span title={email}>{email}</span><PasswordSettings /><button className="text-button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button></div></header>
-    <nav className="main-nav" aria-label="Main navigation"><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => setTab('collection')}>Word collection</button><button aria-current={tab === 'practice' ? 'page' : undefined} onClick={() => setTab('practice')}>Let’s practice <span aria-hidden="true">↗</span></button><span className="nav-note">a little, often.</span></nav>
+    <header className="site-header"><Brand /><div className="account"><span title={email}>{email}</span><button className="text-button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button></div></header>
+    <nav className="main-nav" aria-label="Main navigation"><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { if (tab !== 'home') { setTab('home'); setPracticing(false) } }}>Home</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setTab('collection'); setPracticing(false) }}>Collection</button><button aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => { setTab('settings'); setPracticing(false) }}>Settings</button></nav>
     <main>
-      <div className="page-heading"><div><p className="eyebrow">THE LITTLE WORD WORKSHOP</p><h1>{tab === 'collection' ? <>Small steps.<br /><em>Stronger spelling.</em></> : <>A little practice.<br /><em>A little progress.</em></>}</h1></div><p>For the words that need<br />a second hello.</p></div>
+      <div className="page-heading"><h1>{tab === 'home' ? 'Let’s practice' : tab === 'collection' ? 'Collection' : 'Settings'}</h1></div>
       {authError && <p className="error" role="alert">{authError}</p>}
       {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>Retry sync</button></div>}
-      {tab === 'collection' && <section className="category-grid" aria-label="Word categories">{(Object.keys(categories) as Category[]).map(key => <button key={key} className={`category-card ${key} ${category === key ? 'active' : ''}`} aria-pressed={category === key} onClick={() => setCategory(category === key ? 'all' : key)}><span className="category-sign">{categories[key].label}</span><span className="category-copy"><strong>{key === 'new' ? 'New beginnings' : key === 'plus' ? 'Finding their feet' : 'Worth another try'}</strong><span>{categories[key].description}</span></span><span className="category-count">{words.filter(w => w.category === key).length}</span></button>)}</section>}
-      {tab === 'collection' ? <Collection words={words} loading={loading} category={category} onCategory={setCategory} refresh={refresh} onPractice={() => setTab('practice')} /> : <Practice words={words} loading={loading} onUpdated={refresh} />}
+      {tab === 'settings' ? <div className="settings-layout">
+        <div>{preferences ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : !error && <p role="status">Loading your languages…</p>}</div>
+        <div className="settings-secondary">
+          <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">Your data</h2><DataExport /></section>
+          <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">Account</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
+        </div>
+      </div> : !preferences ? !error && <p role="status">Loading your languages…</p> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} /> : <div className="home-actions">{!practicing && <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} />}<Practice words={words} loading={loading} onUpdated={refresh} onActiveChange={setPracticing} preferences={preferences} /></div>}
     </main>
-    <footer><span>Little by little is a lot.</span><DataExport /><span>Deutsch & English · Made for learning together</span></footer>
+    <footer><span>Little by little is a lot.</span><span>Private spelling practice</span></footer>
   </div>
 }

@@ -65,7 +65,8 @@ describe('independent private accounts', () => {
     expect(response.headers['content-disposition']).toMatch(/^attachment; filename="worttrainer-\d{4}-\d{2}-\d{2}\.json"$/)
     expect(response.headers['cache-control']).toBe('no-store')
     expect(response.body).toMatchObject({
-      format: 'worttrainer-account-export', schemaVersion: 1,
+      format: 'worttrainer-account-export', schemaVersion: 2,
+      languagePreferences: { enabled: ['de', 'en'], defaultLanguage: 'de' },
       account: { id: first.id, email: first.email },
       words: [{ id: word.id, text: word.text, category: 'plus' }],
       rounds: [{ id: round.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
@@ -74,7 +75,7 @@ describe('independent private accounts', () => {
     expect(Number.isFinite(Date.parse(response.body.exportedAt))).toBe(true)
     expect(response.body.attempts).toHaveLength(2)
     expect(response.body.attempts[1]).toMatchObject({ wordId: word.id, id: round.words[0].attemptId, correct: true })
-    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'exportedAt', 'format', 'rounds', 'schemaVersion', 'statistics', 'words'])
+    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'exportedAt', 'format', 'languagePreferences', 'rounds', 'schemaVersion', 'statistics', 'words'])
     expect(Object.keys(response.body.account).sort()).toEqual(['email', 'id'])
     for (const secret of [credentials.salt, credentials.passwordHash, first.stored.tokenHash, second.email, second.id]) {
       expect(response.text).not.toContain(secret)
@@ -146,9 +147,10 @@ describe('independent private accounts', () => {
     await post('/api/practice', secondResult).expect(200)
     expect(store.words(first.id)[0]).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
     expect(store.words(second.id)[0]).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
-    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8'))
-    expect(disk.accounts[0].attempts).toHaveLength(2)
-    expect(disk.accounts[1].attempts).toHaveLength(1)
+    const firstData = JSON.parse(await readFile(join(directory, 'store.accounts', `${first.id}.json`), 'utf8'))
+    const secondData = JSON.parse(await readFile(join(directory, 'store.accounts', `${second.id}.json`), 'utf8'))
+    expect(firstData.attempts).toHaveLength(2)
+    expect(secondData.attempts).toHaveLength(1)
     await remove(`/api/words/${ownWord.id}`).expect(204)
     expect(store.words(second.id)).toEqual([])
     expect(store.words(first.id)).toHaveLength(1)
@@ -196,9 +198,9 @@ describe('safe versioned ownership migration', () => {
   it('preserves the original account, sessions, history, recognition, and shared quota when other users register', async () => {
     const file = join(directory, 'legacy.json')
     const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8'))
-    const bucket = disk.accounts[0]
+    const bucket = JSON.parse(await readFile(join(directory, 'store.accounts', `${first.id}.json`), 'utf8'))
     const oldSession = { tokenHash: first.stored.tokenHash, expiresAt: first.stored.expiresAt }
-    const legacy = { version: 1, account: bucket.account, words: bucket.words, attempts: bucket.attempts, photoRounds: bucket.photoRounds, sessions: [oldSession], ocrUsage: { month: new Date().toISOString().slice(0, 7), used: 449 } }
+    const legacy = { version: 1, account: disk.accounts[0].account, words: bucket.words, attempts: bucket.attempts, photoRounds: bucket.photoRounds, sessions: [oldSession], ocrUsage: { month: new Date().toISOString().slice(0, 7), used: 449 } }
     const source = JSON.stringify(legacy)
     await writeFile(file, source)
     store = await FileStore.open(file)
@@ -218,9 +220,10 @@ describe('safe versioned ownership migration', () => {
     expect(store.findAccount(first.email)?.id).toBe(owner.id)
     expect(store.sessionAccount(first.stored.tokenHash)).toBe(owner.id)
     const migrated = JSON.parse(await readFile(file, 'utf8'))
-    expect(migrated.version).toBe(2)
-    expect(migrated.accounts[0].attempts).toEqual(bucket.attempts)
-    expect(migrated.accounts[0].account).toEqual(bucket.account)
+    expect(migrated.version).toBe(3)
+    const practice = JSON.parse(await readFile(join(directory, 'legacy.accounts', `${owner.id}.json`), 'utf8'))
+    expect(practice.attempts).toEqual(bucket.attempts)
+    expect(migrated.accounts[0].account).toEqual(disk.accounts[0].account)
     expect(store.ocrUsage().used).toBe(449)
   }, 15_000)
 
@@ -229,19 +232,24 @@ describe('safe versioned ownership migration', () => {
     const source = JSON.stringify({ version: 1, account: null, words: [], attempts: [], sessions: [] })
     await writeFile(file, source)
     await writeFile(`${file}.v1.bak`, 'older backup')
-    await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
+    await expect(FileStore.open(file)).rejects.toThrow('no data has been reset')
     expect(await readFile(file, 'utf8')).toBe(source)
     expect(await readFile(`${file}.v1.bak`, 'utf8')).toBe('older backup')
     await writeFile(`${file}.v1.bak`, source)
     const migrated = await FileStore.open(file)
     expect(migrated.legacyAccount).toBeNull()
-    expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({ version: 2, accounts: [], sessions: [], ocrUsage: { month: null, used: 0 } })
+    expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({ version: 3, accounts: [], sessions: [], ocrUsage: { month: null, used: 0 } })
     expect(await readFile(`${file}.v1.bak`, 'utf8')).toBe(source)
   })
 
   it('rejects orphaned sessions, duplicate emails, and foreign history without replacing stored data', async () => {
     const file = join(directory, 'bad-ownership.json')
     const valid = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8'))
+    valid.version = 2
+    for (const account of valid.accounts) {
+      const data = JSON.parse(await readFile(join(directory, 'store.accounts', `${account.id}.json`), 'utf8'))
+      Object.assign(account, { languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds })
+    }
     for (const corrupt of [
       () => { const data = structuredClone(valid); data.sessions[0].accountId = randomUUID(); return data },
       () => { const data = structuredClone(valid); data.accounts[1].account.email = data.accounts[0].account.email; return data },
@@ -249,7 +257,7 @@ describe('safe versioned ownership migration', () => {
     ]) {
       const source = JSON.stringify(corrupt())
       await writeFile(file, source)
-      await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
+      await expect(FileStore.open(file)).rejects.toThrow('no data has been reset')
       expect(await readFile(file, 'utf8')).toBe(source)
     }
   })

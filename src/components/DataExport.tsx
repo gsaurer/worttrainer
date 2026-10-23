@@ -39,8 +39,8 @@ export function DataExport() {
   }
 
   return <div className="data-export">
-    <button className="text-button" disabled={busy} onClick={() => void download()}>{busy ? 'Preparing JSON…' : 'Export my data (JSON)'}</button>
-    <p>Words, attempts, and rounds. Keep the downloaded file private.</p>
+    <button className="button secondary wide" disabled={busy} onClick={() => void download()}>{busy ? 'Preparing JSON…' : 'Export my data (JSON)'}</button>
+    <p>Languages, words, and practice history. Keep the file private.</p>
     {error && <p className="error" role="alert">{error}</p>}
   </div>
 }

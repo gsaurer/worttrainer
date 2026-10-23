@@ -9,9 +9,22 @@ An adult's sign-in identity and the owner of a private word collection and its
 practice history. Separate registrations do not share collections.
 _Avoid_: Shared installation account, family membership
 
+**Account practice data**:
+A parent account's language preferences, word collection, practice attempts, and
+saved rounds, including recognized handwriting. It does not include sign-in credentials.
+_Avoid_: Account metadata
+
 **Word collection**:
 The correct spellings a parent account has chosen to practice, grouped by
 language and current learning category.
+
+**Enabled language**:
+A language a parent account has chosen for adding words and starting new rounds.
+Disabling it keeps its existing words, progress, and saved rounds.
+
+**Default language**:
+The enabled language selected initially when adding a word or setting up practice.
+Each parent account chooses its own default.
 
 **Practice attempt**:
 A parent-confirmed correct or incorrect result for one word. Adding a word,

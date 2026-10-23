@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { api } from './lib/api'
 import type { Word } from '../shared/model'
+import { initialLanguagePreferences } from '../shared/languages'
 
 const anonymous = { authenticated: false, emailMigrationRequired: false, email: null }
 const account = { authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' }
@@ -11,9 +12,109 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/')
   vi.spyOn(api, 'session').mockResolvedValue(anonymous)
   vi.spyOn(api, 'words').mockResolvedValue([])
+  vi.spyOn(api, 'languagePreferences').mockResolvedValue(initialLanguagePreferences())
+  vi.spyOn(api, 'photoStatus').mockResolvedValue({ rounds: [], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
 })
 
 describe('public registration and private account state', () => {
+  it('does not substitute default settings when account language loading fails', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const preferences = vi.spyOn(api, 'languagePreferences').mockRejectedValue(new Error('Server unavailable'))
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server unavailable')
+    expect(screen.queryByRole('heading', { name: 'Add a word' })).not.toBeInTheDocument()
+    preferences.mockResolvedValue({ enabled: ['fr'], defaultLanguage: 'fr' })
+    await user.click(screen.getByRole('button', { name: 'Retry sync' }))
+    const add = await screen.findByRole('region', { name: 'Add a word' })
+    expect(within(add).getByLabelText('Language')).toHaveValue('fr')
+  })
+
+  it('saves additional account languages and uses the new default on the home page', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const save = vi.spyOn(api, 'saveLanguagePreferences').mockResolvedValue({ enabled: ['de', 'en', 'fr'], defaultLanguage: 'fr' })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Add a word' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.selectOptions(screen.getByLabelText('Add a language'), 'fr')
+    await user.click(screen.getByRole('button', { name: 'Enable' }))
+    await user.selectOptions(screen.getByLabelText('Default language'), 'fr')
+    await user.click(screen.getByRole('button', { name: 'Save languages' }))
+    expect(save).toHaveBeenCalledWith({ enabled: ['de', 'en', 'fr'], defaultLanguage: 'fr' })
+    const add = await screen.findByRole('region', { name: 'Add a word' })
+    expect(within(add).getByLabelText('Language')).toHaveValue('fr')
+    expect(screen.getByText('Français · All categories · 0 available')).toBeInTheDocument()
+  })
+
+  it('syncs changed language preferences on focus without an account switch', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const preferences = vi.spyOn(api, 'languagePreferences').mockResolvedValue(initialLanguagePreferences())
+    render(<App />)
+    const add = await screen.findByRole('region', { name: 'Add a word' })
+    expect(within(add).getByLabelText('Language')).toHaveValue('de')
+    preferences.mockResolvedValue({ enabled: ['fr'], defaultLanguage: 'fr' })
+    fireEvent(window, new Event('focus'))
+    await waitFor(() => expect(within(add).getByLabelText('Language')).toHaveValue('fr'))
+    expect(screen.getByText('Français · All categories · 0 available')).toBeInTheDocument()
+  })
+
+  it('groups languages, export and password changes in Settings rather than Home or Collection', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Add a word' })
+    const navigation = screen.getByRole('navigation', { name: 'Main navigation' })
+    expect(within(navigation).getAllByRole('button').map(button => button.textContent)).toEqual(['Home', 'Collection', 'Settings'])
+    expect(screen.queryByRole('button', { name: 'Export my data (JSON)' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Change password')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: 'Languages' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Your data' })).getByRole('button', { name: 'Export my data (JSON)' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Account' })).getByText(account.email)).toBeInTheDocument()
+    expect(screen.getByText('Change password')).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).queryByText('Change password')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('contentinfo')).queryByRole('button')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Collection' }))
+    expect(screen.queryByRole('button', { name: 'Export my data (JSON)' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Change password')).not.toBeInTheDocument()
+  })
+
+  it('keeps export and password settings accessible when language sync fails', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    vi.spyOn(api, 'languagePreferences').mockRejectedValue(new Error('Server unavailable'))
+    render(<App />)
+    await screen.findByRole('alert')
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('button', { name: 'Export my data (JSON)' })).toBeEnabled()
+    expect(screen.getByText('Change password')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save languages' })).not.toBeInTheDocument()
+  })
+
+  it('changes the password inline in Settings and keeps failed exports retryable', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const changePassword = vi.spyOn(api, 'changePassword').mockResolvedValue(undefined)
+    const exportData = vi.spyOn(api, 'exportData').mockRejectedValue(new Error('Network unavailable'))
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByText('Change password'))
+    await user.type(screen.getByLabelText('Current password'), 'old private passphrase')
+    await user.type(screen.getByLabelText('New password'), 'new private passphrase')
+    await user.click(screen.getByRole('button', { name: 'Update password' }))
+    expect(changePassword).toHaveBeenCalledWith('old private passphrase', 'new private passphrase')
+    expect(await screen.findByRole('status')).toHaveTextContent('Password changed.')
+    expect(screen.getByLabelText('Current password')).toHaveValue('')
+    expect(screen.getByLabelText('New password')).toHaveValue('')
+    await user.click(screen.getByRole('button', { name: 'Export my data (JSON)' }))
+    expect(exportData).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not export your data: Network unavailable')
+    expect(screen.getByRole('button', { name: 'Export my data (JSON)' })).toBeEnabled()
+  })
+
   it('registers from a retired setup link without submitting any setup token', async () => {
     window.history.replaceState(null, '', '/#setup=retired-token')
     const signup = vi.spyOn(api, 'signup').mockResolvedValue(account)
@@ -34,12 +135,47 @@ describe('public registration and private account state', () => {
     const oldWord: Word = { id: '1', text: 'Private-first-account', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
     vi.spyOn(api, 'session').mockResolvedValue(account)
     const words = vi.spyOn(api, 'words').mockResolvedValue([oldWord])
+    const user = userEvent.setup()
     render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Collection' }))
+    await user.type(screen.getByLabelText('Search words'), 'Private')
     expect(await screen.findByText(oldWord.text)).toBeInTheDocument()
     vi.spyOn(api, 'session').mockResolvedValue({ ...account, email: 'another@example.com' })
     words.mockResolvedValue([])
     fireEvent(window, new Event('focus'))
     await screen.findByText('another@example.com')
     expect(screen.queryByText(oldWord.text)).not.toBeInTheDocument()
+  })
+
+  it('starts on an action-only home page and keeps collection details on a separate page', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Start a challenge' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Collection overview' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Collection' }))
+    expect(screen.getByRole('region', { name: 'Collection overview' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Add a word' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Home' }))
+    expect(screen.getByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
+  })
+
+  it('hides word entry during dictation and restores it after pausing', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn(), speak: vi.fn() })
+    vi.stubGlobal('SpeechSynthesisUtterance', class {})
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const word: Word = { id: '1', text: 'Geheim', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
+    vi.spyOn(api, 'words').mockResolvedValue([word])
+    vi.spyOn(api, 'createPhotoRound').mockResolvedValue({ id: 'round-1', startedAt: word.created_at, writtenAt: null, reviewedAt: null, nextIndex: 0, words: [{ id: word.id, text: word.text, language: word.language, attemptId: 'attempt-1' }], recognition: null, results: null })
+    render(<App />)
+    await user.type(await screen.findByLabelText('Word'), word.text)
+    await user.click(screen.getByRole('button', { name: 'Start 10 words' }))
+    expect(screen.queryByLabelText('Word')).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue(word.text)).not.toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent(word.text)
+    await user.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(await screen.findByLabelText('Word')).toHaveValue('')
   })
 })

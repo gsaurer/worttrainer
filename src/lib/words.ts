@@ -1,10 +1,6 @@
-import type { Category, Language, Word } from '../../shared/model'
+import type { Category, Word } from '../../shared/model'
 export { validateWord } from '../../shared/model'
-
-export const languages: Record<Language, { name: string; speech: string }> = {
-  de: { name: 'Deutsch', speech: 'de-DE' },
-  en: { name: 'English', speech: 'en-GB' },
-}
+export { languages } from '../../shared/languages'
 
 export const categories: Record<Category, { label: string; description: string }> = {
   new: { label: 'New', description: 'A fresh start' },

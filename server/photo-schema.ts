@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { languageSchema } from './languages.js'
 
 export const recognitionSchema = z.object({
   answers: z.array(z.object({
@@ -16,7 +17,7 @@ export const photoRoundSchema = z.object({
   reviewedAt: z.string().datetime().nullable(),
   nextIndex: z.number().int().min(0),
   words: z.array(z.object({
-    id: z.uuid(), text: z.string().min(1).max(160), language: z.enum(['de', 'en']), attemptId: z.uuid(),
+    id: z.uuid(), text: z.string().min(1).max(160), language: languageSchema, attemptId: z.uuid(),
   }).strict()).min(1).max(100),
   recognition: recognitionSchema.nullable(),
   results: z.array(z.boolean()).nullable(),

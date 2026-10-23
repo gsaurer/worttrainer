@@ -1,4 +1,5 @@
-export type Language = 'de' | 'en'
+import type { Language, LanguagePreferences } from './languages.js'
+export type { Language, LanguagePreferences } from './languages.js'
 export type Category = 'new' | 'plus' | 'minus'
 
 export type Word = {
@@ -45,9 +46,10 @@ export type PhotoStatus = RoundStatus
 
 export type AccountDataExport = {
   format: 'worttrainer-account-export'
-  schemaVersion: 1
+  schemaVersion: 2
   exportedAt: string
   account: { id: string } & ({ email: string } | { username: string })
+  languagePreferences: LanguagePreferences
   words: Word[]
   attempts: { id: string; wordId: string; correct: boolean; createdAt: string }[]
   rounds: PracticeRound[]

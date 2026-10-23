@@ -24,6 +24,22 @@ beforeEach(() => {
 })
 
 describe('spoken dictation', () => {
+  it('uses a matching additional-language voice rather than a different language', () => {
+    const french = { lang: 'fr-FR', localService: true }
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [englishVoice, french], cancel, speak })
+    const { result } = renderHook(useDictation)
+    act(() => result.current.speak('papillon', 'fr'))
+    expect(speak.mock.calls[0][0]).toMatchObject({ text: 'papillon', voice: french, lang: 'fr-FR' })
+  })
+
+  it('explicitly reports a missing additional-language voice without using another language', () => {
+    const { result } = renderHook(useDictation)
+    act(() => result.current.speak('papillon', 'fr'))
+    expect(result.current.error).toContain('No Français voice')
+    expect(result.current.error).not.toContain('papillon')
+    expect(speak).not.toHaveBeenCalled()
+  })
+
   it('uses a matching German voice, allows repeat, and cancels on unmount', () => {
     const { result, unmount } = renderHook(useDictation)
     act(() => result.current.speak('Straße', 'de'))

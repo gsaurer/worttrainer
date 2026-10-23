@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PracticeRound, Word } from '../../shared/model'
 import { api } from '../lib/api'
@@ -14,12 +14,27 @@ beforeEach(() => {
 })
 
 describe('whole-round dictation', () => {
+  it('starts in the account default language and excludes disabled languages from new rounds', async () => {
+    const user = userEvent.setup()
+    const french: Word = { ...word, id: 'french', text: 'papillon', language: 'fr' }
+    const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue({ ...round, words: [{ ...round.words[0], id: french.id, text: french.text, language: 'fr' }] })
+    render(<Practice words={[word, french]} loading={false} onUpdated={vi.fn()} preferences={{ enabled: ['fr'], defaultLanguage: 'fr' }} />)
+    expect(screen.getByText('Français · All categories · 1 available')).toBeInTheDocument()
+    await user.click(screen.getByText('Change words', { selector: 'summary' }))
+    expect(screen.getByLabelText('Language')).toHaveValue('fr')
+    expect(screen.getByRole('option', { name: 'Français' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Deutsch' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Start 10 words' }))
+    expect(create).toHaveBeenCalledWith([french.id])
+    expect(document.body).not.toHaveTextContent('papillon')
+  })
+
   it('persists a filtered round before dictation and never offers immediate marking', async () => {
     const user = userEvent.setup()
     const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
     const english: Word = { ...word, id: '44444444-4444-4444-8444-444444444444', text: 'butterfly', language: 'en' }
     render(<Practice words={[word, english]} loading={false} onUpdated={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: 'Start round (1 word)' }))
+    await user.click(await screen.findByRole('button', { name: 'Start 10 words' }))
     expect(create).toHaveBeenCalledWith([word.id])
     expect(document.body).not.toHaveTextContent(word.text)
     expect(screen.queryByRole('button', { name: /reveal|spelled correctly/i })).not.toBeInTheDocument()
@@ -30,27 +45,27 @@ describe('whole-round dictation', () => {
     const user = userEvent.setup()
     vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
     render(<Practice words={[word]} loading={false} onUpdated={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: /start round/i }))
+    await user.click(await screen.findByRole('button', { name: 'Start 10 words' }))
     await user.click(screen.getByRole('button', { name: /listen to the hidden/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No Deutsch voice')
     expect(document.body).not.toHaveTextContent(word.text)
     expect(window.speechSynthesis.speak).not.toHaveBeenCalled()
   })
 
-  it('does not start an empty list and defaults large collections to ten words', async () => {
+  it('disables empty rounds and offers a direct ten-word start for large collections', async () => {
     const user = userEvent.setup()
     const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
     const { rerender } = render(<Practice words={[]} loading={false} onUpdated={vi.fn()} />)
-    expect(await screen.findByRole('button', { name: /start round/i })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Start 10 words' })).toBeDisabled()
     rerender(<Practice words={Array.from({ length: 101 }, (_, index) => ({ ...word, id: String(index) }))} loading={false} onUpdated={vi.fn()} />)
-    expect(screen.getByLabelText('How many words?')).toHaveValue('10')
-    await user.click(screen.getByRole('button', { name: 'Start round (10 words)' }))
+    expect(screen.queryByLabelText('How many words?')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Start 10 words' }))
     expect(create).toHaveBeenCalledOnce()
     expect(create.mock.calls[0][0]).toHaveLength(10)
     expect(new Set(create.mock.calls[0][0]).size).toBe(10)
   })
 
-  it.each([10, 15, 20, 25])('selects exactly %i distinct words from the chosen language and category', async size => {
+  it.each([10, 15, 20])('selects exactly %i distinct words from the chosen language and category', async size => {
     const user = userEvent.setup()
     const candidates = Array.from({ length: 30 }, (_, index) => ({ ...word, id: `eligible-${index}`, text: `Word-${index}` }))
     const excluded: Word[] = [
@@ -59,9 +74,10 @@ describe('whole-round dictation', () => {
     ]
     const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
     render(<Practice words={[...candidates, ...excluded]} loading={false} onUpdated={vi.fn()} />)
-    await user.selectOptions(screen.getByLabelText('Which words?'), 'new')
-    await user.selectOptions(screen.getByLabelText('How many words?'), String(size))
-    await user.click(screen.getByRole('button', { name: `Start round (${size} words)` }))
+    expect(screen.getByLabelText('Language')).not.toBeVisible()
+    await user.click(screen.getByText('Change words', { selector: 'summary' }))
+    await user.selectOptions(screen.getByLabelText('Category'), 'new')
+    await user.click(screen.getByRole('button', { name: `Start ${size} words` }))
     expect(create).toHaveBeenCalledOnce()
     const selected = create.mock.calls[0][0]
     expect(selected).toHaveLength(size)
@@ -69,23 +85,50 @@ describe('whole-round dictation', () => {
     expect(selected.every(id => candidates.some(candidate => candidate.id === id))).toBe(true)
   })
 
-  it('uses all available words when fewer match than the requested size', async () => {
+  it.each([10, 15, 20])('keeps all three choices visible and caps the %i-word choice at the available eight words', async size => {
     const user = userEvent.setup()
     const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
-    render(<Practice words={[word]} loading={false} onUpdated={vi.fn()} />)
-    await user.selectOptions(screen.getByLabelText('How many words?'), '25')
-    expect(screen.getByText(/fewer words are available/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Start round (1 word)' }))
-    expect(create).toHaveBeenCalledWith([word.id])
+    const available = Array.from({ length: 8 }, (_, index) => ({ ...word, id: `available-${index}` }))
+    render(<Practice words={available} loading={false} onUpdated={vi.fn()} />)
+    const actions = screen.getByRole('group', { name: 'Start a practice challenge' })
+    expect(within(actions).getAllByRole('button')).toHaveLength(3)
+    expect(within(actions).getAllByText('words')).toHaveLength(3)
+    const start = within(actions).getByRole('button', { name: `Start ${size} words` })
+    expect(start).toHaveAccessibleDescription('Uses up to 8 available words, without repeats.')
+    await user.click(start)
+    expect(create.mock.calls[0][0].sort()).toEqual(available.map(item => item.id).sort())
   })
 
-  it('resumes the saved length rather than applying the current ten-word preset', async () => {
+  it('keeps the challenge visible for collections between presets and uses all available words', async () => {
+    const user = userEvent.setup()
+    const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
+    render(<Practice words={Array.from({ length: 12 }, (_, index) => ({ ...word, id: `available-${index}` }))} loading={false} onUpdated={vi.fn()} />)
+    const actions = screen.getByRole('group', { name: 'Start a practice challenge' })
+    expect(within(actions).getAllByRole('button')).toHaveLength(3)
+    await user.click(within(actions).getByRole('button', { name: 'Start 20 words' }))
+    expect(create.mock.calls[0][0]).toHaveLength(12)
+    expect(new Set(create.mock.calls[0][0]).size).toBe(12)
+  })
+
+  it('changes the visible selection and start actions when another language is chosen', async () => {
+    const user = userEvent.setup()
+    const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)
+    const english: Word = { ...word, id: 'english', text: 'butterfly', language: 'en' }
+    render(<Practice words={[word, english]} loading={false} onUpdated={vi.fn()} />)
+    await user.click(screen.getByText('Change words', { selector: 'summary' }))
+    await user.selectOptions(screen.getByLabelText('Language'), 'en')
+    expect(screen.getByText('English · All categories · 1 available')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Start 10 words' }))
+    expect(create).toHaveBeenCalledWith([english.id])
+  })
+
+  it('resumes the saved length rather than applying a current start size', async () => {
     const user = userEvent.setup()
     const saved = { ...round, words: Array.from({ length: 25 }, (_, index) => ({ ...round.words[0], id: `saved-${index}`, attemptId: `saved-attempt-${index}` })) }
     vi.spyOn(api, 'photoStatus').mockResolvedValue({ rounds: [saved], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
     const create = vi.spyOn(api, 'createPhotoRound')
     render(<Practice words={[word]} loading={false} onUpdated={vi.fn()} />)
-    expect(screen.getByLabelText('How many words?')).toHaveValue('10')
+    expect(screen.getByRole('button', { name: 'Start 10 words' })).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Continue round' }))
     expect(screen.getByRole('progressbar', { name: 'Numbered answers written' })).toHaveAttribute('max', '25')
     expect(create).not.toHaveBeenCalled()

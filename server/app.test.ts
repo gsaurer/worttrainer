@@ -86,7 +86,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await request(app).post('/api/words').set('Origin', origin).set('Cookie', cookie).set('Content-Type', 'application/json').send('{broken').expect(400)
     await post('/api/words', { text: 'a'.repeat(20_000), language: 'en' }).expect(413)
     await post('/api/words', { text: 'word', language: 'en', category: 'plus' }).expect(400)
-    await post('/api/words', { text: 'word', language: 'fr' }).expect(400)
+    await post('/api/words', { text: 'word', language: 'xx' }).expect(400)
+    await post('/api/words', { text: 'word', language: 'fr' }).expect(409)
     for (const text of ['', ' ', 'a\nb', 'a'.repeat(81)]) await post('/api/words', { text, language: 'en' }).expect(400)
   })
 
@@ -95,8 +96,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     expect(word).toMatchObject({ text: 'Schmetterling', category: 'new', consecutive_mistakes: 0, last_practiced_at: null })
     await post('/api/words', { text: 'schmetterling', language: 'de' }).expect(409)
     await add('Schmetterling', 'en')
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: unknown[] }[] }
-    expect(saved.accounts[0].attempts).toHaveLength(0)
+    const saved = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8'))
+    expect(saved.attempts).toHaveLength(0)
   })
 
   it('applies every confirmed category transition, including first mistake while in plus', async () => {
@@ -131,8 +132,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await request(app).get('/api/words').set('Cookie', cookie).expect(200)
     expect(await mark(word.id, false, attemptId)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
-    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { words: Word[] }[] }
-    expect(disk.accounts[0].words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    const disk = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8')) as { words: Word[] }
+    expect(disk.words.find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
   })
 
   it('removes attempt history when a word is deleted and rejects further marks', async () => {
@@ -140,8 +141,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await mark(word.id, false)
     await request(app).delete(`/api/words/${word.id}`).set('Origin', origin).set('Cookie', cookie).send({}).expect(204)
     await post('/api/practice', { wordId: word.id, correct: true, attemptId: randomUUID() }).expect(404)
-    const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: { wordId: string }[] }[] }
-    expect(disk.accounts[0].attempts.some(attempt => attempt.wordId === word.id)).toBe(false)
+    const disk = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8')) as { attempts: { wordId: string }[] }
+    expect(disk.attempts.some(attempt => attempt.wordId === word.id)).toBe(false)
   })
 
   it('changes password, rotates the cookie, and revokes old sessions and old credentials', async () => {
@@ -157,10 +158,10 @@ describe('real self-hosted authentication and JSON persistence', () => {
   it('never overwrites a corrupt or unsupported store with an empty collection', async () => {
     const file = join(directory, 'broken.json')
     await writeFile(file, '{not valid JSON')
-    await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
+    await expect(FileStore.open(file)).rejects.toThrow('no data has been reset')
     expect(await readFile(file, 'utf8')).toBe('{not valid JSON')
     await writeFile(file, '{"version":99}')
-    await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
+    await expect(FileStore.open(file)).rejects.toThrow('no data has been reset')
   })
 
   it('recovers a forgotten password without deleting words or leaving active sessions', async () => {
@@ -192,7 +193,7 @@ describe('real self-hosted authentication and JSON persistence', () => {
     const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8'))
     const oldSessions = [{ tokenHash: createHash('sha256').update(cookie.split('=')[1]).digest('hex'), expiresAt: Date.now() + 60_000 }]
     const account = store.account(accountId)
-    const data = disk.accounts[0]
+    const data = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8'))
     await writeFile(file, JSON.stringify({ version: 1, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds, ocrUsage: disk.ocrUsage, sessions: oldSessions, account: { username: 'old-parent', salt: account.salt, passwordHash: account.passwordHash } }))
     const legacy = await FileStore.open(file)
     const legacyApp = createApp({ ...options(), store: legacy })
@@ -211,8 +212,9 @@ describe('real self-hosted authentication and JSON persistence', () => {
       .send({ email: ' Parent@Example.com ', password: 'a recovered secure passphrase' }).expect(200)
     expect(response.body).toEqual({ authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' })
     const saved = JSON.parse(await readFile(file, 'utf8'))
-    expect(saved.accounts[0].words).toEqual(data.words)
-    expect(saved.accounts[0].attempts).toEqual(data.attempts)
+    const practice = JSON.parse(await readFile(join(directory, 'legacy.accounts', `${legacyId}.json`), 'utf8'))
+    expect(practice.words).toEqual(data.words)
+    expect(practice.attempts).toEqual(data.attempts)
     expect(saved.accounts[0].account).not.toHaveProperty('username')
     expect(saved.accounts[0].account.passwordHash).toBe(account.passwordHash)
     expect(saved.sessions).toHaveLength(2)
