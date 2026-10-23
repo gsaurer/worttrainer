@@ -38,6 +38,61 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
 describe('account language preferences', () => {
+  it('saves the website language in only its account file and syncs it in sessions and exports after restart', async () => {
+    const word = await store.addWord(first.id, 'beautiful', 'en')
+    const round = await store.createPhotoRound(first.id, [word.id])
+    const indexBefore = await readFile(file, 'utf8')
+    const otherFile = join(directory, 'store.accounts', `${second.id}.json`)
+    const otherBefore = await readFile(otherFile, 'utf8')
+    await post('/api/website-language', { websiteLanguage: 'de' }).expect(200).expect({ websiteLanguage: 'de' })
+    expect((await get('/api/session')).body.websiteLanguage).toBe('de')
+    expect((await get('/api/session', second.cookie)).body.websiteLanguage).toBe('en')
+    expect(await readFile(file, 'utf8')).toBe(indexBefore)
+    expect(await readFile(otherFile, 'utf8')).toBe(otherBefore)
+    const reopened = await FileStore.open(file)
+    app = createApp({ store: reopened, origin, secureCookie: false })
+    expect((await get('/api/session')).body.websiteLanguage).toBe('de')
+    expect((await get('/api/export')).body).toMatchObject({
+      schemaVersion: 3, websiteLanguage: 'de',
+      languagePreferences: { enabled: ['de', 'en'], defaultLanguage: 'de' },
+      words: [word], rounds: [round], attempts: [],
+    })
+    await post('/api/website-language', { websiteLanguage: 'en' }).expect(200)
+    expect((await FileStore.open(file)).websiteLanguage(first.id)).toBe('en')
+  })
+
+  it('rejects unauthenticated, cross-origin, unknown language and owner-forging website settings without writing', async () => {
+    const accountFile = join(directory, 'store.accounts', `${first.id}.json`)
+    const before = await readFile(accountFile, 'utf8')
+    await post('/api/website-language', { websiteLanguage: 'de' }, '').expect(401)
+    await request(app).post('/api/website-language').set('Origin', 'https://untrusted.example').set('Cookie', first.cookie)
+      .send({ websiteLanguage: 'de' }).expect(403)
+    for (const input of [{}, { websiteLanguage: 'fr' }, { websiteLanguage: 'DE' }, { websiteLanguage: null }, { websiteLanguage: 'de', accountId: second.id }]) {
+      await post('/api/website-language', input).expect(400)
+    }
+    expect(await readFile(accountFile, 'utf8')).toBe(before)
+    expect(store.websiteLanguage(first.id)).toBe('en')
+  })
+
+  it('opens older account files in English without rewriting them, and refuses malformed saved website settings', async () => {
+    const word = await store.addWord(first.id, 'Straße', 'de')
+    const accountFile = join(directory, 'store.accounts', `${first.id}.json`)
+    const data = JSON.parse(await readFile(accountFile, 'utf8'))
+    delete data.websiteLanguage
+    const legacy = JSON.stringify(data)
+    await writeFile(accountFile, legacy)
+    const reopened = await FileStore.open(file)
+    expect(reopened.websiteLanguage(first.id)).toBe('en')
+    expect(reopened.words(first.id)).toEqual([word])
+    expect(await readFile(accountFile, 'utf8')).toBe(legacy)
+    await reopened.setWebsiteLanguage(first.id, 'de')
+    expect(JSON.parse(await readFile(accountFile, 'utf8')).websiteLanguage).toBe('de')
+    const invalid = JSON.stringify({ ...data, websiteLanguage: 'fr' })
+    await writeFile(accountFile, invalid)
+    await expect(FileStore.open(file)).rejects.toThrow('no data has been reset')
+    expect(await readFile(accountFile, 'utf8')).toBe(invalid)
+  })
+
   it('persists only the signed-in account’s languages, including after restart and in the private export', async () => {
     await request(app).get('/api/languages').expect(401)
     await post('/api/languages', { enabled: ['fr'], defaultLanguage: 'fr' }, '').expect(401)
@@ -50,7 +105,7 @@ describe('account language preferences', () => {
     const reopened = await FileStore.open(file)
     expect(reopened.languagePreferences(first.id)).toEqual(preferences)
     expect(reopened.languagePreferences(second.id)).toEqual({ enabled: ['de', 'en'], defaultLanguage: 'de' })
-    expect((await get('/api/export')).body).toMatchObject({ schemaVersion: 2, languagePreferences: preferences })
+    expect((await get('/api/export')).body).toMatchObject({ schemaVersion: 3, websiteLanguage: 'en', languagePreferences: preferences })
     const clone = reopened.languagePreferences(first.id)
     clone.enabled.push('en')
     expect(reopened.languagePreferences(first.id)).toEqual(preferences)

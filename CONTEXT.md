@@ -10,9 +10,13 @@ practice history. Separate registrations do not share collections.
 _Avoid_: Shared installation account, family membership
 
 **Account practice data**:
-A parent account's language preferences, word collection, practice attempts, and
+A parent account's website language, practice-language preferences, word collection, practice attempts, and
 saved rounds, including recognized handwriting. It does not include sign-in credentials.
 _Avoid_: Account metadata
+
+**Website language**:
+The language of the website's menus, instructions, and messages, chosen separately
+from the languages of the words and dictation. Each parent account has its own choice.
 
 **Word collection**:
 The correct spellings a parent account has chosen to practice, grouped by

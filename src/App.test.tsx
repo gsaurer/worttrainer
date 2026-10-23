@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { api } from './lib/api'
-import type { Word } from '../shared/model'
+import type { AuthState, Word } from '../shared/model'
 import { initialLanguagePreferences } from '../shared/languages'
 
 const anonymous = { authenticated: false, emailMigrationRequired: false, email: null }
@@ -17,6 +17,103 @@ beforeEach(() => {
 })
 
 describe('public registration and private account state', () => {
+  it('uses the browser language for visitors, allows switching, and saves the signup language', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-AT')
+    const signup = vi.spyOn(api, 'signup').mockResolvedValue({ ...account, websiteLanguage: 'de' })
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Willkommen zurück.' })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Sprache der Website'), 'en')
+    expect(screen.getByRole('heading', { name: 'Welcome back, grown-up.' })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Website language'), 'de')
+    await user.click(screen.getByRole('button', { name: 'Konto erstellen' }))
+    await user.type(screen.getByLabelText('E-Mail-Adresse eines Elternteils'), account.email)
+    await user.type(screen.getByLabelText('Passwort', { exact: true }), 'a long test passphrase')
+    await user.type(screen.getByLabelText('Passwort bestätigen'), 'a long test passphrase')
+    await user.click(screen.getByRole('button', { name: 'Mein Konto erstellen' }))
+    expect(signup).toHaveBeenCalledWith(account.email, 'a long test passphrase', 'de')
+    expect(await screen.findByRole('heading', { name: 'Wort hinzufügen' })).toBeInTheDocument()
+    expect(document.documentElement.lang).toBe('de')
+  })
+
+  it('lets the account language override the browser and does not let an old session undo a saved choice', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE')
+    const session = vi.spyOn(api, 'session').mockResolvedValue({ ...account, websiteLanguage: 'en' })
+    vi.spyOn(api, 'languagePreferences').mockResolvedValue({ enabled: ['en'], defaultLanguage: 'en' })
+    const save = vi.spyOn(api, 'saveWebsiteLanguage').mockResolvedValue({ websiteLanguage: 'de' })
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
+    expect(document.documentElement.lang).toBe('en')
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.selectOptions(screen.getByLabelText('Website language'), 'de')
+    let resolve!: (state: AuthState) => void
+    session.mockReturnValueOnce(new Promise(resolvePromise => { resolve = resolvePromise }))
+    fireEvent(window, new Event('focus'))
+    await user.click(screen.getByRole('button', { name: 'Save language' }))
+    expect(save).toHaveBeenCalledWith('de')
+    expect(await screen.findByRole('status')).toHaveTextContent('Sprache gespeichert.')
+    expect(document.documentElement.lang).toBe('de')
+    await act(async () => resolve({ ...account, websiteLanguage: 'en' }))
+    expect(screen.getByRole('heading', { name: 'Einstellungen', level: 1 })).toBeInTheDocument()
+    expect(document.documentElement.lang).toBe('de')
+    await user.click(screen.getByRole('button', { name: 'Start', exact: true }))
+    expect(screen.getByText('English · Alle Kategorien · 0 verfügbar')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Wort hinzufügen' })).getByLabelText('Sprache')).toHaveValue('en')
+  })
+
+  it('refreshes the account website language on focus and on the thirty-second sync', async () => {
+    const session = vi.spyOn(api, 'session').mockResolvedValue({ ...account, websiteLanguage: 'en' })
+    vi.useFakeTimers()
+    try {
+      await act(async () => { render(<App />) })
+      expect(screen.getByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
+      session.mockResolvedValue({ ...account, websiteLanguage: 'de' })
+      await act(async () => { fireEvent(window, new Event('focus')) })
+      expect(screen.getByRole('heading', { name: 'Wort hinzufügen' })).toBeInTheDocument()
+      expect(document.documentElement.lang).toBe('de')
+      session.mockResolvedValue({ ...account, websiteLanguage: 'en' })
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+      expect(screen.getByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
+      expect(document.documentElement.lang).toBe('en')
+    } finally { vi.useRealTimers() }
+  })
+
+  it('cannot apply the old account’s delayed language save after switching accounts', async () => {
+    const session = vi.spyOn(api, 'session').mockResolvedValue({ ...account, websiteLanguage: 'en' })
+    let resolve!: (result: { websiteLanguage: 'de' }) => void
+    vi.spyOn(api, 'saveWebsiteLanguage').mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise }))
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.selectOptions(screen.getByLabelText('Website language'), 'de')
+    await user.click(screen.getByRole('button', { name: 'Save language' }))
+    session.mockResolvedValue({ ...account, email: 'second@example.com', websiteLanguage: 'en' })
+    fireEvent(window, new Event('focus'))
+    await screen.findByText('second@example.com')
+    await act(async () => resolve({ websiteLanguage: 'de' }))
+    expect(screen.getByRole('heading', { name: 'Add a word' })).toBeInTheDocument()
+    expect(document.documentElement.lang).toBe('en')
+  })
+
+  it('keeps a failed website-language choice retryable and translates settings errors in German', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue({ ...account, websiteLanguage: 'de' })
+    const save = vi.spyOn(api, 'saveWebsiteLanguage').mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce({ websiteLanguage: 'en' })
+    vi.spyOn(api, 'exportData').mockRejectedValue(new Error('Failed to fetch'))
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Einstellungen' }))
+    await user.selectOptions(screen.getByLabelText('Sprache der Website'), 'en')
+    await user.click(screen.getByRole('button', { name: 'Sprache speichern' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Keine Verbindung zum Server.')
+    expect(screen.getByLabelText('Sprache der Website')).toHaveValue('en')
+    await user.click(screen.getByRole('button', { name: 'Meine Daten exportieren (JSON)' }))
+    expect(screen.getAllByRole('alert').some(alert => alert.textContent?.includes('Daten konnten nicht exportiert werden: Keine Verbindung zum Server.'))).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Sprache speichern' }))
+    expect(await screen.findByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(save).toHaveBeenCalledTimes(2)
+  })
+
   it('does not substitute default settings when account language loading fails', async () => {
     const user = userEvent.setup()
     vi.spyOn(api, 'session').mockResolvedValue(account)
@@ -127,7 +224,7 @@ describe('public registration and private account state', () => {
     await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
     await user.type(screen.getByLabelText('Confirm password'), 'a long test passphrase')
     await user.click(screen.getByRole('button', { name: 'Create my account' }))
-    expect(signup).toHaveBeenCalledWith('parent@example.com', 'a long test passphrase')
+    expect(signup).toHaveBeenCalledWith('parent@example.com', 'a long test passphrase', 'en')
     expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 

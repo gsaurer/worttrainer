@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Language } from '../../shared/model'
 import { languages } from '../lib/words'
+import { useI18n } from '../i18n/context'
+import type { Message, Values } from '../i18n/messages'
 
 export function useDictation() {
+  const { t } = useI18n()
   const supported = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
   const [speaking, setSpeaking] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<{ key: Message; values?: Values } | null>(null)
   const current = useRef<SpeechSynthesisUtterance | null>(null)
 
   const stop = useCallback(() => {
@@ -29,15 +32,15 @@ export function useDictation() {
 
   const speak = useCallback((word: string, language: Language) => {
     stop()
-    setError('')
+    setError(null)
     if (!supported) {
-      setError('Spoken dictation is not supported in this browser. Try a current Chrome, Edge, or Safari browser.')
+      setError({ key: 'Spoken dictation is not supported in this browser. Try a current Chrome, Edge, or Safari browser.' })
       return
     }
     const matching = window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().split(/[-_]/)[0] === language)
     const voice = matching.find(v => v.localService) ?? matching[0]
     if (!voice) {
-      setError(`No ${languages[language].name} voice is available yet. Enable a ${languages[language].name} speech voice in your device settings, wait a moment, then try Listen again.`)
+      setError({ key: 'No {language} voice is available yet. Enable a {language} speech voice in your device settings, wait a moment, then try Listen again.', values: { language: languages[language].name } })
       return
     }
     try {
@@ -52,15 +55,15 @@ export function useDictation() {
         if (current.current !== utterance) return
         current.current = null
         setSpeaking(false)
-        setError(`Dictation could not play (${event.error}). Check your device audio and try Listen again.`)
+        setError({ key: 'Dictation could not play ({error}). Check your device audio and try Listen again.', values: { error: event.error } })
       }
       window.speechSynthesis.speak(utterance)
     } catch (error) {
       current.current = null
       setSpeaking(false)
-      setError(`Dictation could not start: ${error instanceof Error ? error.message : 'Please try again.'}`)
+      setError(error instanceof Error ? { key: 'Dictation could not start: {error}', values: { error: error.message } } : { key: 'Dictation could not start: Please try again.' })
     }
   }, [stop, supported])
 
-  return { supported, speaking, error, speak, stop }
+  return { supported, speaking, error: error ? t(error.key, error.values) : '', speak, stop }
 }

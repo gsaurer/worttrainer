@@ -7,7 +7,7 @@ import { roundStatistics, type AccountDataExport } from '../../shared/model'
 import { initialLanguagePreferences } from '../../shared/languages'
 
 const data: AccountDataExport = {
-  format: 'worttrainer-account-export', schemaVersion: 2, exportedAt: '2026-10-23T00:00:00Z', languagePreferences: initialLanguagePreferences(),
+  format: 'worttrainer-account-export', schemaVersion: 3, exportedAt: '2026-10-23T00:00:00Z', websiteLanguage: 'en', languagePreferences: initialLanguagePreferences(),
   account: { id: 'account', email: 'parent@example.test' }, words: [], attempts: [], rounds: [], statistics: roundStatistics([]),
 }
 beforeEach(() => {

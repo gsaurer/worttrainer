@@ -1,6 +1,7 @@
 import type { Language, LanguagePreferences } from './languages.js'
 export type { Language, LanguagePreferences } from './languages.js'
 export type Category = 'new' | 'plus' | 'minus'
+export type WebsiteLanguage = 'de' | 'en'
 
 export type Word = {
   id: string
@@ -16,6 +17,7 @@ export type AuthState = {
   authenticated: boolean
   emailMigrationRequired: boolean
   email: string | null
+  websiteLanguage?: WebsiteLanguage
 }
 
 export type PhotoRecognition = {
@@ -46,10 +48,11 @@ export type PhotoStatus = RoundStatus
 
 export type AccountDataExport = {
   format: 'worttrainer-account-export'
-  schemaVersion: 2
+  schemaVersion: 3
   exportedAt: string
   account: { id: string } & ({ email: string } | { username: string })
   languagePreferences: LanguagePreferences
+  websiteLanguage: WebsiteLanguage
   words: Word[]
   attempts: { id: string; wordId: string; correct: boolean; createdAt: string }[]
   rounds: PracticeRound[]

@@ -1,4 +1,4 @@
-import type { AccountDataExport, AuthState, Language, LanguagePreferences, PhotoRound, PhotoStatus, Word } from '../../shared/model'
+import type { AccountDataExport, AuthState, Language, LanguagePreferences, PhotoRound, PhotoStatus, WebsiteLanguage, Word } from '../../shared/model'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -28,7 +28,8 @@ async function readResponse<T>(response: Response, protectedRequest: boolean): P
 export const api = {
   session: () => request<AuthState>('/session'),
   login: (email: string, password: string) => request<AuthState>('/login', 'POST', { email, password }),
-  signup: (email: string, password: string) => request<AuthState>('/signup', 'POST', { email, password }),
+  signup: (email: string, password: string, websiteLanguage: WebsiteLanguage = 'en') => request<AuthState>('/signup', 'POST', { email, password, websiteLanguage }),
+  saveWebsiteLanguage: (websiteLanguage: WebsiteLanguage) => request<{ websiteLanguage: WebsiteLanguage }>('/website-language', 'POST', { websiteLanguage }, true),
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),
   words: () => request<Word[]>('/words', 'GET', undefined, true),

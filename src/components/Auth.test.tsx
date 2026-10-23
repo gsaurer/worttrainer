@@ -16,7 +16,7 @@ describe('private parent authentication', () => {
     await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
     await user.type(screen.getByLabelText('Confirm password'), 'a long test passphrase')
     await user.click(screen.getByRole('button', { name: 'Create my account' }))
-    expect(signup).toHaveBeenCalledWith('parent@example.com', 'a long test passphrase')
+    expect(signup).toHaveBeenCalledWith('parent@example.com', 'a long test passphrase', 'en')
     expect(screen.queryByLabelText('One-time setup code')).not.toBeInTheDocument()
     expect(authenticated).toHaveBeenCalledWith(state)
     expect(screen.getAllByRole('textbox')).toHaveLength(1)

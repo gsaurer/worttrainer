@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LanguagePreferences, Word } from '../../shared/model'
 import { errorMessage } from '../lib/words'
 import { api } from '../lib/api'
+import { useI18n } from '../i18n/context'
 
 export function useWords() {
+  const { t, message } = useI18n()
   const [words, setWords] = useState<Word[]>([])
   const [preferences, setPreferences] = useState<LanguagePreferences | null>(null)
   const [loading, setLoading] = useState(true)
@@ -20,7 +22,7 @@ export function useWords() {
         setError('')
       }
     } catch (error) {
-      if (requests.current.generation === request) setError(`Could not sync your account: ${errorMessage(error)}`)
+      if (requests.current.generation === request) setError(errorMessage(error))
     } finally {
       if (requests.current.generation === request) setLoading(false)
     }
@@ -55,5 +57,5 @@ export function useWords() {
     setError('')
   }, [])
 
-  return { words, preferences, loading, error, refresh, saveLanguages }
+  return { words, preferences, loading, error: error ? t('Could not sync your account: {error}', { error: message(error) }) : '', refresh, saveLanguages }
 }

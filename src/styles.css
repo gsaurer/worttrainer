@@ -61,6 +61,8 @@ form .button { margin-top: 24px; }
 .brand-mark { position: relative; display: flex; align-items: center; justify-content: center; background: var(--green); color: #f8f4df; font-family: var(--serif); font-size: 1.65rem; font-style: italic; width: 39px; height: 40px; border-radius: 10px; letter-spacing: -.12em; padding-right: 7px; transform: rotate(-5deg); }
 .brand-mark > span { font-family: "DM Sans", sans-serif; font-size: .8rem; position: absolute; right: 6px; top: 2px; color: #ebd28c; }
 .header-note { font-family: var(--serif); font-style: italic; color: var(--muted); font-size: .95rem; }
+.website-language-choice { margin: 0; max-width: 170px; font-size: .7rem; }
+.website-language-choice select { margin-top: 4px; min-height: 44px; font-size: .85rem; padding: 8px 28px 8px 10px; }
 .account { display: flex; gap: 20px; align-items: center; }
 .account > span { font-size: .75rem; color: var(--muted); max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .main-nav { display: flex; gap: 32px; align-items: center; border-bottom: 1px solid var(--line); height: 62px; }
@@ -103,6 +105,7 @@ form .button { margin-top: 24px; }
 .settings-secondary { display: grid; gap: 20px; min-width: 0; }
 .settings-panel { padding: 24px; }
 .settings-panel h2 { margin-bottom: 16px; }
+.settings-panel .fine-print { margin: 12px 0 0; }
 .settings-email { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; margin-bottom: 12px; }
 .language-settings { max-width: 650px; padding: 24px; margin: 0 auto; }
 .language-settings fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
@@ -370,6 +373,7 @@ main { animation: arrive .4s ease-out; }
   .app-shell, .welcome-page { padding: 0 16px; }
   .brand { gap: 9px; font-size: 1.4rem; }
   .account > span { display: none; }
+  .website-language-choice { max-width: 120px; }
   .page-heading h1 { font-size: 2.5rem; }
   .page-heading > p { display: none; }
   .main-nav { gap: 23px; }

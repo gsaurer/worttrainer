@@ -159,7 +159,7 @@ OCR counter. It contains no word collection, language settings, attempts, or rou
 
 Each `<account-uuid>.json` is a complete, independently copyable practice document
 with `format: "worttrainer-account-data"` and `schemaVersion: 1`. It contains
-`accountId`, `languagePreferences`, `words`, `attempts`, and `photoRounds`, including
+`accountId`, `websiteLanguage`, `languagePreferences`, `words`, `attempts`, and `photoRounds`, including
 word progress, timestamps, ordered snapshots, recognized text, and confirmed results.
 There are no credentials, sessions, parent email, or other accounts in this file.
 Statistics can be derived from its rounds. The name uses the server-owned UUID,
@@ -213,14 +213,16 @@ When signed in, open **Settings → Your data** and choose **Export my data (JSO
 a UTF-8 file named `worttrainer-YYYY-MM-DD.json` for use in other analysis tools.
 The authenticated `GET /api/export` endpoint serves the same account-scoped data.
 
-The export has `format: "worttrainer-account-export"`, `schemaVersion: 2`, and a
+The export has `format: "worttrainer-account-export"`, `schemaVersion: 3`, and a
 UTC `exportedAt` timestamp. It includes the account identifier and parent email
 (or legacy username), all currently stored words and category progress, individual
 attempts with their timestamps, complete and unfinished rounds with ordered word
 snapshots, recognized text, parent-confirmed results, and round summary statistics.
 `languagePreferences` contains the enabled language codes and `defaultLanguage`.
-Schema version 2 adds this field; existing analysis tools should accept the new
-version. Disabled-language records are included.
+Schema version 2 added practice-language preferences; version 3 adds
+`websiteLanguage` (`de` or `en`). Existing analysis tools should accept the new
+version. Keys, category codes, language codes, and timestamps are not translated.
+Disabled-language records are included.
 Join `attempts.wordId` to `words.id`, and round word `attemptId` to `attempts.id`.
 Dates inside the data are ISO timestamps in UTC; displayed app dates use local time.
 Historical individual answers are included even when they have no associated round.
@@ -301,7 +303,24 @@ and language/category totals. Spellings are not listed by default. Use
 **Search words** to find a spelling, inspect its progress, or delete it with
 confirmation. Searches show up to 20 matches; refine the query to find others.
 
-### Choose your languages
+### Website language
+
+The website is available in German and English. Before signing in, it starts in
+German for a German browser, otherwise English; use the **Website language**
+selector to switch. Creating an account saves that choice. After signing in,
+choose **Settings → Website language → Save language** (German:
+**Einstellungen → Sprache der Website → Sprache speichern**).
+This preference is saved in your private account file and restored at sign-in.
+Other visible devices sync on focus or within 30 seconds. Existing accounts
+without this preference keep the original English interface.
+
+Website language is independent of practice languages: switching the interface
+does not translate your words, change categories or results, or select a different
+dictation voice. Dates display in the website language and device time zone;
+exports retain ISO UTC timestamps. Unknown technical error details remain visible
+as returned by the server or device.
+
+### Choose your practice languages
 
 Open **Settings → Languages**, enable languages from the built-in catalogue, choose a
 **Default language**, and **Save languages**. These preferences belong to your

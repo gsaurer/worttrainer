@@ -28,7 +28,7 @@ describe('word collection', () => {
     await user.type(screen.getByLabelText('Search words'), 'Straße')
     const time = container.querySelector('time')
     expect(time).toHaveAttribute('dateTime', timestamp)
-    expect(time).toHaveTextContent(new Date(timestamp).toLocaleString())
+    expect(time).toHaveTextContent(new Date(timestamp).toLocaleString('en-GB'))
   })
 
   it('opens with an aggregate overview, not the full list of spellings', () => {
