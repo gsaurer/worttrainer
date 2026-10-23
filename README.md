@@ -218,13 +218,12 @@ Never put the parent account password in `.env`; the secure browser form sets it
    spaces), and adding is disabled for that language. The server also rejects
    duplicates, including simultaneous additions from another device. Different
    languages and accounts can keep the same spelling independently.
-2. On the same home page, press **Start 10 words**, **Start 15 words**,
-   **Start 20 words**, or **Start 25 words**. One press saves and opens the
-   numbered round. Use **Change words** for optional language/category filters.
-   Each round randomly selects distinct matching words. Smaller collections show
-   only the available sizes, without duplicate buttons: eight matching words
-   give one **Start 8 words** button; twelve give **Start 10 words** and
-   **Start 12 words**. Resuming a saved round keeps its original words and length.
+2. On the same home page, press **10 words**, **15 words**, or **20 Challenge**.
+   All three buttons stay visible and start a numbered round with one press.
+   Use **Change words** for optional language/category filters. Sizes are
+   maximums: if only eight words match, every choice uses those eight, without
+   repeats. A short note shows this limit. Resuming a saved round keeps its
+   original words and length, including older 25-word rounds.
 3. Tap **Listen** and write the answer on paper, numbered **1, 2, 3...**.
    Spelling stays concealed, including from the accessibility tree, throughout
    dictation. Tap **Next word** to save your position, or **Check answers** after
@@ -287,7 +286,7 @@ All rounds support manual review without OCR configuration. To use one photo:
 
 1. Start a numbered round. Each word is dictated without displaying its spelling.
    Write one answer per line, numbered **1, 2, 3...** in dictation order. A sheet
-   uses up to 25 words; older saved rounds of up to 100 words still work.
+   uses up to 20 words; older saved rounds of up to 100 words still work.
 2. Tap **Next word**, then **Check answers** after the last word.
    The server saves the ordered word snapshots,
    current position, start time, and writing-finished time. Pause and reopen

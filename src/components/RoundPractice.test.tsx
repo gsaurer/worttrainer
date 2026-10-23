@@ -26,7 +26,7 @@ describe('persisted whole-round practice', () => {
     const review = vi.spyOn(api, 'reviewPhotoRound').mockResolvedValue({ ...written, reviewedAt: '2026-10-22T12:02:00Z', results: [true] })
     const refresh = vi.fn().mockResolvedValue(undefined)
     render(<RoundPractice words={[word]} onUpdated={refresh} />)
-    await user.click(await screen.findByRole('button', { name: 'Start 1 word' }))
+    await user.click(await screen.findByRole('button', { name: 'Start 10 words' }))
     expect(document.body).not.toHaveTextContent(word.text)
     expect(screen.queryByText(/expected spelling/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Check answers' }))

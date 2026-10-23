@@ -100,7 +100,8 @@ export function RoundPractice({ words, onUpdated, loading = false, filters, sele
   }
 
   const word = round?.words[round.nextIndex]
-  const roundSizes = words.length ? [...new Set([10, 15, 20, 25].map(size => Math.min(size, words.length)))] : [10]
+  const roundSizes = [10, 15, 20]
+  const shortRound = !loading && words.length > 0 && words.length < 20
   return <section className="photo-practice" aria-label="Practice rounds">
     {round && <div className="practice-topline">
       <span>Round <span className="round-id" title={round.id}>#{round.id.slice(0, 8)}</span></span>
@@ -113,8 +114,9 @@ export function RoundPractice({ words, onUpdated, loading = false, filters, sele
         <p className="round-instruction">Listen. Write numbered answers on paper. Check them at the end.</p>
         <p className="selection-summary">{selectionLabel && <>{selectionLabel} · </>}{loading ? 'Syncing…' : `${words.length} available`}</p>
         <div className="round-starts" role="group" aria-label="Start a practice round">
-          {roundSizes.map((size, index) => <button key={size} className={`button ${index === 0 ? 'primary' : 'secondary'}`} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, size).map(word => word.id))) })}>Start {size} {size === 1 ? 'word' : 'words'}</button>)}
+          {roundSizes.map((size, index) => <button key={size} className={`button ${index === 0 ? 'primary' : 'secondary'}`} aria-label={size === 20 ? 'Start 20-word challenge' : `Start ${size} words`} aria-describedby={shortRound ? 'round-size-note' : undefined} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, size).map(word => word.id))) })}><strong>{size}</strong><span>{size === 20 ? 'Challenge' : 'words'}</span></button>)}
         </div>
+        {shortRound && <p className="round-size-note" id="round-size-note">Uses up to {words.length} available {words.length === 1 ? 'word' : 'words'}, without repeats.</p>}
         {filters && <details className="round-options"><summary>Change words</summary><fieldset className="round-filters" disabled={busy || loading}>{filters}</fieldset></details>}
         {!loading && !words.length && <p className="notice">No matching words. Add a word or change the filters.</p>}
         {!speech.supported && <p className="error">This browser does not support dictation. Use a current Chrome, Edge, or Safari browser.</p>}

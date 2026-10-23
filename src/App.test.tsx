@@ -71,7 +71,7 @@ describe('public registration and private account state', () => {
     vi.spyOn(api, 'createPhotoRound').mockResolvedValue({ id: 'round-1', startedAt: word.created_at, writtenAt: null, reviewedAt: null, nextIndex: 0, words: [{ id: word.id, text: word.text, language: word.language, attemptId: 'attempt-1' }], recognition: null, results: null })
     render(<App />)
     await user.type(await screen.findByLabelText('Word'), word.text)
-    await user.click(screen.getByRole('button', { name: 'Start 1 word' }))
+    await user.click(screen.getByRole('button', { name: 'Start 10 words' }))
     expect(screen.queryByLabelText('Word')).not.toBeInTheDocument()
     expect(screen.queryByDisplayValue(word.text)).not.toBeInTheDocument()
     expect(document.body).not.toHaveTextContent(word.text)
