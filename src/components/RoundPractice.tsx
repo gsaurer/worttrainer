@@ -28,6 +28,7 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
 }) {
   const [status, setStatus] = useState<RoundStatus | null>(null)
   const [round, setRound] = useState<PracticeRound | null>(null)
+  const [roundSize, setRoundSize] = useState(10)
   const [answers, setAnswers] = useState<(boolean | null)[]>([])
   const [pendingResults, setPendingResults] = useState<boolean[] | null>(null)
   const [photo, setPhoto] = useState<File | null>(null)
@@ -96,6 +97,7 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
   }
 
   const word = round?.words[round.nextIndex]
+  const selectedCount = Math.min(words.length, roundSize)
   return <section className="photo-practice" aria-label="Practice rounds">
     {round && <div className="practice-topline">
       <span>Round <span className="round-id" title={round.id}>#{round.id.slice(0, 8)}</span></span>
@@ -107,11 +109,14 @@ export function RoundPractice({ words, onUpdated, loading = false, filters }: {
         <p className="eyebrow">A LITTLE PRACTICE. A RECORD OF PROGRESS.</p>
         <h2>One round, one step forward.</h2>
         <p>Choose your words, then listen and write the whole round on paper. Number each answer <strong>1, 2, 3…</strong> in dictation order. At the end, mark the answers manually or upload one photo and check the suggestions.</p>
-        {filters}
+        <div className="round-filters">
+          {filters}
+          <div><label htmlFor="round-size">How many words?</label><select id="round-size" value={roundSize} disabled={busy || loading} onChange={event => setRoundSize(Number(event.target.value))}>{[10, 15, 20, 25].map(size => <option key={size} value={size}>{size} words</option>)}</select></div>
+        </div>
+        {words.length > 0 && <p className="fine-print">{selectedCount} of {words.length} matching {words.length === 1 ? 'word' : 'words'} in this round. {words.length < roundSize ? 'Fewer words are available than your chosen size, so all matching words will be used.' : 'Randomly selected, with no repeats within the round.'}</p>}
         <p className="fine-print">No child account or name is needed. Photograph only the answers, not names, faces, or other personal details. Unclear handwriting never automatically counts as wrong.</p>
-        <button className="button primary" disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, 100).map(word => word.id))) })}>Start round ({Math.min(words.length, 100)} {words.length === 1 ? 'word' : 'words'})</button>
+        <button className="button primary" disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => void run(async () => { openRound(await api.createPhotoRound(shuffled(words).slice(0, roundSize).map(word => word.id))) })}>Start round ({selectedCount} {selectedCount === 1 ? 'word' : 'words'})</button>
         {!words.length && <p className="notice">{loading ? 'Syncing your collection…' : 'Add words or choose another language or category before starting a round.'}</p>}
-        {words.length > 100 && <p className="notice">{words.length} words match your filters. This round selects 100 at random; choose a category for a smaller round.</p>}
         {!speech.supported && <p className="error">This browser does not support dictation. Use a current Chrome, Edge, or Safari browser.</p>}
         {status && <p className="notice">{status.ocr.enabled ? `Photo reading configured. Shared server budget: ${status.ocr.used} of ${status.ocr.limit} reserved readings used in ${status.ocr.month} (UTC). Your sheets and results remain private.` : 'Automatic reading is not configured yet. Set an Azure Free/F0 endpoint and key on the server; manual end-of-sheet review already works.'}</p>}
         {!status && <button className="text-button" disabled={busy} onClick={() => void run(async () => { setStatus(await api.photoStatus()) })}>Reload saved rounds</button>}
