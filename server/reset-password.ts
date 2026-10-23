@@ -21,7 +21,7 @@ async function recover() {
     try { return await terminal.question('') }
     finally { muted = false; process.stdout.write('\n') }
   }
-  console.log('The app MUST be stopped before recovery. Back up its data file first.')
+  console.log('The app MUST be stopped before recovery. Back up its index and account data directory first.')
   try {
     const confirm = await terminal.question('Type RESET to continue: ')
     if (confirm !== 'RESET') throw new Error('Recovery canceled; nothing was changed.')

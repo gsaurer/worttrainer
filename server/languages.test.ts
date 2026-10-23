@@ -58,6 +58,7 @@ describe('account language preferences', () => {
 
   it('rejects invalid, duplicate, empty, unknown, disabled-default and owner-forging settings without writing them', async () => {
     const before = await readFile(file, 'utf8')
+    const practiceBefore = await readFile(join(directory, 'store.accounts', `${first.id}.json`), 'utf8')
     for (const input of [
       { enabled: [], defaultLanguage: 'de' },
       { enabled: ['de', 'de'], defaultLanguage: 'de' },
@@ -66,6 +67,7 @@ describe('account language preferences', () => {
       { enabled: ['fr'], defaultLanguage: 'fr', accountId: second.id },
     ]) await post('/api/languages', input).expect(400)
     expect(await readFile(file, 'utf8')).toBe(before)
+    expect(await readFile(join(directory, 'store.accounts', `${first.id}.json`), 'utf8')).toBe(practiceBefore)
   })
 
   it('supports new languages end to end and preserves disabled-language words, reviews, history and progress', async () => {
@@ -90,28 +92,34 @@ describe('account language preferences', () => {
     await post('/api/photo-rounds', { wordIds: [word.id] }).expect(201)
   })
 
-  it('opens older version-2 accounts with Deutsch/English defaults without overwriting their data', async () => {
+  it('migrates older version-2 accounts with Deutsch/English defaults and preserves their original data', async () => {
     const word = await store.addWord(first.id, 'Straße', 'de')
     const round = await store.createPhotoRound(first.id, [word.id])
     const data = JSON.parse(await readFile(file, 'utf8'))
-    for (const account of data.accounts) delete account.languagePreferences
+    data.version = 2
+    for (const account of data.accounts) {
+      const practice = JSON.parse(await readFile(join(directory, 'store.accounts', `${account.id}.json`), 'utf8'))
+      Object.assign(account, { words: practice.words, attempts: practice.attempts, photoRounds: practice.photoRounds })
+    }
     const legacy = JSON.stringify(data)
-    await writeFile(file, legacy)
-    const reopened = await FileStore.open(file)
+    const oldFile = join(directory, 'legacy.json')
+    await writeFile(oldFile, legacy)
+    const reopened = await FileStore.open(oldFile)
     expect(reopened.languagePreferences(first.id)).toEqual({ enabled: ['de', 'en'], defaultLanguage: 'de' })
     expect(reopened.words(first.id)).toEqual([word])
     expect(reopened.photoRounds(first.id)).toEqual([round])
-    expect(await readFile(file, 'utf8')).toBe(legacy)
+    expect(await readFile(`${oldFile}.v2.bak`, 'utf8')).toBe(legacy)
     await reopened.setLanguagePreferences(first.id, { enabled: ['de', 'fr'], defaultLanguage: 'fr' })
-    expect((await FileStore.open(file)).words(first.id)).toEqual([word])
+    expect((await FileStore.open(oldFile)).words(first.id)).toEqual([word])
   })
 
   it('does not replace a store containing malformed saved language preferences', async () => {
-    const data = JSON.parse(await readFile(file, 'utf8'))
-    data.accounts[0].languagePreferences = { enabled: [], defaultLanguage: 'de' }
+    const target = join(directory, 'store.accounts', `${first.id}.json`)
+    const data = JSON.parse(await readFile(target, 'utf8'))
+    data.languagePreferences = { enabled: [], defaultLanguage: 'de' }
     const invalid = JSON.stringify(data)
-    await writeFile(file, invalid)
-    await expect(FileStore.open(file)).rejects.toThrow('has not been overwritten')
-    expect(await readFile(file, 'utf8')).toBe(invalid)
+    await writeFile(target, invalid)
+    await expect(FileStore.open(file)).rejects.toThrow('no data has been reset')
+    expect(await readFile(target, 'utf8')).toBe(invalid)
   })
 })

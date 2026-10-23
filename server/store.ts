@@ -1,7 +1,8 @@
-import { chmod, copyFile, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { constants } from 'node:fs'
-import { dirname } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type Word } from '../shared/model.js'
 import { initialLanguagePreferences } from '../shared/languages.js'
@@ -59,9 +60,7 @@ const legacyStoreSchema = z.object({
   }
 })
 const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
-const storeSchema = z.object({
-  version: z.literal(2), accounts: z.array(accountDataSchema), sessions: z.array(sessionSchema), ocrUsage: usageSchema,
-}).strict().superRefine((data, context) => {
+function validateOwnership(data: { accounts: { id: string; account: Account }[]; sessions: StoredSession[] }, context: z.RefinementCtx) {
   const ids = new Set(data.accounts.map(account => account.id))
   const emails = data.accounts.flatMap(item => 'email' in item.account ? [item.account.email] : [])
   if (ids.size !== data.accounts.length || new Set(emails).size !== emails.length ||
@@ -70,12 +69,96 @@ const storeSchema = z.object({
       new Set(data.sessions.map(session => session.tokenHash)).size !== data.sessions.length) {
     context.addIssue({ code: 'custom', message: 'Inconsistent account ownership.' })
   }
-})
+}
+const stateSchema = z.object({
+  accounts: z.array(accountDataSchema), sessions: z.array(sessionSchema), ocrUsage: usageSchema,
+}).strict().superRefine(validateOwnership)
+const oldStoreSchema = stateSchema.safeExtend({ version: z.literal(2) })
+const indexSchema = z.object({
+  version: z.literal(3),
+  accounts: z.array(z.object({ id: z.uuid(), account: accountSchema }).strict()),
+  sessions: z.array(sessionSchema), ocrUsage: usageSchema,
+}).strict().superRefine(validateOwnership)
+const accountFileSchema = z.object({
+  format: z.literal('worttrainer-account-data'), schemaVersion: z.literal(1),
+  accountId: z.uuid(), languagePreferences: languagePreferencesSchema,
+  ...collectionShape,
+}).strict().superRefine(validateCollection)
 
 export type Account = z.infer<typeof accountSchema>
 export type StoredSession = z.infer<typeof sessionSchema>
-type State = z.infer<typeof storeSchema>
+type State = z.infer<typeof stateSchema>
 type AccountData = z.infer<typeof accountDataSchema>
+
+function accountDirectory(file: string) {
+  return join(dirname(file), `${basename(file, extname(file))}.accounts`)
+}
+
+function accountFile(file: string, id: string) {
+  return join(accountDirectory(file), `${z.uuid().parse(id)}.json`)
+}
+
+function privateData(data: AccountData): z.infer<typeof accountFileSchema> {
+  return {
+    format: 'worttrainer-account-data', schemaVersion: 1, accountId: data.id,
+    languagePreferences: data.languagePreferences,
+    words: data.words, attempts: data.attempts, photoRounds: data.photoRounds,
+  }
+}
+
+function indexData(state: State): z.infer<typeof indexSchema> {
+  return {
+    version: 3, accounts: state.accounts.map(({ id, account }) => ({ id, account })),
+    sessions: state.sessions, ocrUsage: state.ocrUsage,
+  }
+}
+
+function missing(error: unknown) {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT'
+}
+
+async function writeJson(file: string, data: unknown) {
+  const temp = `${file}.${randomUUID()}.tmp`
+  try {
+    const handle = await open(temp, 'wx', 0o600)
+    try {
+      await handle.writeFile(JSON.stringify(data, null, 2) + '\n', 'utf8')
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    await rename(temp, file)
+  } catch (error) {
+    await rm(temp, { force: true })
+    throw error
+  }
+}
+
+async function preserveBackup(file: string, text: string, version: 1 | 2) {
+  const backup = `${file}.v${version}.bak`
+  try { await copyFile(file, backup, constants.COPYFILE_EXCL) }
+  catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
+    if (await readFile(backup, 'utf8') !== text) throw new Error(`The existing version-${version} backup differs from the source. Preserve both files before retrying migration.`)
+  }
+  await chmod(backup, 0o600)
+}
+
+async function ensureAccountFile(file: string, data: AccountData) {
+  const target = accountFile(file, data.id)
+  await mkdir(accountDirectory(file), { recursive: true, mode: 0o700 })
+  let text: string
+  try { text = await readFile(target, 'utf8') }
+  catch (error) {
+    if (!missing(error)) throw error
+    await writeJson(target, privateData(data))
+    return
+  }
+  if (!isDeepStrictEqual(accountFileSchema.parse(JSON.parse(text)), privateData(data))) {
+    throw new Error(`Existing account data ${target} differs from the migration or registration. Preserve both files before retrying; neither has been replaced.`)
+  }
+  await chmod(target, 0o600)
+}
 
 function owned(state: State, accountId: string): AccountData {
   const account = state.accounts.find(account => account.id === accountId)
@@ -87,13 +170,19 @@ export class FileStore {
   private tail: Promise<void> = Promise.resolve()
   private constructor(private file: string, private state: State) {}
 
-  static async open(file: string) {
+  static async open(file: string): Promise<FileStore> {
     await mkdir(dirname(file), { recursive: true, mode: 0o700 })
     let text: string
     try { text = await readFile(file, 'utf8') }
     catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-        return new FileStore(file, { version: 2, accounts: [], sessions: [], ocrUsage: { month: null, used: 0 } })
+      if (missing(error)) {
+        let entries: string[] = []
+        try { entries = await readdir(accountDirectory(file)) }
+        catch (error) { if (!missing(error)) throw error }
+        if (entries.length) throw new Error(`Missing account index ${file}, but account data exists. Restore the index from a matching backup; no data has been reset.`)
+        const state: State = { accounts: [], sessions: [], ocrUsage: { month: null, used: 0 } }
+        await writeJson(file, indexData(state))
+        return new FileStore(file, state)
       }
       throw new Error(`Cannot read data store ${file}. Restore a valid backup; the file has not been overwritten.`, { cause: error })
     }
@@ -102,27 +191,43 @@ export class FileStore {
       if (typeof raw === 'object' && raw !== null && 'version' in raw && raw.version === 1) {
         const old = legacyStoreSchema.parse(raw)
         const id = randomUUID()
-        const state = storeSchema.parse({
+        const state = oldStoreSchema.parse({
           version: 2,
           accounts: old.account ? [{ id, account: old.account, words: old.words, attempts: old.attempts, photoRounds: old.photoRounds }] : [],
           sessions: old.sessions.map(session => ({ ...session, accountId: id })),
           ocrUsage: old.ocrUsage,
         })
-        try { await copyFile(file, `${file}.v1.bak`, constants.COPYFILE_EXCL) }
-        catch (error) {
-          if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
-          if (await readFile(`${file}.v1.bak`, 'utf8') !== text) throw new Error('The existing version-1 backup differs from the source. Preserve both files and move the old backup before retrying migration.')
-          console.info('Existing version-1 backup retained:', `${file}.v1.bak`)
-        }
-        await chmod(`${file}.v1.bak`, 0o600)
-        const store = new FileStore(file, state)
-        await store.transaction(() => undefined)
-        console.info('Migrated private account storage; original backup:', `${file}.v1.bak`)
-        return store
+        await preserveBackup(file, text, 1)
+        // Persist the generated owner ID before splitting files, so retries keep it.
+        await writeJson(file, state)
+        return await FileStore.open(file)
       }
-      return new FileStore(file, storeSchema.parse(raw))
+      if (typeof raw === 'object' && raw !== null && 'version' in raw && raw.version === 2) {
+        const old = oldStoreSchema.parse(raw)
+        const state: State = { accounts: old.accounts, sessions: old.sessions, ocrUsage: old.ocrUsage }
+        await preserveBackup(file, text, 2)
+        for (const account of state.accounts) await ensureAccountFile(file, account)
+        // Publish the index only after every complete account file is durable.
+        await writeJson(file, indexData(state))
+        console.info('Migrated to separate private account files; original backup:', `${file}.v2.bak`)
+        return new FileStore(file, state)
+      }
+      const index = indexSchema.parse(raw)
+      const accounts: AccountData[] = []
+      for (const identity of index.accounts) {
+        const target = accountFile(file, identity.id)
+        let data: z.infer<typeof accountFileSchema>
+        try {
+          data = accountFileSchema.parse(JSON.parse(await readFile(target, 'utf8')))
+          if (data.accountId !== identity.id) throw new Error('The account file belongs to a different account.')
+        } catch (error) {
+          throw new Error(`Cannot read private account data ${target}. Restore its matching backup.`, { cause: error })
+        }
+        accounts.push({ ...identity, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds })
+      }
+      return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage }))
     } catch (error) {
-      throw new Error(`Cannot read data store ${file}. Restore a valid backup; the file has not been overwritten.`, { cause: error })
+      throw new Error(`Cannot read data store ${file}. Restore a valid backup; no data has been reset. ${error instanceof Error ? error.message : 'Storage operation failed.'}`, { cause: error })
     }
   }
 
@@ -249,28 +354,16 @@ export class FileStore {
   }
 
   private accountTransaction<T>(accountId: string, change: (account: AccountData) => T) {
-    return this.transaction(state => change(owned(state, accountId)))
+    return this.transaction(state => change(owned(state, accountId)),
+      state => writeJson(accountFile(this.file, accountId), privateData(owned(state, accountId))))
   }
 
-  private transaction<T>(change: (state: State) => T): Promise<T> {
+  private transaction<T>(change: (state: State) => T, persist = (state: State) => writeJson(this.file, indexData(state))): Promise<T> {
     const operation = this.tail.then(async () => {
       const draft = structuredClone(this.state)
       const result = change(draft)
-      const checked = storeSchema.parse(draft)
-      const temp = `${this.file}.${randomUUID()}.tmp`
-      try {
-        const handle = await open(temp, 'wx', 0o600)
-        try {
-          await handle.writeFile(JSON.stringify(checked, null, 2) + '\n', 'utf8')
-          await handle.sync()
-        } finally {
-          await handle.close()
-        }
-        await rename(temp, this.file)
-      } catch (error) {
-        await rm(temp, { force: true })
-        throw error
-      }
+      const checked = stateSchema.parse(draft)
+      await persist(checked)
       this.state = checked
       return structuredClone(result)
     })
@@ -284,6 +377,9 @@ export class FileStore {
       if (state.accounts.some(item => 'email' in item.account && item.account.email === account.email)) throw new HttpError(409, 'This email is already registered. Sign in instead.')
       state.accounts.push({ id: session.accountId, account, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], photoRounds: [] })
       state.sessions.push(session)
+    }, async state => {
+      await ensureAccountFile(this.file, owned(state, session.accountId))
+      await writeJson(this.file, indexData(state))
     })
   }
 

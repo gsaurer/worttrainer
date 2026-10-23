@@ -33,8 +33,10 @@ password, or mock login. Registration is public wherever the app is reachable.
 Every new account starts with an empty private collection; signing in to the
 same account on another device syncs that account's words and progress.
 
-Data is created in `data/store.json`, ignored by Git. Restarting the app preserves
-all accounts, words, progress, and unexpired sessions. On another device, sign in
+Data is created in `data/store.json` and `data/store.accounts/`, ignored by Git.
+The main file holds login information, sessions, and the shared OCR counter.
+Each account has one separate JSON file containing all its practice data.
+Restarting the app preserves all accounts, words, progress, and unexpired sessions. On another device, sign in
 with the same parent credentials once the app is hosted at a reachable URL.
 The development server is loopback-only by default.
 
@@ -43,22 +45,27 @@ service: no verification messages, magic links, or email password resets are sen
 Email ownership is not verified. Forgotten passwords require the server
 operator's interactive recovery command.
 
-### Upgrading from the single-account version
+### Upgrading existing storage
 
 Keep the existing data volume and deploy the updated application. On startup,
-version-1 JSON is validated, backed up as **`store.json.v1.bak`** beside the
-original file with restrictive permissions, and atomically migrated to version 2.
-The original account retains its password, words, practice history, saved photo
-rounds, and unexpired sessions. New registrations never receive those records.
-The shared OCR counter is preserved. No account is made an installation admin.
+version-2 combined JSON is validated and backed up exactly as **`store.json.v2.bak`**
+with restrictive permissions. The app writes each account's complete practice file
+before atomically replacing the main file with the version-3 login index.
+Account IDs, credentials, language settings, words, attempts, saved rounds,
+recognized text, unexpired sessions, and the shared OCR counter are preserved.
 
-An existing backup is never overwritten. A matching backup permits a migration
-retry; a different backup stops startup so you can preserve both files before
-moving the older backup. Unsupported or inconsistent data also stops startup
-without replacing the original file. Protect and retain the migration backup
-with your other backups; it contains the original private data and credentials.
-Old application versions cannot read version 2: stop the app and restore a
-compatible backup before rolling back, accepting loss of changes since that backup.
+Version-1 single-account storage first receives an exact **`store.json.v1.bak`**
+and a version-2 ownership upgrade, then the same split-file migration. The original
+account keeps its private records; new registrations never receive them. No account
+is made an installation admin.
+
+Existing backups are never overwritten. A matching backup and matching staged
+account files permit retry after an interrupted migration. Conflicting backups,
+conflicting account files, unsupported data, or missing/corrupt referenced account
+files stop startup instead of resetting data or replacing the conflicting files.
+Protect migration backups: they still contain the old combined private data and
+credentials. Older application versions cannot read the version-3 index. Stop the
+app and restore a compatible backup before rollback, accepting loss of newer changes.
 
 `SETUP_TOKEN` is no longer used and can be removed from `.env`. Existing emails
 and passwords still work through **Sign in**. A retired setup link is harmless
@@ -72,7 +79,7 @@ the password is verified is the username replaced by that email. Words, practice
 history, progress, and the password are preserved; that account's other sessions
 are revoked. Other accounts are unaffected. Use an email not already registered.
 Afterward, sign in on every device with that email and the same password.
-Do not delete the data file or create a fresh account to make this change.
+Do not delete the data files or create a fresh account to make this change.
 
 ## Deploy as a container (including on Proxmox)
 
@@ -127,26 +134,64 @@ This is appropriate for a small family app, not active-active cluster replicas.
 Use a local filesystem with atomic rename support, not a shared network filesystem.
 In Proxmox, move/restore the app **with its volume**, rather than running replicas
 against the same file. Multiple replicas or a much larger collection should use
-SQLite/PostgreSQL instead. The app loads all accounts' JSON into memory; each
-mutation rewrites that file. A container's writable layer is **not** the data backup.
+SQLite/PostgreSQL instead. The app loads the index and all referenced account
+files into memory. Practice changes rewrite only the affected account file;
+login/session/password and shared-quota changes rewrite only the main index.
+Registration writes the new practice file first, then publishes its identity in
+the index. A failed index write can leave an unreferenced file, but cannot expose
+an incomplete account. Unreferenced files are never automatically adopted or deleted.
+A container's writable layer is **not** the data backup.
+
+### Storage layout
+
+With the default `DATA_FILE=data/store.json`:
+
+```text
+data/
+  store.json
+  store.accounts/
+    <account-uuid>.json
+```
+
+`store.json` uses storage version 3. It contains account UUIDs, parent email (or
+legacy username), password hashes/salts, hashed sessions, and the installation-wide
+OCR counter. It contains no word collection, language settings, attempts, or rounds.
+
+Each `<account-uuid>.json` is a complete, independently copyable practice document
+with `format: "worttrainer-account-data"` and `schemaVersion: 1`. It contains
+`accountId`, `languagePreferences`, `words`, `attempts`, and `photoRounds`, including
+word progress, timestamps, ordered snapshots, recognized text, and confirmed results.
+There are no credentials, sessions, parent email, or other accounts in this file.
+Statistics can be derived from its rounds. The name uses the server-owned UUID,
+never an email or a client-supplied path. Files are private (0600) and the account
+directory is private (0700) on Unix.
+
+For a custom `DATA_FILE`, the account directory is beside it, named after its
+filename without the extension plus `.accounts` (for example,
+`/private/family.json` uses `/private/family.accounts/`). Keep both on the same
+persistent data volume. Do not change `DATA_FILE` without moving its matching
+account directory too.
 
 ### Back up and restore
 
-Use Proxmox/volume backups, or stop the app briefly and copy its JSON file:
+Use Proxmox/volume backups, or stop the app briefly and copy the **whole data
+directory**, including the index, account files, and migration backups:
 
 ```sh
 docker compose stop worttrainer
 mkdir -p backups
-docker compose cp worttrainer:/app/data/store.json ./backups/store.json
+docker compose cp worttrainer:/app/data/. ./backups/
 docker compose start worttrainer
 ```
 
 Protect backups: they contain password hashes, private words, and hashed session
 identifiers. Restore with the app stopped, correct ownership, and the same volume
-path, then restart. Keep a copy before upgrades or manual recovery. Do not run
+path, then restart. Restore the index and its account directory from the same
+snapshot; mixing versions can lose progress or stop startup. Backing up only
+`store.json` is no longer sufficient. Keep a copy before upgrades or manual recovery. Do not run
 `docker compose down -v` unless you intend to delete every account's data.
 
-If a parent password is forgotten, stop the backend, back up the file, and use
+If a parent password is forgotten, stop the backend, back up the data directory, and use
 the interactive recovery command. Select the target account by email (or old
 username); it preserves all words and revokes **only that account's sessions**:
 
@@ -187,6 +232,14 @@ file: it contains private words, email, and any recognized handwriting.
 This is an analysis format, **not** a server backup or a supported import/restore
 format; continue backing up the data volume for recovery.
 
+An operator can also copy just `data/store.accounts/<account-uuid>.json` while
+the app is stopped for that account's raw practice data. This is the backend
+practice document, not the download's enriched analysis format: it uses
+`photoRounds` rather than `rounds`, has no parent email or derived statistics,
+and uses its own schema version. The existing authenticated export button/API
+still provides the familiar analysis download. Neither format is a supported
+import or a replacement for a complete server backup.
+
 ## Configuration
 
 | Variable | Development default | Container / production |
@@ -194,7 +247,7 @@ format; continue backing up the data volume for recovery.
 | `APP_ORIGIN` | `http://localhost:5173` | Required exact origin; used for CSRF checks |
 | `PORT` | `3001` | `3000` |
 | `HOST` | `127.0.0.1` | `0.0.0.0` inside container |
-| `DATA_FILE` | `data/store.json` | `/app/data/store.json` |
+| `DATA_FILE` | `data/store.json` (login index; account files beside it) | `/app/data/store.json` and `/app/data/store.accounts/` |
 | `COOKIE_SECURE` | `false` | `true`; Compose overrides to false only for its local HTTP default |
 | `TRUST_PROXY` | `0` | Set `1` only behind exactly one trusted proxy |
 | `OCR_AZURE_ENDPOINT` | Unset | Optional HTTPS resource root, e.g. `https://your-resource.cognitiveservices.azure.com` |
@@ -390,7 +443,7 @@ do not consume its allowance. There are no Azure credentials included in this
 repository and no working external recognition until these are configured.
 
 The app reserves one analysis **before** each provider submission, persisted in
-the same JSON file. Failed/uncertain requests and explicit re-uploads still count.
+the main login index, not in an account's practice file. Failed/uncertain requests and explicit re-uploads still count.
 The default hard ceiling is **450 per UTC calendar month**, adjustable downward
 only (1–450), **shared across all accounts on the server**, not 450 per account.
 Round contents and recognized text remain private; authenticated users can see
@@ -436,10 +489,12 @@ restoring an older backup or deleting it also rolls back that local counter.
   a polling failure. Cleanup failures are logged without image content or keys;
   Azure's retention policy still applies. No provider training/privacy promises
   beyond those published terms are assumed.
-- Deleting `data/store.json` **while the app is stopped** removes every account,
-  collection, history, and session, and resets the shared OCR counter. Back it up
-  first if needed. Existing migration/volume backups are separate copies and
-  still contain private data until the operator removes them.
+- Removing only the login index does **not** remove account practice files.
+  Startup refuses a missing index when the matching account directory is nonempty;
+  restore a consistent backup instead of recreating accounts. To intentionally
+  wipe an installation while stopped, the operator must remove the index **and**
+  its account directory. Existing migration/volume backups are separate copies
+  and still contain private data until the operator removes them.
 
 Speech uses the browser's Web Speech API. A voice for each practice language must
 be installed/enabled on each device. Locally installed voices are preferred; some
@@ -465,7 +520,9 @@ password authentication, cookies, session invalidation, CSRF, input validation,
 all category transitions, concurrent answers, idempotent retries, fresh-store
 restarts, deletion, corrupt-file protection, email normalization/validation, and
 non-destructive storage/username upgrades, independent private accounts,
-cross-account request isolation, and targeted password recovery. Photo tests cover saved ordering and
+cross-account request isolation, and targeted password recovery. Storage tests cover
+one-file-per-account isolation, write scope/failures, migration backups/retries,
+missing/mismatched files, and restart/export fidelity. Photo tests cover saved ordering and
 timestamps, atomic/idempotent batch review, free-budget reservations/restarts,
 image validation/metadata removal, explicit numbering, recognition uncertainty,
 and provider errors. Provider responses in tests are fixtures, not live Azure

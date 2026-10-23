@@ -68,8 +68,8 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     expect(store.photoRound(accountId, round.id)).toMatchObject({ nextIndex: 1, writtenAt: null, reviewedAt: null })
     expect(store.photoRound(accountId, round.id).words.map(word => word.id)).toEqual(ids)
     expect(store.words(accountId).every(word => word.last_practiced_at === null)).toBe(true)
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: unknown[] }[] }
-    expect(saved.accounts[0].attempts).toHaveLength(0)
+    const saved = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8'))
+    expect(saved.attempts).toHaveLength(0)
   })
   it('saves a reviewed batch atomically and deduplicates simultaneous retries across restart', async () => {
     const round = await newRound()
@@ -85,9 +85,9 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     store = await FileStore.open(join(directory, 'store.json'))
     app = createApp(options())
     await post(path, { results: [true, false] }).expect(200)
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: { createdAt: string }[] }[] }
-    expect(saved.accounts[0].attempts).toHaveLength(2)
-    expect(saved.accounts[0].attempts.every(attempt => attempt.createdAt === store.photoRound(accountId, round.id).reviewedAt)).toBe(true)
+    const saved = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8')) as { attempts: { createdAt: string }[] }
+    expect(saved.attempts).toHaveLength(2)
+    expect(saved.attempts.every(attempt => attempt.createdAt === store.photoRound(accountId, round.id).reviewedAt)).toBe(true)
     const again = await newRound()
     await finish(again)
     await post(`/api/photo-rounds/${again.id}/review`, { results: [false, false] }).expect(200)
@@ -129,7 +129,7 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     const response = await upload(round.id).expect(200)
     expect(response.body.recognition.answers.map((answer: { text: string }) => answer.text)).toEqual(['Straße', 'Schmeterling'])
     expect(store.words(accountId).every(word => word.last_practiced_at === null)).toBe(true)
-    const saved = await readFile(join(directory, 'store.json'), 'utf8')
+    const saved = await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8')
     expect(saved).toContain('Schmeterling')
     expect(saved).not.toContain(photo.toString('base64'))
     expect(saved).not.toContain(ocr.key)
@@ -159,8 +159,8 @@ describe('persisted photo rounds and parent-confirmed batches', () => {
     await request(app).delete(`/api/photo-rounds/${round.id}`).set('Cookie', cookie).set('Origin', origin).send({}).expect(204)
     expect(store.photoRounds(accountId)).toHaveLength(0)
     expect(store.words(accountId).find(word => word.id === ids[0])?.category).toBe('plus')
-    const saved = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8')) as { accounts: { attempts: unknown[] }[] }
-    expect(saved.accounts[0].attempts).toHaveLength(2)
+    const saved = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8'))
+    expect(saved.attempts).toHaveLength(2)
   })
   it('removes stored recognition snapshots on word deletion and does not partially apply a stale batch', async () => {
     const round = await newRound()
