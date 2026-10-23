@@ -14,6 +14,21 @@ beforeEach(() => {
 })
 
 describe('whole-round dictation', () => {
+  it('starts in the account default language and excludes disabled languages from new rounds', async () => {
+    const user = userEvent.setup()
+    const french: Word = { ...word, id: 'french', text: 'papillon', language: 'fr' }
+    const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue({ ...round, words: [{ ...round.words[0], id: french.id, text: french.text, language: 'fr' }] })
+    render(<Practice words={[word, french]} loading={false} onUpdated={vi.fn()} preferences={{ enabled: ['fr'], defaultLanguage: 'fr' }} />)
+    expect(screen.getByText('Français · All categories · 1 available')).toBeInTheDocument()
+    await user.click(screen.getByText('Change words', { selector: 'summary' }))
+    expect(screen.getByLabelText('Language')).toHaveValue('fr')
+    expect(screen.getByRole('option', { name: 'Français' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Deutsch' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Start 10 words' }))
+    expect(create).toHaveBeenCalledWith([french.id])
+    expect(document.body).not.toHaveTextContent('papillon')
+  })
+
   it('persists a filtered round before dictation and never offers immediate marking', async () => {
     const user = userEvent.setup()
     const create = vi.spyOn(api, 'createPhotoRound').mockResolvedValue(round)

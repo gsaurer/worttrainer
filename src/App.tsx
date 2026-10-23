@@ -10,6 +10,7 @@ import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
 import { DataExport } from './components/DataExport'
 import { AddWord } from './components/AddWord'
+import { LanguageSettings } from './components/LanguageSettings'
 
 function removeSetupFragment() {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
@@ -56,8 +57,8 @@ export default function App() {
 }
 
 function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => void }) {
-  const { words, loading, error, refresh } = useWords()
-  const [tab, setTab] = useState<'home' | 'collection'>('home')
+  const { words, preferences, loading, error, refresh, saveLanguages } = useWords()
+  const [tab, setTab] = useState<'home' | 'collection' | 'languages'>('home')
   const [practicing, setPracticing] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -72,13 +73,13 @@ function FamilyApp({ email, onSignedOut }: { email: string; onSignedOut: () => v
 
   return <div className="app-shell">
     <header className="site-header"><Brand /><div className="account"><span title={email}>{email}</span><PasswordSettings /><button className="text-button" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button></div></header>
-    <nav className="main-nav" aria-label="Main navigation"><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { if (tab !== 'home') { setTab('home'); setPracticing(false) } }}>Home</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setTab('collection'); setPracticing(false) }}>Collection</button></nav>
+    <nav className="main-nav" aria-label="Main navigation"><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { if (tab !== 'home') { setTab('home'); setPracticing(false) } }}>Home</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setTab('collection'); setPracticing(false) }}>Collection</button><button aria-current={tab === 'languages' ? 'page' : undefined} onClick={() => { setTab('languages'); setPracticing(false) }}>Languages</button></nav>
     <main>
-      <div className="page-heading"><h1>{tab === 'collection' ? 'Collection' : 'Let’s practice'}</h1></div>
+      <div className="page-heading"><h1>{tab === 'home' ? 'Let’s practice' : tab === 'collection' ? 'Collection' : 'Languages'}</h1></div>
       {authError && <p className="error" role="alert">{authError}</p>}
       {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>Retry sync</button></div>}
-      {tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} /> : <div className="home-actions">{!practicing && <AddWord words={words} loading={loading} refresh={refresh} />}<Practice words={words} loading={loading} onUpdated={refresh} onActiveChange={setPracticing} /></div>}
+      {!preferences ? !error && <p role="status">Loading your languages…</p> : tab === 'languages' ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} /> : <div className="home-actions">{!practicing && <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} />}<Practice words={words} loading={loading} onUpdated={refresh} onActiveChange={setPracticing} preferences={preferences} /></div>}
     </main>
-    <footer><span>Little by little is a lot.</span><DataExport /><span>Deutsch & English · Made for learning together</span></footer>
+    <footer><span>Little by little is a lot.</span><DataExport /><span>Private spelling practice</span></footer>
   </div>
 }

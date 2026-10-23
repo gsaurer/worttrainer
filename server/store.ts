@@ -3,7 +3,9 @@ import { constants } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type Word } from '../shared/model.js'
+import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type Word } from '../shared/model.js'
+import { initialLanguagePreferences } from '../shared/languages.js'
+import { languagePreferencesSchema, languageSchema } from './languages.js'
 import { HttpError } from './errors.js'
 import { photoRoundSchema, recognitionSchema } from './photo-schema.js'
 import type { PhotoRecognition, PhotoRound } from '../shared/model.js'
@@ -21,7 +23,7 @@ const accountSchema = z.union([emailAccountSchema, legacyAccountSchema])
 const wordSchema = z.object({
   id: z.uuid(),
   text: z.string().refine(value => validateWord(value) === null && value.trim() === value),
-  language: z.enum(['de', 'en']),
+  language: languageSchema,
   category: z.enum(['new', 'plus', 'minus']),
   consecutive_mistakes: z.number().int().min(0).max(2),
   created_at: z.string().datetime(),
@@ -56,7 +58,7 @@ const legacyStoreSchema = z.object({
     context.addIssue({ code: 'custom', message: 'Unowned stored data.' })
   }
 })
-const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, ...collectionShape }).strict().superRefine(validateCollection)
+const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
 const storeSchema = z.object({
   version: z.literal(2), accounts: z.array(accountDataSchema), sessions: z.array(sessionSchema), ocrUsage: usageSchema,
 }).strict().superRefine((data, context) => {
@@ -135,13 +137,21 @@ export class FileStore {
   }
   words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
   photoRounds(accountId: string): PhotoRound[] { return structuredClone(owned(this.state, accountId).photoRounds) }
+  languagePreferences(accountId: string): LanguagePreferences { return structuredClone(owned(this.state, accountId).languagePreferences) }
+
+  setLanguagePreferences(accountId: string, preferences: LanguagePreferences) {
+    return this.accountTransaction(accountId, state => {
+      state.languagePreferences = languagePreferencesSchema.parse(preferences)
+      return state.languagePreferences
+    })
+  }
 
   exportData(accountId: string): AccountDataExport {
     const data = owned(this.state, accountId)
     return structuredClone({
-      format: 'worttrainer-account-export', schemaVersion: 1, exportedAt: new Date().toISOString(),
+      format: 'worttrainer-account-export', schemaVersion: 2, exportedAt: new Date().toISOString(),
       account: { id: data.id, ...('email' in data.account ? { email: data.account.email } : { username: data.account.username }) },
-      words: data.words, attempts: data.attempts, rounds: data.photoRounds,
+      languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, rounds: data.photoRounds,
       statistics: roundStatistics(data.photoRounds),
     })
   }
@@ -176,6 +186,7 @@ export class FileStore {
         return { id: word.id, text: word.text, language: word.language, attemptId: randomUUID() }
       })
       if (new Set(words.map(word => word.language)).size !== 1) throw new HttpError(400, 'Choose one language for each sheet.')
+      if (!state.languagePreferences.enabled.includes(words[0].language)) throw new HttpError(409, 'This language is disabled. Enable it in Languages before starting a new round.')
       const round: PhotoRound = { id: randomUUID(), startedAt: new Date().toISOString(), writtenAt: null, reviewedAt: null, nextIndex: 0, words, recognition: null, results: null }
       state.photoRounds.unshift(round)
       return round
@@ -271,7 +282,7 @@ export class FileStore {
   register(account: z.infer<typeof emailAccountSchema>, session: StoredSession) {
     return this.transaction(state => {
       if (state.accounts.some(item => 'email' in item.account && item.account.email === account.email)) throw new HttpError(409, 'This email is already registered. Sign in instead.')
-      state.accounts.push({ id: session.accountId, account, words: [], attempts: [], photoRounds: [] })
+      state.accounts.push({ id: session.accountId, account, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], photoRounds: [] })
       state.sessions.push(session)
     })
   }
@@ -320,6 +331,7 @@ export class FileStore {
 
   addWord(accountId: string, text: string, language: Language) {
     return this.accountTransaction(accountId, state => {
+      if (!state.languagePreferences.enabled.includes(language)) throw new HttpError(409, 'This language is disabled. Enable it in Languages before adding words.')
       if (state.words.some(word => word.language === language && word.text.toLowerCase() === text.toLowerCase())) {
         throw new HttpError(409, 'That word is already in this language’s collection.')
       }

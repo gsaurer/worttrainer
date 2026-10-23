@@ -65,7 +65,8 @@ describe('independent private accounts', () => {
     expect(response.headers['content-disposition']).toMatch(/^attachment; filename="worttrainer-\d{4}-\d{2}-\d{2}\.json"$/)
     expect(response.headers['cache-control']).toBe('no-store')
     expect(response.body).toMatchObject({
-      format: 'worttrainer-account-export', schemaVersion: 1,
+      format: 'worttrainer-account-export', schemaVersion: 2,
+      languagePreferences: { enabled: ['de', 'en'], defaultLanguage: 'de' },
       account: { id: first.id, email: first.email },
       words: [{ id: word.id, text: word.text, category: 'plus' }],
       rounds: [{ id: round.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
@@ -74,7 +75,7 @@ describe('independent private accounts', () => {
     expect(Number.isFinite(Date.parse(response.body.exportedAt))).toBe(true)
     expect(response.body.attempts).toHaveLength(2)
     expect(response.body.attempts[1]).toMatchObject({ wordId: word.id, id: round.words[0].attemptId, correct: true })
-    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'exportedAt', 'format', 'rounds', 'schemaVersion', 'statistics', 'words'])
+    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'exportedAt', 'format', 'languagePreferences', 'rounds', 'schemaVersion', 'statistics', 'words'])
     expect(Object.keys(response.body.account).sort()).toEqual(['email', 'id'])
     for (const secret of [credentials.salt, credentials.passwordHash, first.stored.tokenHash, second.email, second.id]) {
       expect(response.text).not.toContain(secret)

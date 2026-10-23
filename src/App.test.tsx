@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { api } from './lib/api'
 import type { Word } from '../shared/model'
+import { initialLanguagePreferences } from '../shared/languages'
 
 const anonymous = { authenticated: false, emailMigrationRequired: false, email: null }
 const account = { authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' }
@@ -11,10 +12,53 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/')
   vi.spyOn(api, 'session').mockResolvedValue(anonymous)
   vi.spyOn(api, 'words').mockResolvedValue([])
+  vi.spyOn(api, 'languagePreferences').mockResolvedValue(initialLanguagePreferences())
   vi.spyOn(api, 'photoStatus').mockResolvedValue({ rounds: [], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
 })
 
 describe('public registration and private account state', () => {
+  it('does not substitute default settings when account language loading fails', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const preferences = vi.spyOn(api, 'languagePreferences').mockRejectedValue(new Error('Server unavailable'))
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server unavailable')
+    expect(screen.queryByRole('heading', { name: 'Add a word' })).not.toBeInTheDocument()
+    preferences.mockResolvedValue({ enabled: ['fr'], defaultLanguage: 'fr' })
+    await user.click(screen.getByRole('button', { name: 'Retry sync' }))
+    const add = await screen.findByRole('region', { name: 'Add a word' })
+    expect(within(add).getByLabelText('Language')).toHaveValue('fr')
+  })
+
+  it('saves additional account languages and uses the new default on the home page', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const save = vi.spyOn(api, 'saveLanguagePreferences').mockResolvedValue({ enabled: ['de', 'en', 'fr'], defaultLanguage: 'fr' })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Add a word' })
+    await user.click(screen.getByRole('button', { name: 'Languages' }))
+    await user.selectOptions(screen.getByLabelText('Add a language'), 'fr')
+    await user.click(screen.getByRole('button', { name: 'Enable' }))
+    await user.selectOptions(screen.getByLabelText('Default language'), 'fr')
+    await user.click(screen.getByRole('button', { name: 'Save languages' }))
+    expect(save).toHaveBeenCalledWith({ enabled: ['de', 'en', 'fr'], defaultLanguage: 'fr' })
+    const add = await screen.findByRole('region', { name: 'Add a word' })
+    expect(within(add).getByLabelText('Language')).toHaveValue('fr')
+    expect(screen.getByText('Français · All categories · 0 available')).toBeInTheDocument()
+  })
+
+  it('syncs changed language preferences on focus without an account switch', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    const preferences = vi.spyOn(api, 'languagePreferences').mockResolvedValue(initialLanguagePreferences())
+    render(<App />)
+    const add = await screen.findByRole('region', { name: 'Add a word' })
+    expect(within(add).getByLabelText('Language')).toHaveValue('de')
+    preferences.mockResolvedValue({ enabled: ['fr'], defaultLanguage: 'fr' })
+    fireEvent(window, new Event('focus'))
+    await waitFor(() => expect(within(add).getByLabelText('Language')).toHaveValue('fr'))
+    expect(screen.getByText('Français · All categories · 0 available')).toBeInTheDocument()
+  })
+
   it('registers from a retired setup link without submitting any setup token', async () => {
     window.history.replaceState(null, '', '/#setup=retired-token')
     const signup = vi.spyOn(api, 'signup').mockResolvedValue(account)

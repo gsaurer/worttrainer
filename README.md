@@ -1,6 +1,6 @@
 # Worttrainer
 
-A small, self-hosted family spelling workshop. German and English words, spoken
+A small, self-hosted family spelling workshop. Configurable practice languages, spoken
 dictation, paper answers, and parent-marked progress. Independent private
 email/password accounts, a Node.js backend, and **real JSON storage on disk**.
 No cloud service, email provider, child profiles, or database provisioning needed
@@ -167,11 +167,14 @@ When signed in, choose **Export my data (JSON)** in the page footer. This downlo
 a UTF-8 file named `worttrainer-YYYY-MM-DD.json` for use in other analysis tools.
 The authenticated `GET /api/export` endpoint serves the same account-scoped data.
 
-The export has `format: "worttrainer-account-export"`, `schemaVersion: 1`, and a
+The export has `format: "worttrainer-account-export"`, `schemaVersion: 2`, and a
 UTC `exportedAt` timestamp. It includes the account identifier and parent email
 (or legacy username), all currently stored words and category progress, individual
 attempts with their timestamps, complete and unfinished rounds with ordered word
 snapshots, recognized text, parent-confirmed results, and round summary statistics.
+`languagePreferences` contains the enabled language codes and `defaultLanguage`.
+Schema version 2 adds this field; existing analysis tools should accept the new
+version. Disabled-language records are included.
 Join `attempts.wordId` to `words.id`, and round word `attemptId` to `attempts.id`.
 Dates inside the data are ISO timestamps in UTC; displayed app dates use local time.
 Historical individual answers are included even when they have no associated round.
@@ -211,7 +214,7 @@ Never put the parent account password in `.env`; the secure browser form sets it
 
 ## Practice together
 
-1. On **Home**, enter the **correct spelling**, choose Deutsch or English,
+1. On **Home**, enter the **correct spelling**, choose an enabled language,
    then press **Add word** or Enter. The field clears and stays focused for
    the next word; the selected language is kept.
    Existing words are flagged as you type (case-insensitive, ignoring edge
@@ -242,6 +245,30 @@ is no longer a separate practice mode; all practice now uses saved rounds.
 and language/category totals. Spellings are not listed by default. Use
 **Search words** to find a spelling, inspect its progress, or delete it with
 confirmation. Searches show up to 20 matches; refine the query to find others.
+
+### Choose your languages
+
+Open **Languages**, enable languages from the built-in catalogue, choose a
+**Default language**, and **Save languages**. These preferences belong to your
+parent account and sync across devices, including on focus and the normal
+30-second refresh. They are not server `.env` settings.
+
+Deutsch and English remain enabled initially for new and existing accounts.
+There are 26 language choices, including French, Spanish, Italian, Portuguese,
+Dutch, Danish, Swedish, Norwegian Bokmål, Finnish, Polish, Czech, Slovak,
+Hungarian, Romanian, Ukrainian, Russian, Turkish, Greek, Arabic, Hebrew, Hindi,
+Chinese, Japanese, and Korean. Dictation still needs an installed matching voice.
+
+Word entry and new rounds use enabled languages only. Their initial selection
+uses your account default; an explicitly selected enabled language stays selected
+while that screen remains open. At least one language must stay enabled, and the
+default must be enabled. Disabling the current default selects another remaining
+language in the settings form.
+
+Disabling a language does **not** delete words, attempts, or rounds. They remain
+in overview/search/export, and existing rounds can still be resumed and reviewed.
+Re-enable the language to add words or create new rounds. Older data files without
+language preferences retain their original data and use Deutsch/English defaults.
 
 | Practice result | Category and consecutive-mistake count |
 | --- | --- |
@@ -330,7 +357,9 @@ An Azure account/subscription and a **Document Intelligence resource explicitly
 created on the Free/F0 pricing tier** are required. Choose a suitable data region.
 The currently advertised F0 allowance is
 [500 pages per month](https://azure.microsoft.com/en-us/pricing/details/document-intelligence/);
-Read supports [English and German handwriting](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/language-support/ocr?view=doc-intel-4.0.0).
+Check [Azure's supported handwriting languages](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/language-support/ocr?view=doc-intel-4.0.0)
+for the language you enable. A practice-language choice does not guarantee Azure
+handwriting support or accuracy; manual review remains available for every language.
 Free-tier availability and terms can change. This is not an unlimited service
 and is not a paid trial dependency.
 
@@ -412,8 +441,8 @@ restoring an older backup or deleting it also rolls back that local counter.
   first if needed. Existing migration/volume backups are separate copies and
   still contain private data until the operator removes them.
 
-Speech uses the browser's Web Speech API. German and English voices must be
-installed/enabled on each device. Locally installed voices are preferred; some
+Speech uses the browser's Web Speech API. A voice for each practice language must
+be installed/enabled on each device. Locally installed voices are preferred; some
 platform voices send text to an online speech provider. If the language voice is
 missing, the app reports it instead of choosing the wrong language. Playback
 stops on reveal, navigation, or hiding the page. Check actual audio/pronunciation

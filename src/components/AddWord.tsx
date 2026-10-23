@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { Language, Word } from '../../shared/model'
+import type { Language, LanguagePreferences, Word } from '../../shared/model'
+import { initialLanguagePreferences } from '../../shared/languages'
 import { categories, errorMessage, languages, validateWord } from '../lib/words'
 import { api } from '../lib/api'
 
-export function AddWord({ words, loading, refresh }: { words: Word[]; loading: boolean; refresh: () => Promise<void> }) {
-  const [language, setLanguage] = useState<Language>('de')
+export function AddWord({ words, loading, refresh, preferences = initialLanguagePreferences() }: { words: Word[]; loading: boolean; refresh: () => Promise<void>; preferences?: LanguagePreferences }) {
+  const [selectedLanguage, setLanguage] = useState<Language | null>(null)
+  const language = selectedLanguage && preferences.enabled.includes(selectedLanguage) ? selectedLanguage : preferences.defaultLanguage
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -48,8 +50,8 @@ export function AddWord({ words, loading, refresh }: { words: Word[]; loading: b
   return <section className="add-card" aria-labelledby="add-title">
     <h2 id="add-title">Add a word</h2>
     <form className="quick-add" onSubmit={add}>
-      <div><label htmlFor="new-word">Word</label><input ref={input} id="new-word" autoComplete="off" enterKeyHint="done" spellCheck={false} value={text} onChange={event => { setText(event.target.value); setError(''); setNotice('') }} placeholder="Correct spelling" disabled={saving} required aria-invalid={!!existing || !!error} aria-describedby={error ? 'add-error' : existing ? 'word-duplicate' : undefined} /></div>
-      <div><label htmlFor="new-language">Language</label><select id="new-language" value={language} onChange={event => { setLanguage(event.target.value as Language); setError(''); setNotice('') }} disabled={saving}><option value="de">Deutsch</option><option value="en">English</option></select></div>
+      <div><label htmlFor="new-word">Word</label><input ref={input} id="new-word" dir="auto" autoComplete="off" enterKeyHint="done" spellCheck={false} value={text} onChange={event => { setText(event.target.value); setError(''); setNotice('') }} placeholder="Correct spelling" disabled={saving} required aria-invalid={!!existing || !!error} aria-describedby={error ? 'add-error' : existing ? 'word-duplicate' : undefined} /></div>
+      <div><label htmlFor="new-language">Language</label><select id="new-language" value={language} onChange={event => { setLanguage(event.target.value as Language); setError(''); setNotice('') }} disabled={saving}>{preferences.enabled.map(value => <option key={value} value={value}>{languages[value].name}</option>)}</select></div>
       <button className="button primary" disabled={saving || loading || !!existing || !text.trim()}>{saving ? 'Adding…' : 'Add word'}</button>
     </form>
     {existing && !error && <p id="word-duplicate" role="status" className="add-status">{duplicateMessage}</p>}

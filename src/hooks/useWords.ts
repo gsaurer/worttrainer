@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Word } from '../../shared/model'
+import type { LanguagePreferences, Word } from '../../shared/model'
 import { errorMessage } from '../lib/words'
 import { api } from '../lib/api'
 
 export function useWords() {
   const [words, setWords] = useState<Word[]>([])
+  const [preferences, setPreferences] = useState<LanguagePreferences | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const requests = useRef({ generation: 0 })
@@ -12,13 +13,14 @@ export function useWords() {
   const load = useCallback(async () => {
     const request = ++requests.current.generation
     try {
-      const data = await api.words()
+      const [data, languages] = await Promise.all([api.words(), api.languagePreferences()])
       if (requests.current.generation === request) {
         setWords(data)
+        setPreferences(languages)
         setError('')
       }
     } catch (error) {
-      if (requests.current.generation === request) setError(`Could not sync your collection: ${errorMessage(error)}`)
+      if (requests.current.generation === request) setError(`Could not sync your account: ${errorMessage(error)}`)
     } finally {
       if (requests.current.generation === request) setLoading(false)
     }
@@ -45,5 +47,13 @@ export function useWords() {
     }
   }, [load, refresh])
 
-  return { words, loading, error, refresh }
+  const saveLanguages = useCallback(async (preferences: LanguagePreferences) => {
+    const saved = await api.saveLanguagePreferences(preferences)
+    requests.current.generation++
+    setPreferences(saved)
+    setLoading(false)
+    setError('')
+  }, [])
+
+  return { words, preferences, loading, error, refresh, saveLanguages }
 }

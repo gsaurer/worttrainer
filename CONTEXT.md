@@ -13,6 +13,14 @@ _Avoid_: Shared installation account, family membership
 The correct spellings a parent account has chosen to practice, grouped by
 language and current learning category.
 
+**Enabled language**:
+A language a parent account has chosen for adding words and starting new rounds.
+Disabling it keeps its existing words, progress, and saved rounds.
+
+**Default language**:
+The enabled language selected initially when adding a word or setting up practice.
+Each parent account chooses its own default.
+
 **Practice attempt**:
 A parent-confirmed correct or incorrect result for one word. Adding a word,
 listening to dictation, and reading a photo are not practice attempts.

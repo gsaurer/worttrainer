@@ -86,7 +86,8 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await request(app).post('/api/words').set('Origin', origin).set('Cookie', cookie).set('Content-Type', 'application/json').send('{broken').expect(400)
     await post('/api/words', { text: 'a'.repeat(20_000), language: 'en' }).expect(413)
     await post('/api/words', { text: 'word', language: 'en', category: 'plus' }).expect(400)
-    await post('/api/words', { text: 'word', language: 'fr' }).expect(400)
+    await post('/api/words', { text: 'word', language: 'xx' }).expect(400)
+    await post('/api/words', { text: 'word', language: 'fr' }).expect(409)
     for (const text of ['', ' ', 'a\nb', 'a'.repeat(81)]) await post('/api/words', { text, language: 'en' }).expect(400)
   })
 

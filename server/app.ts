@@ -8,6 +8,7 @@ import { FileStore, parentEmailSchema } from './store.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { HttpError } from './errors.js'
 import { normalizePhoto, readAzurePhoto, type OcrOptions } from './ocr.js'
+import { languagePreferencesSchema, languageSchema } from './languages.js'
 
 export type AppOptions = {
   store: FileStore
@@ -146,11 +147,15 @@ export function createApp(options: AppOptions) {
     res.status(204).end()
   })
 
+  app.get('/api/languages', requireAuth, (req, res) => { res.json(store.languagePreferences(accountId(req))) })
+  app.post('/api/languages', requireAuth, async (req, res) => {
+    res.json(await store.setLanguagePreferences(accountId(req), parse(languagePreferencesSchema, req.body)))
+  })
   app.get('/api/words', requireAuth, (req, res) => { res.json(store.words(accountId(req))) })
   app.post('/api/words', requireAuth, async (req, res) => {
     const input = parse(z.object({
       text: z.string().refine(value => validateWord(value) === null, 'Enter a word with 1–80 characters and no line breaks or control characters.').transform(value => value.trim()),
-      language: z.enum(['de', 'en']),
+      language: languageSchema,
     }).strict(), req.body)
     res.status(201).json(await store.addWord(accountId(req), input.text, input.language))
   })

@@ -10,6 +10,17 @@ const words: Word[] = [
 ]
 
 describe('word collection', () => {
+  it('keeps disabled-language data visible in overview totals and searchable', async () => {
+    const user = userEvent.setup()
+    render(<Collection words={words} loading={false} refresh={vi.fn()} preferences={{ enabled: ['fr'], defaultLanguage: 'fr' }} />)
+    expect(screen.getByRole('rowheader', { name: 'Français' })).toBeInTheDocument()
+    expect(screen.getByRole('rowheader', { name: 'Deutsch (off)' })).toBeInTheDocument()
+    expect(screen.getByRole('rowheader', { name: 'English (off)' })).toBeInTheDocument()
+    expect(screen.getByText('Total words').nextElementSibling).toHaveTextContent('2')
+    await user.type(screen.getByLabelText('Search words'), 'Straße')
+    expect(screen.getByText('Straße')).toBeInTheDocument()
+  })
+
   it('shows the local practice date and time in search results while preserving the server timestamp', async () => {
     const user = userEvent.setup()
     const timestamp = '2026-10-22T12:34:56Z'

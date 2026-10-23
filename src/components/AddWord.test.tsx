@@ -8,6 +8,16 @@ import { AddWord } from './AddWord'
 const word: Word = { id: '1', text: 'Straße', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
 
 describe('quick word entry', () => {
+  it('uses the account default and only offers its enabled languages', async () => {
+    const user = userEvent.setup()
+    const insert = vi.spyOn(api, 'addWord').mockResolvedValue(word)
+    render(<AddWord words={[]} loading={false} refresh={vi.fn()} preferences={{ enabled: ['fr', 'en'], defaultLanguage: 'fr' }} />)
+    expect(screen.getByLabelText('Language')).toHaveValue('fr')
+    expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['Français', 'English'])
+    await user.type(screen.getByLabelText('Word'), 'papillon{Enter}')
+    expect(insert).toHaveBeenCalledWith('papillon', 'fr')
+  })
+
   it('adds with one button press, clears and refocuses the input, and keeps the language', async () => {
     const user = userEvent.setup()
     const insert = vi.spyOn(api, 'addWord').mockResolvedValue(word)
