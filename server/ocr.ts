@@ -38,12 +38,27 @@ export function numberedAnswers(analysis: Analysis, count: number): PhotoRecogni
   const warnings = new Set<string>()
   const seen = new Set<number>()
   const words = analysis.pages.flatMap(page => page.words)
+  const numberedLine = /^\s*(\d{1,3})[.)\]:-]?\s+(.+?)\s*$/
+  const content = analysis.content.trim()
+  const ordered = content.split(/[,;:]/.test(content) ? /[,;:]/ : /\r?\n/).map(text => text.trim())
+  if (!analysis.content.split('\n').some(line => numberedLine.test(line)) && ordered.length === count && ordered.every(text => text && !/[\r\n]/.test(text))) {
+    let offset = 0
+    return {
+      answers: ordered.map((text, index) => {
+        const start = analysis.content.indexOf(text, offset)
+        offset = start + text.length
+        const confidences = words.filter(word => word.span.offset < start + text.length && word.span.offset + word.span.length > start).map(word => word.confidence)
+        return { number: index + 1, text: text.slice(0, 1000), confidence: confidences.length ? Math.min(...confidences) : null }
+      }),
+      warnings: ['Check the answer order before saving.'],
+    }
+  }
   let offset = 0
   for (const line of analysis.content.split('\n')) {
-    const match = /^\s*(\d{1,3})[.)\]:-]?\s+(.+?)\s*$/.exec(line)
+    const match = numberedLine.exec(line)
     if (match) {
       const number = Number(match[1])
-      if (number < 1 || number > count) warnings.add('Some numbers are outside this round. Check the whole sheet for missing or shifted answers.')
+      if (number < 1 || number > count) warnings.add('Some numbers are outside this challenge. Check the whole sheet for missing or shifted answers.')
       else if (seen.has(number)) {
         answers[number - 1] = { number, text: null, confidence: null }
         warnings.add(`Number ${number} appeared more than once. Mark it yourself.`)

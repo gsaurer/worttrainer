@@ -4,12 +4,13 @@ import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import { nextProgress, roundStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type WebsiteLanguage, type Word } from '../shared/model.js'
+import { nextProgress, challengeStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type WebsiteLanguage, type Word } from '../shared/model.js'
 import { initialLanguagePreferences } from '../shared/languages.js'
 import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
 import { HttpError } from './errors.js'
-import { photoRoundSchema, recognitionSchema } from './photo-schema.js'
-import type { PhotoRecognition, PhotoRound } from '../shared/model.js'
+import { challengeSchema, recognitionSchema } from './challenge-schema.js'
+import { wordResources } from './word-resources.js'
+import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList } from '../shared/model.js'
 
 export const parentEmailSchema = z.string().trim().toLowerCase().email('Enter a valid parent email address.').max(254)
 const credentialsSchema = z.object({
@@ -29,24 +30,34 @@ const wordSchema = z.object({
   consecutive_mistakes: z.number().int().min(0).max(2),
   created_at: z.string().datetime(),
   last_practiced_at: z.string().datetime().nullable(),
-}).strict().refine(word => (word.category === 'minus') === (word.consecutive_mistakes === 2))
+}).strict().refine(word => word.consecutive_mistakes < 2 || word.category === 'minus')
 const oldSessionSchema = z.object({ tokenHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.number().int().positive() }).strict()
 const sessionSchema = oldSessionSchema.extend({ accountId: z.uuid() }).strict()
+const wordListsSchema = z.array(z.object({
+  resourceId: z.string().min(1).max(120),
+  title: z.string().min(1).max(200),
+  language: languageSchema,
+  sectionIds: z.array(z.string().min(1).max(120)).min(1).refine(ids => new Set(ids).size === ids.length),
+  wordIds: z.array(z.uuid()).refine(ids => new Set(ids).size === ids.length),
+}).strict())
 const collectionShape = {
   words: z.array(wordSchema),
   attempts: z.array(z.object({ id: z.uuid(), wordId: z.uuid(), correct: z.boolean(), createdAt: z.string().datetime() }).strict()),
-  photoRounds: z.array(photoRoundSchema).default([]),
+  challenges: z.array(challengeSchema).default([]),
+  wordLists: wordListsSchema.default([]),
 }
 const usageSchema = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).nullable(), used: z.number().int().min(0) }).strict().default({ month: null, used: 0 })
-function validateCollection(data: { words: Word[]; attempts: { id: string; wordId: string }[]; photoRounds: PhotoRound[] }, context: z.RefinementCtx) {
+function validateCollection(data: { words: Word[]; attempts: { id: string; wordId: string }[]; challenges: Challenge[]; wordLists: AddedWordList[] }, context: z.RefinementCtx) {
   const wordIds = new Set(data.words.map(word => word.id))
   if (wordIds.size !== data.words.length ||
       new Set(data.words.map(word => `${word.language}:${word.text.toLowerCase()}`)).size !== data.words.length ||
       new Set(data.attempts.map(attempt => attempt.id)).size !== data.attempts.length ||
       data.attempts.some(attempt => !wordIds.has(attempt.wordId)) ||
-      new Set(data.photoRounds.map(round => round.id)).size !== data.photoRounds.length ||
-      data.photoRounds.some(round => round.words.some(word => !wordIds.has(word.id))) ||
-      new Set(data.photoRounds.flatMap(round => round.words.map(word => word.attemptId))).size !== data.photoRounds.reduce((count, round) => count + round.words.length, 0)) {
+      new Set(data.challenges.map(challenge => challenge.id)).size !== data.challenges.length ||
+      data.challenges.some(challenge => challenge.words.some(word => !wordIds.has(word.id))) ||
+      new Set(data.wordLists.map(list => list.resourceId)).size !== data.wordLists.length ||
+      data.wordLists.some(list => list.wordIds.some(id => !data.words.some(word => word.id === id && word.language === list.language))) ||
+      new Set(data.challenges.flatMap(challenge => challenge.words.map(word => word.attemptId))).size !== data.challenges.reduce((count, challenge) => count + challenge.words.length, 0)) {
     context.addIssue({ code: 'custom', message: 'Inconsistent stored data.' })
   }
 }
@@ -55,7 +66,7 @@ const legacyStoreSchema = z.object({
   sessions: z.array(oldSessionSchema), ocrUsage: usageSchema,
 }).strict().superRefine((data, context) => {
   validateCollection(data, context)
-  if (!data.account && (data.words.length || data.attempts.length || data.sessions.length || data.photoRounds.length || data.ocrUsage.used)) {
+  if (!data.account && (data.words.length || data.attempts.length || data.sessions.length || data.challenges.length || data.wordLists.length || data.ocrUsage.used)) {
     context.addIssue({ code: 'custom', message: 'Unowned stored data.' })
   }
 })
@@ -79,12 +90,24 @@ const indexSchema = z.object({
   accounts: z.array(z.object({ id: z.uuid(), account: accountSchema }).strict()),
   sessions: z.array(sessionSchema), ocrUsage: usageSchema,
 }).strict().superRefine(validateOwnership)
-const accountFileSchema = z.object({
-  format: z.literal('worttrainer-account-data'), schemaVersion: z.literal(1),
+function migrateLegacyCollection(value: unknown) {
+  if (typeof value !== 'object' || value === null || !('photoRounds' in value) || 'challenges' in value) return value
+  const { photoRounds, ...data } = value
+  return { ...data, challenges: photoRounds }
+}
+
+const accountFileSchema = z.preprocess(value => {
+  const data = migrateLegacyCollection(value)
+  return typeof data === 'object' && data !== null && 'schemaVersion' in data && (data.schemaVersion === 1 || data.schemaVersion === 2)
+    ? { ...data, schemaVersion: 3, wordLists: 'wordLists' in data ? data.wordLists : [] }
+    : data
+}, z.object({
+  format: z.literal('worttrainer-account-data'), schemaVersion: z.literal(3),
   accountId: z.uuid(), languagePreferences: languagePreferencesSchema,
   websiteLanguage: websiteLanguageSchema.default('en'),
   ...collectionShape,
-}).strict().superRefine(validateCollection)
+  wordLists: wordListsSchema,
+}).strict().superRefine(validateCollection))
 
 export type Account = z.infer<typeof accountSchema>
 export type StoredSession = z.infer<typeof sessionSchema>
@@ -101,10 +124,10 @@ function accountFile(file: string, id: string) {
 
 function privateData(data: AccountData): z.infer<typeof accountFileSchema> {
   return {
-    format: 'worttrainer-account-data', schemaVersion: 1, accountId: data.id,
+    format: 'worttrainer-account-data', schemaVersion: 3, accountId: data.id,
     languagePreferences: data.languagePreferences,
     websiteLanguage: data.websiteLanguage,
-    words: data.words, attempts: data.attempts, photoRounds: data.photoRounds,
+    words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists,
   }
 }
 
@@ -156,8 +179,14 @@ async function ensureAccountFile(file: string, data: AccountData) {
     await writeJson(target, privateData(data))
     return
   }
-  if (!isDeepStrictEqual(accountFileSchema.parse(JSON.parse(text)), privateData(data))) {
+  const raw: unknown = JSON.parse(text)
+  const existing = accountFileSchema.parse(raw)
+  if (!isDeepStrictEqual(existing, privateData(data))) {
     throw new Error(`Existing account data ${target} differs from the migration or registration. Preserve both files before retrying; neither has been replaced.`)
+  }
+  if (typeof raw === 'object' && raw !== null && 'schemaVersion' in raw && (raw.schemaVersion === 1 || raw.schemaVersion === 2)) {
+    await preserveBackup(target, text, raw.schemaVersion)
+    await writeJson(target, existing)
   }
   await chmod(target, 0o600)
 }
@@ -191,11 +220,11 @@ export class FileStore {
     try {
       const raw: unknown = JSON.parse(text)
       if (typeof raw === 'object' && raw !== null && 'version' in raw && raw.version === 1) {
-        const old = legacyStoreSchema.parse(raw)
+        const old = legacyStoreSchema.parse(migrateLegacyCollection(raw))
         const id = randomUUID()
         const state = oldStoreSchema.parse({
           version: 2,
-          accounts: old.account ? [{ id, account: old.account, words: old.words, attempts: old.attempts, photoRounds: old.photoRounds }] : [],
+          accounts: old.account ? [{ id, account: old.account, words: old.words, attempts: old.attempts, challenges: old.challenges, wordLists: old.wordLists }] : [],
           sessions: old.sessions.map(session => ({ ...session, accountId: id })),
           ocrUsage: old.ocrUsage,
         })
@@ -205,7 +234,10 @@ export class FileStore {
         return await FileStore.open(file)
       }
       if (typeof raw === 'object' && raw !== null && 'version' in raw && raw.version === 2) {
-        const old = oldStoreSchema.parse(raw)
+        const old = oldStoreSchema.parse({
+          ...raw,
+          accounts: 'accounts' in raw && Array.isArray(raw.accounts) ? raw.accounts.map(migrateLegacyCollection) : undefined,
+        })
         const state: State = { accounts: old.accounts, sessions: old.sessions, ocrUsage: old.ocrUsage }
         await preserveBackup(file, text, 2)
         for (const account of state.accounts) await ensureAccountFile(file, account)
@@ -220,12 +252,18 @@ export class FileStore {
         const target = accountFile(file, identity.id)
         let data: z.infer<typeof accountFileSchema>
         try {
-          data = accountFileSchema.parse(JSON.parse(await readFile(target, 'utf8')))
+          const text = await readFile(target, 'utf8')
+          const raw: unknown = JSON.parse(text)
+          data = accountFileSchema.parse(raw)
           if (data.accountId !== identity.id) throw new Error('The account file belongs to a different account.')
+          if (typeof raw === 'object' && raw !== null && 'schemaVersion' in raw && (raw.schemaVersion === 1 || raw.schemaVersion === 2)) {
+            await preserveBackup(target, text, raw.schemaVersion)
+            await writeJson(target, data)
+          }
         } catch (error) {
           throw new Error(`Cannot read private account data ${target}. Restore its matching backup.`, { cause: error })
         }
-        accounts.push({ ...identity, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds })
+        accounts.push({ ...identity, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists })
       }
       return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage }))
     } catch (error) {
@@ -243,7 +281,8 @@ export class FileStore {
     return item ? { id: item.id, account: { ...item.account } } : null
   }
   words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
-  photoRounds(accountId: string): PhotoRound[] { return structuredClone(owned(this.state, accountId).photoRounds) }
+  addedWordLists(accountId: string): AddedWordList[] { return structuredClone(owned(this.state, accountId).wordLists) }
+  challenges(accountId: string): Challenge[] { return structuredClone(owned(this.state, accountId).challenges) }
   languagePreferences(accountId: string): LanguagePreferences { return structuredClone(owned(this.state, accountId).languagePreferences) }
   websiteLanguage(accountId: string): WebsiteLanguage { return owned(this.state, accountId).websiteLanguage }
 
@@ -264,17 +303,17 @@ export class FileStore {
   exportData(accountId: string): AccountDataExport {
     const data = owned(this.state, accountId)
     return structuredClone({
-      format: 'worttrainer-account-export', schemaVersion: 3, exportedAt: new Date().toISOString(),
+      format: 'worttrainer-account-export', schemaVersion: 5, exportedAt: new Date().toISOString(),
       account: { id: data.id, ...('email' in data.account ? { email: data.account.email } : { username: data.account.username }) },
-      websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, rounds: data.photoRounds,
-      statistics: roundStatistics(data.photoRounds),
+      websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists,
+      statistics: challengeStatistics(data.challenges),
     })
   }
 
-  photoRound(accountId: string, id: string): PhotoRound {
-    const round = owned(this.state, accountId).photoRounds.find(round => round.id === id)
-    if (!round) throw new HttpError(404, 'Photo round not found.')
-    return structuredClone(round)
+  challenge(accountId: string, id: string): Challenge {
+    const challenge = owned(this.state, accountId).challenges.find(challenge => challenge.id === id)
+    if (!challenge) throw new HttpError(404, 'Challenge not found.')
+    return structuredClone(challenge)
   }
 
   ocrUsage(month = new Date().toISOString().slice(0, 7)) {
@@ -290,7 +329,7 @@ export class FileStore {
     })
   }
 
-  createPhotoRound(accountId: string, wordIds: string[]) {
+  createChallenge(accountId: string, wordIds: string[]) {
     return this.accountTransaction(accountId, state => {
       if (!wordIds.length || wordIds.length > 100 || new Set(wordIds).size !== wordIds.length) {
         throw new HttpError(400, 'Choose 1–100 distinct words for one numbered sheet.')
@@ -301,61 +340,73 @@ export class FileStore {
         return { id: word.id, text: word.text, language: word.language, attemptId: randomUUID() }
       })
       if (new Set(words.map(word => word.language)).size !== 1) throw new HttpError(400, 'Choose one language for each sheet.')
-      if (!state.languagePreferences.enabled.includes(words[0].language)) throw new HttpError(409, 'This language is disabled. Enable it in Languages before starting a new round.')
-      const round: PhotoRound = { id: randomUUID(), startedAt: new Date().toISOString(), writtenAt: null, reviewedAt: null, nextIndex: 0, words, recognition: null, results: null }
-      state.photoRounds.unshift(round)
-      return round
+      if (!state.languagePreferences.enabled.includes(words[0].language)) throw new HttpError(409, 'This language is disabled. Enable it in Languages before starting a new challenge.')
+      const challenge = challengeSchema.parse({ id: randomUUID(), startedAt: new Date().toISOString(), writtenAt: null, reviewedAt: null, nextIndex: 0, words, recognition: null, results: null, telemetry: [], check: null, photo: null })
+      state.challenges.unshift(challenge)
+      return challenge
     })
   }
 
-  advancePhotoRound(accountId: string, id: string, nextIndex: number) {
+  advanceChallenge(accountId: string, id: string, nextIndex: number, timing: NavigationTiming) {
     return this.accountTransaction(accountId, state => {
-      const round = state.photoRounds.find(round => round.id === id)
-      if (!round) throw new HttpError(404, 'Photo round not found.')
-      if (nextIndex === round.nextIndex) return round
-      if (round.reviewedAt || nextIndex !== round.nextIndex + 1 || nextIndex > round.words.length) throw new HttpError(409, 'This sheet changed on another device. Reopen it to continue.')
-      round.nextIndex = nextIndex
-      if (nextIndex === round.words.length) round.writtenAt = new Date().toISOString()
-      return round
+      const challenge = state.challenges.find(challenge => challenge.id === id)
+      if (!challenge) throw new HttpError(404, 'Challenge not found.')
+      if (timing.fromIndex !== challenge.nextIndex) throw new HttpError(409, 'This sheet changed on another device. Reopen it to continue.')
+      if (challenge.writtenAt || challenge.reviewedAt || Math.abs(nextIndex - challenge.nextIndex) > 1 || nextIndex < 0 || nextIndex > challenge.words.length) throw new HttpError(409, 'This sheet changed on another device. Reopen it to continue.')
+      const now = new Date().toISOString()
+      const telemetry = challenge.telemetry
+      if (telemetry.length >= 10000) throw new HttpError(409, 'This sheet changed on another device. Reopen it to continue.')
+      telemetry.push({
+        fromIndex: challenge.nextIndex, toIndex: nextIndex, recordedAt: now,
+        elapsedMs: timing.elapsedMs,
+        intervalSeconds: timing.intervalSeconds, automatic: timing.automatic,
+        action: timing.action,
+      })
+      challenge.nextIndex = nextIndex
+      if (nextIndex === challenge.words.length) challenge.writtenAt = now
+      return challenge
     })
   }
 
-  saveRecognition(accountId: string, id: string, recognition: PhotoRecognition) {
+  saveRecognition(accountId: string, id: string, recognition: PhotoRecognition, photo: ChallengePhoto) {
     return this.accountTransaction(accountId, state => {
-      const round = state.photoRounds.find(round => round.id === id)
-      if (!round) throw new HttpError(404, 'Photo round not found.')
-      if (!round.writtenAt || round.reviewedAt) throw new HttpError(409, 'Finish writing before reading a photo; reviewed sheets cannot be changed.')
-      round.recognition = recognitionSchema.parse(recognition)
-      return photoRoundSchema.parse(round)
+      const challenge = state.challenges.find(challenge => challenge.id === id)
+      if (!challenge) throw new HttpError(404, 'Challenge not found.')
+      if (!challenge.writtenAt || challenge.reviewedAt) throw new HttpError(409, 'Finish writing before reading a photo; reviewed sheets cannot be changed.')
+      challenge.recognition = recognitionSchema.parse(recognition)
+      challenge.photo = photo
+      return challengeSchema.parse(challenge)
     })
   }
 
-  reviewPhotoRound(accountId: string, id: string, results: boolean[]) {
+  reviewChallenge(accountId: string, id: string, results: boolean[], check: ChallengeCheckInput) {
     return this.accountTransaction(accountId, state => {
-      const round = state.photoRounds.find(round => round.id === id)
-      if (!round) throw new HttpError(404, 'Photo round not found.')
-      if (!round.writtenAt || results.length !== round.words.length) throw new HttpError(400, 'Finish the sheet and explicitly mark every answer.')
-      if (round.results) {
-        if (round.results.some((correct, index) => correct !== results[index])) throw new HttpError(409, 'This sheet was already saved with different results. Reopen it to see the saved answers.')
-        return round
+      const challenge = state.challenges.find(challenge => challenge.id === id)
+      if (!challenge) throw new HttpError(404, 'Challenge not found.')
+      if (!challenge.writtenAt || results.length !== challenge.words.length) throw new HttpError(400, 'Finish the sheet and explicitly mark every answer.')
+      if (check.spellings.length !== challenge.words.length || (check.method === 'photo' && !challenge.recognition)) throw new HttpError(400, 'Finish the sheet and explicitly mark every answer.')
+      if (challenge.results) {
+        if (challenge.results.some((correct, index) => correct !== results[index]) || !isDeepStrictEqual(check, { method: challenge.check!.method, spellings: challenge.check!.spellings })) throw new HttpError(409, 'This sheet was already saved with different results. Reopen it to see the saved answers.')
+        return challenge
       }
       const now = new Date().toISOString()
-      round.words.forEach((snapshot, index) => {
+      challenge.words.forEach((snapshot, index) => {
         const word = state.words.find(word => word.id === snapshot.id)
-        if (!word) throw new HttpError(409, 'A word in this sheet was deleted. No answers were saved; start a new round.')
-        Object.assign(word, nextProgress(word, results[index]), { last_practiced_at: now })
+        if (!word) throw new HttpError(409, 'A word in this sheet was deleted. No answers were saved; start a new challenge.')
+        Object.assign(word, nextProgress(word, results[index], state.attempts), { last_practiced_at: now })
         state.attempts.push({ id: snapshot.attemptId, wordId: word.id, correct: results[index], createdAt: now })
       })
-      round.results = results
-      round.reviewedAt = now
-      return round
+      challenge.results = results
+      challenge.reviewedAt = now
+      challenge.check = { ...check, evaluatedAt: now }
+      return challenge
     })
   }
 
-  deletePhotoRound(accountId: string, id: string) {
+  deleteChallenge(accountId: string, id: string) {
     return this.accountTransaction(accountId, state => {
-      if (!state.photoRounds.some(round => round.id === id)) throw new HttpError(404, 'Photo round not found.')
-      state.photoRounds = state.photoRounds.filter(round => round.id !== id)
+      if (!state.challenges.some(challenge => challenge.id === id)) throw new HttpError(404, 'Challenge not found.')
+      state.challenges = state.challenges.filter(challenge => challenge.id !== id)
     })
   }
 
@@ -385,7 +436,7 @@ export class FileStore {
   register(account: z.infer<typeof emailAccountSchema>, session: StoredSession, websiteLanguage: WebsiteLanguage = 'en') {
     return this.transaction(state => {
       if (state.accounts.some(item => 'email' in item.account && item.account.email === account.email)) throw new HttpError(409, 'This email is already registered. Sign in instead.')
-      state.accounts.push({ id: session.accountId, account, websiteLanguage, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], photoRounds: [] })
+      state.accounts.push({ id: session.accountId, account, websiteLanguage, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], challenges: [], wordLists: [] })
       state.sessions.push(session)
     }, async state => {
       await ensureAccountFile(this.file, owned(state, session.accountId))
@@ -447,13 +498,46 @@ export class FileStore {
     })
   }
 
+  importWordResource(accountId: string, resourceId: string, sectionIds: string[], enableLanguage: boolean) {
+    const resource = wordResources.find(item => item.id === resourceId)
+    if (!resource) throw new HttpError(404, 'Word list not found.')
+    if (!sectionIds.length || new Set(sectionIds).size !== sectionIds.length || sectionIds.some(id => !resource.sections.some(section => section.id === id))) {
+      throw new HttpError(400, 'Choose valid sections from this word list.')
+    }
+    return this.accountTransaction(accountId, state => {
+      if (!state.languagePreferences.enabled.includes(resource.language)) {
+        if (!enableLanguage) throw new HttpError(409, 'Enable this word list language before adding words.')
+        state.languagePreferences.enabled.push(resource.language)
+      }
+      const entries = resource.sections.filter(section => sectionIds.includes(section.id)).flatMap(section => section.entries)
+      const unique = new Map(entries.map(entry => [entry.word.toLowerCase(), entry.word]))
+      const existing = new Set(state.words.filter(word => word.language === resource.language).map(word => word.text.toLowerCase()))
+      const added = [...unique].filter(([key]) => !existing.has(key)).map(([, text]): Word => ({
+        id: randomUUID(), text, language: resource.language, category: 'new', consecutive_mistakes: 0,
+        created_at: new Date().toISOString(), last_practiced_at: null,
+      }))
+      state.words.unshift(...added)
+      const wordIds = state.words.filter(word => word.language === resource.language && unique.has(word.text.toLowerCase())).map(word => word.id)
+      const list = state.wordLists.find(list => list.resourceId === resource.id)
+      if (list) {
+        list.title = resource.title
+        list.sectionIds = [...new Set([...list.sectionIds, ...sectionIds])]
+        list.wordIds = [...new Set([...list.wordIds, ...wordIds])]
+      } else {
+        state.wordLists.push({ resourceId: resource.id, title: resource.title, language: resource.language, sectionIds: [...sectionIds], wordIds })
+      }
+      return { added: added.length, existing: unique.size - added.length, language: resource.language }
+    })
+  }
+
   deleteWord(accountId: string, id: string) {
     return this.accountTransaction(accountId, state => {
       if (!state.words.some(word => word.id === id)) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
       state.words = state.words.filter(word => word.id !== id)
+      for (const list of state.wordLists) list.wordIds = list.wordIds.filter(wordId => wordId !== id)
       state.attempts = state.attempts.filter(attempt => attempt.wordId !== id)
       // Remove snapshots/recognized handwriting for a deleted word as well.
-      state.photoRounds = state.photoRounds.filter(round => !round.words.some(word => word.id === id))
+      state.challenges = state.challenges.filter(challenge => !challenge.words.some(word => word.id === id))
     })
   }
 
@@ -466,7 +550,7 @@ export class FileStore {
         if (existing.wordId !== wordId || existing.correct !== correct) throw new HttpError(409, 'This attempt ID already belongs to another answer.')
         return { ...word }
       }
-      Object.assign(word, nextProgress(word, correct), { last_practiced_at: new Date().toISOString() })
+      Object.assign(word, nextProgress(word, correct, state.attempts), { last_practiced_at: new Date().toISOString() })
       state.attempts.push({ id: attemptId, wordId, correct, createdAt: word.last_practiced_at! })
       return { ...word }
     })

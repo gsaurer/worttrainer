@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, CircleUserRound, LogOut, Settings } from 'lucide-react'
 import type { AuthState, WebsiteLanguage } from '../shared/model'
 import { api } from './lib/api'
 import { errorMessage } from './lib/words'
@@ -6,10 +7,11 @@ import { useWords } from './hooks/useWords'
 import { Auth } from './components/Auth'
 import { Brand } from './components/Icons'
 import { Collection } from './components/Collection'
+import { Statistics } from './components/Statistics'
 import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
 import { DataExport } from './components/DataExport'
-import { AddWord } from './components/AddWord'
+import { WordResources } from './components/WordResources'
 import { LanguageSettings } from './components/LanguageSettings'
 import { WebsiteLanguageSettings } from './components/WebsiteLanguageSettings'
 import { I18nProvider } from './i18n/I18n'
@@ -76,11 +78,26 @@ function Application() {
 
 function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: string; onSignedOut: () => void; onWebsiteLanguageSaved: (language: WebsiteLanguage) => void }) {
   const { t, message } = useI18n()
-  const { words, preferences, loading, error, refresh, saveLanguages } = useWords()
-  const [tab, setTab] = useState<'home' | 'collection' | 'settings'>('home')
-  const [practicing, setPracticing] = useState(false)
+  const [tab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings' | 'resources'>('home')
+  const { words, wordLists, preferences, loading, error, refresh, saveLanguages } = useWords(tab)
   const [signingOut, setSigningOut] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountMenu = useRef<HTMLDivElement>(null)
+  const accountToggle = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!accountOpen) return
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !accountMenu.current?.contains(event.target)) setAccountOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setAccountOpen(false); accountToggle.current?.focus() }
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [accountOpen])
 
   async function signOut() {
     setSigningOut(true)
@@ -90,13 +107,23 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
     finally { setSigningOut(false) }
   }
 
+  const pageTitle = t(tab === 'home' ? 'Home' : tab === 'collection' ? 'Collection' : tab === 'statistics' ? 'Progress' : tab === 'resources' ? 'Word lists' : 'Settings')
+  const showPageTitle = tab === 'settings' || tab === 'resources'
+
   return <div className="app-shell">
-    <header className="site-header"><Brand /><div className="account"><span title={email}>{email}</span><button className="text-button" disabled={signingOut} onClick={() => void signOut()}>{t(signingOut ? 'Signing out…' : 'Sign out')}</button></div></header>
-    <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { if (tab !== 'home') { setTab('home'); setPracticing(false) } }}>{t('Home')}</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setTab('collection'); setPracticing(false) }}>{t('Collection')}</button><button aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => { setTab('settings'); setPracticing(false) }}>{t('Settings')}</button></nav>
-    <main>
-      <div className="page-heading"><h1>{t(tab === 'home' ? 'Let’s practice' : tab === 'collection' ? 'Collection' : 'Settings')}</h1></div>
+    <header className="site-header"><Brand /><div className="account" ref={accountMenu} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setAccountOpen(false) }}>
+      <button ref={accountToggle} className="account-toggle" aria-label={t('Account menu')} title={email} aria-expanded={accountOpen} aria-controls="account-actions" onClick={() => setAccountOpen(previous => !previous)}><CircleUserRound /><ChevronDown size={16} /></button>
+      {accountOpen && <div id="account-actions" className="account-panel" role="group" aria-label={t('Account')}>
+        <p className="account-identity">{email}</p>
+        <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Settings size={18} />{t('Settings')}</button>
+        <button disabled={signingOut} onClick={() => void signOut()}><LogOut size={18} />{t(signingOut ? 'Signing out…' : 'Sign out')}</button>
+      </div>}
+    </div></header>
+    <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' || tab === 'resources' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>
+    <main className={showPageTitle ? undefined : 'workspace-content'}>
+      {showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>}
       {authError && <p className="error" role="alert">{t('Could not sign out: {error}', { error: message(authError) })}</p>}
-      {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>{t('Retry sync')}</button></div>}
+      {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>{t('Retry loading')}</button></div>}
       {tab === 'settings' ? <div className="settings-layout">
         <div>{preferences ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : !error && <p role="status">{t('Loading your languages…')}</p>}</div>
         <div className="settings-secondary">
@@ -104,7 +131,9 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
           <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
           <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
         </div>
-      </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} /> : <div className="home-actions">{!practicing && <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} />}<Practice words={words} loading={loading} onUpdated={refresh} onActiveChange={setPracticing} preferences={preferences} /></div>}
+      </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'resources' ? <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} onOpenWordLists={() => setTab('resources')} /> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} /> : <div className="home-actions">
+        <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} />
+      </div>}
     </main>
     <footer><span>{t('Little by little is a lot.')}</span><span>{t('Private spelling practice')}</span></footer>
   </div>

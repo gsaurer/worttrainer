@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { hashPassword } from './passwords.js'
 import { FileStore } from './store.js'
-import type { PhotoRound, Word } from '../shared/model.js'
+import type { Challenge, Word } from '../shared/model.js'
 
 const origin = 'http://localhost:5173'
 const password = 'a private account test passphrase'
@@ -19,7 +19,7 @@ let app: ReturnType<typeof createApp>
 let first: Awaited<ReturnType<typeof seed>>
 let second: Awaited<ReturnType<typeof seed>>
 let word: Word
-let round: PhotoRound
+let challenge: Challenge
 
 function session(accountId: string) {
   const token = randomBytes(32).toString('base64url')
@@ -50,9 +50,9 @@ beforeEach(async () => {
   second = await seed('second@example.com')
   word = await store.addWord(first.id, 'Straße', 'de')
   await store.mark(first.id, word.id, false, randomUUID())
-  round = await store.createPhotoRound(first.id, [word.id])
-  await store.advancePhotoRound(first.id, round.id, 1)
-  await store.saveRecognition(first.id, round.id, { answers: [{ number: 1, text: 'Strasse', confidence: 0.99 }], warnings: [] })
+  challenge = await store.createChallenge(first.id, [word.id])
+  await store.advanceChallenge(first.id, challenge.id, 1, { fromIndex: 0, elapsedMs: 5000, intervalSeconds: 5, automatic: false, action: 'next' })
+  await store.saveRecognition(first.id, challenge.id, { answers: [{ number: 1, text: 'Strasse', confidence: 0.99 }], warnings: [] }, { dataUrl: 'data:image/jpeg;base64,aGVsbG8=', uploadedAt: '2026-10-23T10:00:00Z', evaluatedAt: '2026-10-23T10:00:01Z' })
   app = createApp({ store, origin, secureCookie: false })
 })
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
@@ -60,28 +60,28 @@ afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 describe('independent private accounts', () => {
   it('exports one coherent complete account snapshot without credentials or another account’s data', async () => {
     await request(app).get('/api/export').expect(401)
-    await store.reviewPhotoRound(first.id, round.id, [true])
+    await store.reviewChallenge(first.id, challenge.id, [true], { method: 'photo', spellings: ['Strasse'] })
     const response = await request(app).get('/api/export').query({ accountId: second.id }).set('Cookie', first.cookie).expect(200)
     expect(response.headers['content-disposition']).toMatch(/^attachment; filename="worttrainer-\d{4}-\d{2}-\d{2}\.json"$/)
     expect(response.headers['cache-control']).toBe('no-store')
     expect(response.body).toMatchObject({
-      format: 'worttrainer-account-export', schemaVersion: 3, websiteLanguage: 'en',
+      format: 'worttrainer-account-export', schemaVersion: 5, websiteLanguage: 'en',
       languagePreferences: { enabled: ['de', 'en'], defaultLanguage: 'de' },
       account: { id: first.id, email: first.email },
-      words: [{ id: word.id, text: word.text, category: 'plus' }],
-      rounds: [{ id: round.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
+      words: [{ id: word.id, text: word.text, category: 'new' }],
+      challenges: [{ id: challenge.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
       statistics: { correct: 1, incorrect: 0, accuracy: 100 },
     })
     expect(Number.isFinite(Date.parse(response.body.exportedAt))).toBe(true)
     expect(response.body.attempts).toHaveLength(2)
-    expect(response.body.attempts[1]).toMatchObject({ wordId: word.id, id: round.words[0].attemptId, correct: true })
-    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'exportedAt', 'format', 'languagePreferences', 'rounds', 'schemaVersion', 'statistics', 'websiteLanguage', 'words'])
+    expect(response.body.attempts[1]).toMatchObject({ wordId: word.id, id: challenge.words[0].attemptId, correct: true })
+    expect(Object.keys(response.body).sort()).toEqual(['account', 'attempts', 'challenges', 'exportedAt', 'format', 'languagePreferences', 'schemaVersion', 'statistics', 'websiteLanguage', 'wordLists', 'words'])
     expect(Object.keys(response.body.account).sort()).toEqual(['email', 'id'])
     for (const secret of [credentials.salt, credentials.passwordHash, first.stored.tokenHash, second.email, second.id]) {
       expect(response.text).not.toContain(secret)
     }
     const own = await request(app).get('/api/export').set('Cookie', second.cookie).expect(200)
-    expect(own.body).toMatchObject({ account: { id: second.id }, words: [], attempts: [], rounds: [], statistics: { accuracy: null } })
+    expect(own.body).toMatchObject({ account: { id: second.id }, words: [], attempts: [], challenges: [], statistics: { accuracy: null } })
     expect(own.text).not.toContain(first.email)
     const snapshot = store.exportData(first.id)
     snapshot.words[0].text = 'changed copy'
@@ -95,9 +95,9 @@ describe('independent private accounts', () => {
     const response = await post('/api/signup', { email: ' NEW@example.com ', password }, '').expect(201)
     expect(response.body).toEqual({ authenticated: true, emailMigrationRequired: false, email: 'new@example.com', websiteLanguage: 'en' })
     expect((await words(cookieFrom(response)).expect(200)).body).toEqual([])
-    expect((await request(app).get('/api/photo-rounds').set('Cookie', cookieFrom(response)).expect(200)).body.rounds).toEqual([])
+    expect((await request(app).get('/api/challenges').set('Cookie', cookieFrom(response)).expect(200)).body.challenges).toEqual([])
     expect(store.words(first.id)).toEqual(original)
-    expect(store.photoRounds(first.id)).toHaveLength(1)
+    expect(store.challenges(first.id)).toHaveLength(1)
     expect((await words(first.cookie).expect(200)).body).toEqual(original)
   }, 15_000)
 
@@ -119,20 +119,20 @@ describe('independent private accounts', () => {
     const original = store.words(first.id)
     expect((await words(second.cookie).expect(200)).body).toEqual([])
     expect((await request(app).get('/api/words').query({ accountId: first.id }).set('Cookie', second.cookie).expect(200)).body).toEqual([])
-    expect((await request(app).get('/api/photo-rounds').set('Cookie', second.cookie).expect(200)).body.rounds).toEqual([])
+    expect((await request(app).get('/api/challenges').set('Cookie', second.cookie).expect(200)).body.challenges).toEqual([])
     await post('/api/words', { text: 'word', language: 'en', accountId: first.id }).expect(400)
-    await post('/api/photo-rounds', { wordIds: [word.id] }).expect(409)
-    await post('/api/photo-rounds', { wordIds: [randomUUID()] }).expect(409)
+    await post('/api/challenges', { wordIds: [word.id] }).expect(409)
+    await post('/api/challenges', { wordIds: [randomUUID()] }).expect(409)
     await post('/api/practice', { wordId: word.id, correct: true, attemptId: randomUUID() }).expect(404)
     await remove(`/api/words/${word.id}`).expect(404)
-    await post(`/api/photo-rounds/${round.id}/advance`, { nextIndex: 1 }).expect(404)
-    await post(`/api/photo-rounds/${round.id}/review`, { results: [true] }).expect(404)
-    await request(app).post(`/api/photo-rounds/${round.id}/photo`).set('Origin', origin)
+    await post(`/api/challenges/${challenge.id}/advance`, { nextIndex: 1, fromIndex: 0, elapsedMs: 5000, intervalSeconds: 5, automatic: false, action: 'next' }).expect(404)
+    await post(`/api/challenges/${challenge.id}/review`, { results: [true], check: { method: 'manual', spellings: [word.text] } }).expect(404)
+    await request(app).post(`/api/challenges/${challenge.id}/photo`).set('Origin', origin)
       .set('Cookie', second.cookie).set('Content-Type', 'image/png').send(Buffer.from('not a photo')).expect(404)
-    await remove(`/api/photo-rounds/${round.id}`).expect(404)
+    await remove(`/api/challenges/${challenge.id}`).expect(404)
     expect(store.words(first.id)).toEqual(original)
-    expect(store.photoRound(first.id, round.id).recognition?.answers[0].text).toBe('Strasse')
-    expect(store.photoRound(first.id, round.id).reviewedAt).toBeNull()
+    expect(store.challenge(first.id, challenge.id).recognition?.answers[0].text).toBe('Strasse')
+    expect(store.challenge(first.id, challenge.id).reviewedAt).toBeNull()
     expect(store.ocrUsage().used).toBe(0)
   })
 
@@ -145,7 +145,7 @@ describe('independent private accounts', () => {
     await post('/api/practice', secondResult).expect(200)
     await post('/api/practice', firstResult, first.cookie).expect(200)
     await post('/api/practice', secondResult).expect(200)
-    expect(store.words(first.id)[0]).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
+    expect(store.words(first.id)[0]).toMatchObject({ category: 'new', consecutive_mistakes: 0 })
     expect(store.words(second.id)[0]).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     const firstData = JSON.parse(await readFile(join(directory, 'store.accounts', `${first.id}.json`), 'utf8'))
     const secondData = JSON.parse(await readFile(join(directory, 'store.accounts', `${second.id}.json`), 'utf8'))
@@ -154,7 +154,7 @@ describe('independent private accounts', () => {
     await remove(`/api/words/${ownWord.id}`).expect(204)
     expect(store.words(second.id)).toEqual([])
     expect(store.words(first.id)).toHaveLength(1)
-    expect(store.photoRounds(first.id)).toHaveLength(1)
+    expect(store.challenges(first.id)).toHaveLength(1)
   })
 
   it('scopes password changes, recovery, credentials, and session revocation to the selected account', async () => {
@@ -171,7 +171,7 @@ describe('independent private accounts', () => {
     await words(second.cookie).expect(200)
     const recovered = await post('/api/login', { email: first.email, password }, '').expect(200)
     expect((await words(cookieFrom(recovered)).expect(200)).body).toEqual(store.words(first.id))
-    expect(store.photoRounds(first.id)).toHaveLength(1)
+    expect(store.challenges(first.id)).toHaveLength(1)
   }, 15_000)
 
   it('retains up to twenty sessions per account, without evicting another account', async () => {
@@ -185,8 +185,8 @@ describe('independent private accounts', () => {
 
   it('shares the persistent OCR ceiling across accounts, rather than granting each a new budget', async () => {
     await store.reserveOcr(1)
-    const firstStatus = await request(app).get('/api/photo-rounds').set('Cookie', first.cookie).expect(200)
-    const secondStatus = await request(app).get('/api/photo-rounds').set('Cookie', second.cookie).expect(200)
+    const firstStatus = await request(app).get('/api/challenges').set('Cookie', first.cookie).expect(200)
+    const secondStatus = await request(app).get('/api/challenges').set('Cookie', second.cookie).expect(200)
     expect(firstStatus.body.ocr.used).toBe(1)
     expect(secondStatus.body.ocr.used).toBe(1)
     store = await FileStore.open(join(directory, 'store.json'))
@@ -200,7 +200,7 @@ describe('safe versioned ownership migration', () => {
     const disk = JSON.parse(await readFile(join(directory, 'store.json'), 'utf8'))
     const bucket = JSON.parse(await readFile(join(directory, 'store.accounts', `${first.id}.json`), 'utf8'))
     const oldSession = { tokenHash: first.stored.tokenHash, expiresAt: first.stored.expiresAt }
-    const legacy = { version: 1, account: disk.accounts[0].account, words: bucket.words, attempts: bucket.attempts, photoRounds: bucket.photoRounds, sessions: [oldSession], ocrUsage: { month: new Date().toISOString().slice(0, 7), used: 449 } }
+    const legacy = { version: 1, account: disk.accounts[0].account, words: bucket.words, attempts: bucket.attempts, challenges: bucket.challenges, sessions: [oldSession], ocrUsage: { month: new Date().toISOString().slice(0, 7), used: 449 } }
     const source = JSON.stringify(legacy)
     await writeFile(file, source)
     store = await FileStore.open(file)
@@ -208,7 +208,7 @@ describe('safe versioned ownership migration', () => {
     if (!owner) throw new Error('Expected original account after migration.')
     expect(store.sessionAccount(first.stored.tokenHash)).toBe(owner.id)
     expect(store.words(owner.id)).toEqual(bucket.words)
-    expect(store.photoRounds(owner.id)).toEqual(bucket.photoRounds)
+    expect(store.challenges(owner.id)).toEqual(bucket.challenges)
     expect(store.ocrUsage().used).toBe(449)
     expect(await readFile(`${file}.v1.bak`, 'utf8')).toBe(source)
     if (process.platform !== 'win32') expect((await stat(`${file}.v1.bak`)).mode & 0o777).toBe(0o600)
@@ -248,7 +248,7 @@ describe('safe versioned ownership migration', () => {
     valid.version = 2
     for (const account of valid.accounts) {
       const data = JSON.parse(await readFile(join(directory, 'store.accounts', `${account.id}.json`), 'utf8'))
-      Object.assign(account, { languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds })
+      Object.assign(account, { languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges })
     }
     for (const corrupt of [
       () => { const data = structuredClone(valid); data.sessions[0].accountId = randomUUID(); return data },

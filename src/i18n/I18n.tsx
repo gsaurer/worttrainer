@@ -17,5 +17,9 @@ export function I18nProvider({ language: accountLanguage, children }: { language
 
 export function VisitorLanguage() {
   const { language, chooseLanguage, t } = useI18n()
-  return <label className="website-language-choice">{t('Website language')}<select value={language} onChange={event => chooseLanguage(event.target.value as WebsiteLanguage)}><option value="de" lang="de">Deutsch</option><option value="en" lang="en">English</option></select></label>
+  return <div className="website-language-choice" role="group" aria-label={t('Website language')}>
+    <button type="button" lang="en" title="English" aria-label="English" aria-pressed={language === 'en'} onClick={() => chooseLanguage('en')}>EN</button>
+    <span aria-hidden="true">|</span>
+    <button type="button" lang="de" title="Deutsch" aria-label="Deutsch" aria-pressed={language === 'de'} onClick={() => chooseLanguage('de')}>DE</button>
+  </div>
 }

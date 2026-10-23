@@ -9,6 +9,7 @@ import { hashPassword, verifyPassword } from './passwords.js'
 import { HttpError } from './errors.js'
 import { normalizePhoto, readAzurePhoto, type OcrOptions } from './ocr.js'
 import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
+import { wordResources } from './word-resources.js'
 
 export type AppOptions = {
   store: FileStore
@@ -51,7 +52,7 @@ export function createApp(options: AppOptions) {
     res.setHeader('Cache-Control', 'no-store')
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (req.headers.origin !== options.origin) return next(new HttpError(403, 'Request origin is not allowed. Open the app at its configured address.'))
-      const photoUpload = req.method === 'POST' && /^\/photo-rounds\/[0-9a-f-]+\/photo$/.test(req.path)
+      const photoUpload = req.method === 'POST' && /^\/challenges\/[0-9a-f-]+\/photo$/.test(req.path)
       if (photoUpload ? !req.is(['image/jpeg', 'image/png']) : !req.is('application/json')) {
         return next(new HttpError(415, photoUpload ? 'Upload one JPEG or PNG photo.' : 'Send requests as application/json.'))
       }
@@ -157,6 +158,16 @@ export function createApp(options: AppOptions) {
     res.json(await store.setLanguagePreferences(accountId(req), parse(languagePreferencesSchema, req.body)))
   })
   app.get('/api/words', requireAuth, (req, res) => { res.json(store.words(accountId(req))) })
+  app.get('/api/word-lists', requireAuth, (req, res) => { res.json(store.addedWordLists(accountId(req))) })
+  app.get('/api/word-resources', requireAuth, (_req, res) => { res.json(wordResources) })
+  app.post('/api/word-resources/import', requireAuth, async (req, res) => {
+    const input = parse(z.object({
+      resourceId: z.string().min(1).max(80),
+      sectionIds: z.array(z.string().min(1).max(80)).min(1).max(100),
+      enableLanguage: z.boolean(),
+    }).strict(), req.body)
+    res.json(await store.importWordResource(accountId(req), input.resourceId, input.sectionIds, input.enableLanguage))
+  })
   app.post('/api/words', requireAuth, async (req, res) => {
     const input = parse(z.object({
       text: z.string().refine(value => validateWord(value) === null, 'Enter a word with 1–80 characters and no line breaks or control characters.').transform(value => value.trim()),
@@ -173,45 +184,56 @@ export function createApp(options: AppOptions) {
     const input = parse(z.object({ wordId: z.uuid(), correct: z.boolean(), attemptId: z.uuid() }).strict(), req.body)
     res.json(await store.mark(accountId(req), input.wordId, input.correct, input.attemptId))
   })
-  app.get('/api/photo-rounds', requireAuth, (req, res) => {
-    res.json({ rounds: store.photoRounds(accountId(req)), ocr: { enabled: !!options.ocr, ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
+  app.get('/api/challenges', requireAuth, (req, res) => {
+    res.json({ challenges: store.challenges(accountId(req)), ocr: { enabled: !!options.ocr, ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
   })
-  app.post('/api/photo-rounds', requireAuth, async (req, res) => {
+  app.post('/api/challenges', requireAuth, async (req, res) => {
     const input = parse(z.object({ wordIds: z.array(z.uuid()).min(1).max(100, 'Use at most 100 words on one numbered sheet.') }).strict(), req.body)
-    res.status(201).json(await store.createPhotoRound(accountId(req), input.wordIds))
+    res.status(201).json(await store.createChallenge(accountId(req), input.wordIds))
   })
-  app.post('/api/photo-rounds/:id/advance', requireAuth, async (req, res) => {
+  app.post('/api/challenges/:id/advance', requireAuth, async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
-    const input = parse(z.object({ nextIndex: z.number().int().min(1).max(100) }).strict(), req.body)
-    res.json(await store.advancePhotoRound(accountId(req), id, input.nextIndex))
+    const input = parse(z.object({
+      nextIndex: z.number().int().min(0).max(100),
+      fromIndex: z.number().int().min(0).max(99),
+      elapsedMs: z.number().int().min(0).max(604800000),
+      intervalSeconds: z.number().int().min(1).max(120),
+      automatic: z.boolean(),
+      action: z.enum(['next', 'previous', 'stop', 'play', 'listen']),
+    }).strict(), req.body)
+    res.json(await store.advanceChallenge(accountId(req), id, input.nextIndex, input))
   })
   let photoReading = false
   const photoLimiter = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Please wait a minute before sending another photo.' } })
   const photoAvailable: express.RequestHandler = (_req, _res, next) => {
     next(options.ocr ? undefined : new HttpError(503, 'Automatic photo reading needs an Azure Free/F0 endpoint and key. You can still review the sheet manually.'))
   }
-  app.post('/api/photo-rounds/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb' }), async (req, res) => {
+  app.post('/api/challenges/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb' }), async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
     const owner = accountId(req)
-    const round = store.photoRound(owner, id)
-    if (!round.writtenAt || round.reviewedAt) throw new HttpError(409, 'Finish writing first. A reviewed sheet cannot be read again.')
+    const challenge = store.challenge(owner, id)
+    if (!challenge.writtenAt || challenge.reviewedAt) throw new HttpError(409, 'Finish writing first. A reviewed sheet cannot be read again.')
     if (photoReading) throw new HttpError(429, 'Another photo is being read. Please wait and try again.')
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Choose a JPEG or PNG photo first.')
     photoReading = true
     try {
       const image = await normalizePhoto(req.body)
+      const uploadedAt = new Date().toISOString()
       await store.reserveOcr(options.ocr!.monthlyLimit)
-      const recognition = await readAzurePhoto(image, round.words[0].language, round.words.length, options.ocr!)
-      res.json(await store.saveRecognition(owner, id, recognition))
+      const recognition = await readAzurePhoto(image, challenge.words[0].language, challenge.words.length, options.ocr!)
+      res.json(await store.saveRecognition(owner, id, recognition, { dataUrl: `data:image/jpeg;base64,${image.toString('base64')}`, uploadedAt, evaluatedAt: new Date().toISOString() }))
     } finally { photoReading = false }
   })
-  app.post('/api/photo-rounds/:id/review', requireAuth, async (req, res) => {
+  app.post('/api/challenges/:id/review', requireAuth, async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
-    const input = parse(z.object({ results: z.array(z.boolean()).min(1).max(100) }).strict(), req.body)
-    res.json(await store.reviewPhotoRound(accountId(req), id, input.results))
+    const input = parse(z.object({
+      results: z.array(z.boolean()).min(1).max(100),
+      check: z.object({ method: z.enum(['manual', 'photo']), spellings: z.array(z.string().trim().max(1000).nullable()).min(1).max(100) }).strict(),
+    }).strict(), req.body)
+    res.json(await store.reviewChallenge(accountId(req), id, input.results, input.check))
   })
-  app.delete('/api/photo-rounds/:id', requireAuth, async (req, res) => {
-    await store.deletePhotoRound(accountId(req), parse(z.uuid(), req.params.id))
+  app.delete('/api/challenges/:id', requireAuth, async (req, res) => {
+    await store.deleteChallenge(accountId(req), parse(z.uuid(), req.params.id))
     res.status(204).end()
   })
   app.use('/api', (_req, _res, next) => { next(new HttpError(404, 'Unknown API endpoint.')) })

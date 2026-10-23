@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { LanguagePreferences, Word } from '../../shared/model'
+import type { AddedWordList, LanguagePreferences, Word } from '../../shared/model'
 import { errorMessage } from '../lib/words'
 import { api } from '../lib/api'
 import { useI18n } from '../i18n/context'
 
-export function useWords() {
+export function useWords(view = 'home') {
   const { t, message } = useI18n()
   const [words, setWords] = useState<Word[]>([])
+  const [wordLists, setWordLists] = useState<AddedWordList[]>([])
   const [preferences, setPreferences] = useState<LanguagePreferences | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -15,9 +16,10 @@ export function useWords() {
   const load = useCallback(async () => {
     const request = ++requests.current.generation
     try {
-      const [data, languages] = await Promise.all([api.words(), api.languagePreferences()])
+      const [data, languages, lists] = await Promise.all([api.words(), api.languagePreferences(), api.addedWordLists()])
       if (requests.current.generation === request) {
         setWords(data)
+        setWordLists(lists)
         setPreferences(languages)
         setError('')
       }
@@ -47,7 +49,7 @@ export function useWords() {
       window.removeEventListener('focus', refreshVisible)
       document.removeEventListener('visibilitychange', refreshVisible)
     }
-  }, [load, refresh])
+  }, [load, refresh, view])
 
   const saveLanguages = useCallback(async (preferences: LanguagePreferences) => {
     const saved = await api.saveLanguagePreferences(preferences)
@@ -57,5 +59,5 @@ export function useWords() {
     setError('')
   }, [])
 
-  return { words, preferences, loading, error: error ? t('Could not sync your account: {error}', { error: message(error) }) : '', refresh, saveLanguages }
+  return { words, wordLists, preferences, loading, error: error ? t('Could not load your data: {error}', { error: message(error) }) : '', refresh, saveLanguages }
 }

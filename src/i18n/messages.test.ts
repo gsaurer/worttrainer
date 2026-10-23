@@ -30,8 +30,8 @@ describe('German and English messages', () => {
     const timestamp = '2026-10-23T13:45:00Z'
     expect(translations('de').date(timestamp)).toBe(new Date(timestamp).toLocaleString('de-DE'))
     expect(translations('en').date(timestamp)).toBe(new Date(timestamp).toLocaleString('en-GB'))
-    expect(translations('de').categoryLabel('new')).toBe('Neu')
-    expect(translations('en').categoryLabel('new')).toBe('New')
+    expect(translations('de').categoryLabel('new')).toBe('Standard')
+    expect(translations('en').categoryLabel('new')).toBe('Default')
     expect(translations('de').categoryLabel('minus')).toBe('−')
   })
 })

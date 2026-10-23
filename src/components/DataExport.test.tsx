@@ -3,12 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api } from '../lib/api'
 import { DataExport } from './DataExport'
-import { roundStatistics, type AccountDataExport } from '../../shared/model'
+import { challengeStatistics, type AccountDataExport } from '../../shared/model'
 import { initialLanguagePreferences } from '../../shared/languages'
 
 const data: AccountDataExport = {
-  format: 'worttrainer-account-export', schemaVersion: 3, exportedAt: '2026-10-23T00:00:00Z', websiteLanguage: 'en', languagePreferences: initialLanguagePreferences(),
-  account: { id: 'account', email: 'parent@example.test' }, words: [], attempts: [], rounds: [], statistics: roundStatistics([]),
+  format: 'worttrainer-account-export', schemaVersion: 5, exportedAt: '2026-10-23T00:00:00Z', websiteLanguage: 'en', languagePreferences: initialLanguagePreferences(),
+  account: { id: 'account', email: 'parent@example.test' }, words: [], attempts: [], challenges: [], wordLists: [], statistics: challengeStatistics([]),
 }
 beforeEach(() => {
   vi.stubGlobal('URL', class extends URL {

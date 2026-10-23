@@ -92,7 +92,7 @@ describe('real self-hosted authentication and JSON persistence', () => {
     for (const text of ['', ' ', 'a\nb', 'a'.repeat(81)]) await post('/api/words', { text, language: 'en' }).expect(400)
   })
 
-  it('starts words in New with no attempt, normalizes edges and prevents same-language duplicates', async () => {
+  it('starts words in Default with no attempt, normalizes edges and prevents same-language duplicates', async () => {
     const word = await add('  Schmetterling  ')
     expect(word).toMatchObject({ text: 'Schmetterling', category: 'new', consecutive_mistakes: 0, last_practiced_at: null })
     await post('/api/words', { text: 'schmetterling', language: 'de' }).expect(409)
@@ -106,10 +106,16 @@ describe('real self-hosted authentication and JSON persistence', () => {
     expect(await mark(word.id, false)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
     expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    expect(await mark(word.id, true)).toMatchObject({ category: 'minus', consecutive_mistakes: 0 })
+    store = await FileStore.open(join(directory, 'store.json'))
+    app = createApp(options())
+    expect(await mark(word.id, true)).toMatchObject({ category: 'minus', consecutive_mistakes: 0 })
     expect(await mark(word.id, true)).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
-    expect(await mark(word.id, false)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
+    expect(await mark(word.id, true)).toMatchObject({ category: 'new', consecutive_mistakes: 0 })
+    expect(await mark(word.id, true)).toMatchObject({ category: 'new', consecutive_mistakes: 0 })
     expect(await mark(word.id, true)).toMatchObject({ category: 'plus', consecutive_mistakes: 0 })
-    expect(await mark(word.id, false)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(await mark(word.id, false)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     expect(await mark(word.id, false)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
   })
 
@@ -117,10 +123,15 @@ describe('real self-hosted authentication and JSON persistence', () => {
     const word = await add('concurrent', 'en')
     await Promise.all([mark(word.id, false), mark(word.id, false)])
     expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    const correctAttemptId = randomUUID()
+    await Promise.all([mark(word.id, true, correctAttemptId), mark(word.id, true, correctAttemptId)])
+    expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 0 })
+    await mark(word.id, true)
+    expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'minus', consecutive_mistakes: 0 })
     await mark(word.id, true)
     const attemptId = randomUUID()
     await Promise.all([mark(word.id, false, attemptId), mark(word.id, false, attemptId)])
-    expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'plus', consecutive_mistakes: 1 })
+    expect(store.words(accountId).find(item => item.id === word.id)).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
     await post('/api/practice', { wordId: word.id, correct: true, attemptId }).expect(409)
   })
 
@@ -195,7 +206,7 @@ describe('real self-hosted authentication and JSON persistence', () => {
     const oldSessions = [{ tokenHash: createHash('sha256').update(cookie.split('=')[1]).digest('hex'), expiresAt: Date.now() + 60_000 }]
     const account = store.account(accountId)
     const data = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8'))
-    await writeFile(file, JSON.stringify({ version: 1, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds, ocrUsage: disk.ocrUsage, sessions: oldSessions, account: { username: 'old-parent', salt: account.salt, passwordHash: account.passwordHash } }))
+    await writeFile(file, JSON.stringify({ version: 1, words: data.words, attempts: data.attempts, challenges: data.challenges, ocrUsage: disk.ocrUsage, sessions: oldSessions, account: { username: 'old-parent', salt: account.salt, passwordHash: account.passwordHash } }))
     const legacy = await FileStore.open(file)
     const legacyApp = createApp({ ...options(), store: legacy })
     expect((await request(legacyApp).get('/api/session')).body).toEqual({ authenticated: false, emailMigrationRequired: false, email: null })

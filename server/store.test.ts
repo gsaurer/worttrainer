@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { FileStore } from './store.js'
+import { wordResources } from './word-resources.js'
 
 let directory: string
 let file: string
@@ -22,7 +23,7 @@ async function versionTwo() {
     ...index, version: 2,
     accounts: await Promise.all(index.accounts.map(async (identity: { id: string; account: object }) => {
       const data = await json(practiceFile(identity.id))
-      return { ...identity, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.photoRounds }
+      return { ...identity, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, photoRounds: data.challenges }
     })),
   }
 }
@@ -39,14 +40,133 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
 describe('one private practice file per account', () => {
+  it('remembers only added list sections and their owned words across imports and restarts', async () => {
+    const resource = wordResources[0]
+    const section = resource.sections[0]
+    const existing = await store.addWord(first, section.entries[0].word, resource.language)
+    const unrelated = await store.addWord(first, 'Private unrelated spelling', resource.language)
+    await store.mark(first, existing.id, true, randomUUID())
+    const before = store.exportData(first)
+    await store.importWordResource(first, resource.id, [section.id], true)
+    const [list] = store.addedWordLists(first)
+    expect(list).toMatchObject({ resourceId: resource.id, title: resource.title, language: resource.language, sectionIds: [section.id] })
+    expect(list.wordIds).toContain(existing.id)
+    expect(list.wordIds).not.toContain(unrelated.id)
+    expect(list.wordIds).toHaveLength(new Set(section.entries.map(entry => entry.word.toLowerCase())).size)
+    expect(store.words(first).find(word => word.id === existing.id)).toEqual(before.words.find(word => word.id === existing.id))
+    expect(store.exportData(first).attempts).toEqual(before.attempts)
+    expect(store.addedWordLists(second)).toEqual([])
+    await store.importWordResource(first, resource.id, [section.id], true)
+    expect(store.addedWordLists(first)).toEqual([list])
+    const reopened = await FileStore.open(file)
+    expect(reopened.addedWordLists(first)).toEqual([list])
+    expect(reopened.exportData(first).wordLists).toEqual([list])
+  })
+
+  it('backs up version-two files without inferring imported lists from matching words', async () => {
+    const resource = wordResources[0]
+    const word = await store.addWord(first, resource.sections[0].entries[0].word, resource.language)
+    await store.mark(first, word.id, true, randomUUID())
+    const target = practiceFile(first)
+    const legacy = await json(target)
+    legacy.schemaVersion = 2
+    delete legacy.wordLists
+    const source = JSON.stringify(legacy, null, 2)
+    await writeFile(target, source)
+    const reopened = await FileStore.open(file)
+    expect(reopened.addedWordLists(first)).toEqual([])
+    expect(reopened.words(first)).toEqual(legacy.words)
+    expect(reopened.exportData(first).attempts).toEqual(legacy.attempts)
+    expect(await readFile(`${target}.v2.bak`, 'utf8')).toBe(source)
+    expect(await json(target)).toMatchObject({ schemaVersion: 3, wordLists: [] })
+    expect((await FileStore.open(file)).addedWordLists(first)).toEqual([])
+    expect(await readFile(`${target}.v2.bak`, 'utf8')).toBe(source)
+  })
+
+  it('unions added sections and removes deleted words from list membership', async () => {
+    const resource = wordResources.find(resource => resource.id === 'everyday-english')!
+    const [firstSection, secondSection] = resource.sections
+    await store.importWordResource(first, resource.id, [firstSection.id], false)
+    const initial = store.addedWordLists(first)[0]
+    await store.importWordResource(first, resource.id, [secondSection.id], false)
+    const expanded = store.addedWordLists(first)[0]
+    expect(expanded.sectionIds).toEqual([firstSection.id, secondSection.id])
+    expect(expanded.wordIds).toEqual(expect.arrayContaining(initial.wordIds))
+    expect(expanded.wordIds).toHaveLength(new Set([...firstSection.entries, ...secondSection.entries].map(entry => entry.word.toLowerCase())).size)
+    await store.deleteWord(first, initial.wordIds[0])
+    expect(store.addedWordLists(first)[0].wordIds).not.toContain(initial.wordIds[0])
+    expect((await FileStore.open(file)).addedWordLists(first)).toEqual(store.addedWordLists(first))
+  })
+
+  it('rejects list members owned by another account without rewriting the source file', async () => {
+    const resource = wordResources[0]
+    await store.importWordResource(first, resource.id, [resource.sections[0].id], true)
+    const foreign = await store.addWord(second, 'Private word', resource.language)
+    const target = practiceFile(first)
+    const data = await json(target)
+    data.wordLists[0].wordIds.push(foreign.id)
+    const source = JSON.stringify(data)
+    await writeFile(target, source)
+    await expect(FileStore.open(file)).rejects.toThrow()
+    expect(await readFile(target, 'utf8')).toBe(source)
+  })
+
+  it('migrates legacy account history to challenge naming with an exact backup', async () => {
+    const word = await store.addWord(first, 'Straße', 'de')
+    const challenge = await store.createChallenge(first, [word.id])
+    await store.advanceChallenge(first, challenge.id, 1, { fromIndex: 0, elapsedMs: 5000, intervalSeconds: 5, automatic: false, action: 'next' })
+    await store.saveRecognition(first, challenge.id, { answers: [{ number: 1, text: word.text, confidence: 0.9 }], warnings: [] }, { dataUrl: 'data:image/jpeg;base64,aGVsbG8=', uploadedAt: '2026-10-23T10:00:00Z', evaluatedAt: '2026-10-23T10:00:01Z' })
+    await store.reviewChallenge(first, challenge.id, [true], { method: 'photo', spellings: [word.text] })
+    const before = store.exportData(first)
+    const target = practiceFile(first)
+    const source = JSON.stringify({
+      format: 'worttrainer-account-data', schemaVersion: 1, accountId: first,
+      languagePreferences: before.languagePreferences, websiteLanguage: before.websiteLanguage,
+      words: before.words, attempts: before.attempts, photoRounds: before.challenges,
+    })
+    await writeFile(target, source)
+    const migrated = await FileStore.open(file)
+    expect(migrated.exportData(first)).toMatchObject({ words: before.words, attempts: before.attempts })
+    expect(migrated.challenges(first)).toEqual(before.challenges)
+    expect(await readFile(`${target}.v1.bak`, 'utf8')).toBe(source)
+    const current = await json(target)
+    expect(current.schemaVersion).toBe(3)
+    expect(current.challenges).toEqual(before.challenges)
+    expect(current).not.toHaveProperty('photoRounds')
+    const persisted = await readFile(target, 'utf8')
+    await FileStore.open(file)
+    expect(await readFile(target, 'utf8')).toBe(persisted)
+    expect(await readFile(`${target}.v1.bak`, 'utf8')).toBe(source)
+  })
+
+  it('refuses conflicting legacy challenge fields without rewriting account data', async () => {
+    const target = practiceFile(first)
+    const source = JSON.stringify({ ...await json(target), schemaVersion: 1, photoRounds: [] })
+    await writeFile(target, source)
+    await expect(FileStore.open(file)).rejects.toThrow(target)
+    expect(await readFile(target, 'utf8')).toBe(source)
+    expect(await readdir(join(directory, 'store.accounts'))).not.toContain(`${first}.json.v1.bak`)
+  })
+
+  it('refuses a conflicting legacy account backup without replacing either file', async () => {
+    const target = practiceFile(first)
+    const { challenges, ...data } = await json(target)
+    const source = JSON.stringify({ ...data, schemaVersion: 1, photoRounds: challenges })
+    await writeFile(target, source)
+    await writeFile(`${target}.v1.bak`, 'different backup')
+    await expect(FileStore.open(file)).rejects.toThrow(target)
+    expect(await readFile(target, 'utf8')).toBe(source)
+    expect(await readFile(`${target}.v1.bak`, 'utf8')).toBe('different backup')
+  })
+
   it('stores all practice data together, without credentials, identities or another account’s records', async () => {
     const word = await store.addWord(first, 'Straße', 'de')
     await store.addWord(second, 'private second word', 'en')
     await store.setLanguagePreferences(first, { enabled: ['de', 'fr'], defaultLanguage: 'fr' })
-    const round = await store.createPhotoRound(first, [word.id])
-    await store.advancePhotoRound(first, round.id, 1)
-    await store.saveRecognition(first, round.id, { answers: [{ number: 1, text: 'Strasse', confidence: 0.9 }], warnings: [] })
-    await store.reviewPhotoRound(first, round.id, [true])
+    const challenge = await store.createChallenge(first, [word.id])
+    await store.advanceChallenge(first, challenge.id, 1, { fromIndex: 0, elapsedMs: 5000, intervalSeconds: 5, automatic: false, action: 'next' })
+    await store.saveRecognition(first, challenge.id, { answers: [{ number: 1, text: 'Strasse', confidence: 0.9 }], warnings: [] }, { dataUrl: 'data:image/jpeg;base64,aGVsbG8=', uploadedAt: '2026-10-23T10:00:00Z', evaluatedAt: '2026-10-23T10:00:01Z' })
+    await store.reviewChallenge(first, challenge.id, [true], { method: 'photo', spellings: ['Strasse'] })
     const index = await json(file)
     expect(index.version).toBe(3)
     expect(index.accounts).toEqual([
@@ -55,18 +175,18 @@ describe('one private practice file per account', () => {
     ])
     const text = await readFile(practiceFile(first), 'utf8')
     const data = JSON.parse(text)
-    expect(Object.keys(data).sort()).toEqual(['accountId', 'attempts', 'format', 'languagePreferences', 'photoRounds', 'schemaVersion', 'websiteLanguage', 'words'])
+    expect(Object.keys(data).sort()).toEqual(['accountId', 'attempts', 'challenges', 'format', 'languagePreferences', 'schemaVersion', 'websiteLanguage', 'wordLists', 'words'])
     expect(data).toMatchObject({
-      format: 'worttrainer-account-data', schemaVersion: 1, accountId: first,
+      format: 'worttrainer-account-data', schemaVersion: 3, accountId: first,
       languagePreferences: { enabled: ['de', 'fr'], defaultLanguage: 'fr' },
-      words: [{ id: word.id, category: 'plus' }],
-      attempts: [{ id: round.words[0].attemptId, correct: true }],
-      photoRounds: [{ id: round.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
+      words: [{ id: word.id, category: 'new' }],
+      attempts: [{ id: challenge.words[0].attemptId, correct: true }],
+      challenges: [{ id: challenge.id, results: [true], recognition: { answers: [{ text: 'Strasse' }] } }],
     })
     for (const secret of [credentials.salt, credentials.passwordHash, tokenHash, 'first@example.test', 'second@example.test', 'private second word', second]) {
       expect(text).not.toContain(secret)
     }
-    for (const practice of ['Straße', 'Strasse', 'languagePreferences', 'attempts', 'photoRounds']) {
+    for (const practice of ['Straße', 'Strasse', 'languagePreferences', 'attempts', 'challenges']) {
       expect(await readFile(file, 'utf8')).not.toContain(practice)
     }
     expect((await readdir(join(directory, 'store.accounts'))).sort()).toEqual([`${first}.json`, `${second}.json`].sort())
@@ -76,7 +196,7 @@ describe('one private practice file per account', () => {
     }
     const reopened = await FileStore.open(file)
     expect(reopened.exportData(first)).toMatchObject({
-      schemaVersion: 3, websiteLanguage: 'en', words: data.words, attempts: data.attempts, rounds: data.photoRounds,
+      schemaVersion: 5, websiteLanguage: 'en', words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: [],
       languagePreferences: data.languagePreferences, statistics: { correct: 1, accuracy: 100 },
     })
     expect(reopened.sessionAccount(tokenHash)).toBe(first)

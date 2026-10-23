@@ -12,7 +12,7 @@ export function translations(language: WebsiteLanguage) {
     t: (key: Message, values?: Values) => translate(language, key, values),
     message: (text: string) => translateError(language, text),
     date: (value: string) => new Date(value).toLocaleString(language === 'de' ? 'de-DE' : 'en-GB'),
-    categoryLabel: (category: Category) => category === 'new' ? translate(language, 'New') : category === 'plus' ? '+' : '−',
+    categoryLabel: (category: Category) => category === 'new' ? translate(language, 'Default') : category === 'plus' ? '+' : '−',
   }
 }
 

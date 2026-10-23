@@ -11,7 +11,30 @@ const analysis = (content: string, confidence = 0.95) => ({
   content, pages: [{ words: [...content.matchAll(/\S+/g)].map(match => ({ confidence, span: { offset: match.index, length: match[0].length } })) }],
 })
 
-describe('safe numbered handwriting recognition', () => {
+describe('safe handwriting answer recognition', () => {
+  it.each([', ', '; ', ': ', '\n', ',\n'])('reads an ordered unnumbered list separated by %j without correcting spellings', separator => {
+    const result = numberedAnswers(analysis(`  Straße${separator}beautifull${separator}glück\n`), 3)
+    expect(result.answers.map(answer => answer.text)).toEqual(['Straße', 'beautifull', 'glück'])
+    expect(result.answers.every(answer => answer.confidence === 0.95)).toBe(true)
+    expect(result.warnings).toEqual(['Check the answer order before saving.'])
+    expect(suggestedResult('beautiful', result.answers[1].text, result.answers[1].confidence)).toBe(false)
+  })
+
+  it.each(['apple; pear', 'apple; pear; plum; peach', 'apple; ; pear', 'Words:\napple\npear'])('does not guess answer positions for an incomplete or ambiguous list: %s', content => {
+    const result = numberedAnswers(analysis(content), 3)
+    expect(result.answers.every(answer => answer.text === null)).toBe(true)
+    expect(result.warnings.length).toBeGreaterThan(0)
+  })
+
+  it('retains each ordered answer’s own confidence and supports a single unnumbered answer', () => {
+    const data = analysis('Straße; beautifull; glück')
+    data.pages[0].words[1].confidence = 0.5
+    const result = numberedAnswers(data, 3)
+    expect(result.answers.map(answer => answer.confidence)).toEqual([0.95, 0.5, 0.95])
+    expect(suggestedResult('beautiful', result.answers[1].text, result.answers[1].confidence)).toBeNull()
+    expect(numberedAnswers(analysis('Schmeterling'), 1).answers[0]).toEqual({ number: 1, text: 'Schmeterling', confidence: 0.95 })
+  })
+
   it('keeps spelling and case verbatim, matches explicit numbers, and handles Unicode spans', () => {
     const result = numberedAnswers(analysis('2) beautifull\n1. Straße\n3. glück'), 3)
     expect(result.answers.map(answer => answer.text)).toEqual(['Straße', 'beautifull', 'glück'])

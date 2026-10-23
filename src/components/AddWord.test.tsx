@@ -29,7 +29,7 @@ describe('quick word entry', () => {
     await user.click(screen.getByRole('button', { name: 'Add word' }))
     expect(insert).toHaveBeenCalledWith('butterfly', 'en')
     expect(mark).not.toHaveBeenCalled()
-    expect(await screen.findByRole('status')).toHaveTextContent('Added to New.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Added to Default.')
     expect(refresh).toHaveBeenCalledOnce()
     expect(screen.getByLabelText('Word')).toHaveValue('')
     expect(screen.getByLabelText('Word')).toHaveFocus()

@@ -30,17 +30,19 @@ export function useDictation() {
     }
   }, [supported, stop])
 
-  const speak = useCallback((word: string, language: Language) => {
+  const speak = useCallback((word: string, language: Language, onFinished?: (success: boolean) => void) => {
     stop()
     setError(null)
     if (!supported) {
       setError({ key: 'Spoken dictation is not supported in this browser. Try a current Chrome, Edge, or Safari browser.' })
+      onFinished?.(false)
       return
     }
     const matching = window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().split(/[-_]/)[0] === language)
     const voice = matching.find(v => v.localService) ?? matching[0]
     if (!voice) {
       setError({ key: 'No {language} voice is available yet. Enable a {language} speech voice in your device settings, wait a moment, then try Listen again.', values: { language: languages[language].name } })
+      onFinished?.(false)
       return
     }
     try {
@@ -50,18 +52,20 @@ export function useDictation() {
       utterance.rate = 0.8
       current.current = utterance
       utterance.onstart = () => { if (current.current === utterance) setSpeaking(true) }
-      utterance.onend = () => { if (current.current === utterance) { current.current = null; setSpeaking(false) } }
+      utterance.onend = () => { if (current.current === utterance) { current.current = null; setSpeaking(false); onFinished?.(true) } }
       utterance.onerror = event => {
         if (current.current !== utterance) return
         current.current = null
         setSpeaking(false)
         setError({ key: 'Dictation could not play ({error}). Check your device audio and try Listen again.', values: { error: event.error } })
+        onFinished?.(false)
       }
       window.speechSynthesis.speak(utterance)
     } catch (error) {
       current.current = null
       setSpeaking(false)
       setError(error instanceof Error ? { key: 'Dictation could not start: {error}', values: { error: error.message } } : { key: 'Dictation could not start: Please try again.' })
+      onFinished?.(false)
     }
   }, [stop, supported])
 

@@ -10,47 +10,67 @@ const words: Word[] = [
 ]
 
 describe('word collection', () => {
-  it('keeps disabled-language data visible in overview totals and searchable', async () => {
+  it('keeps word entry and word lists together and visible for an existing collection', async () => {
+    const user = userEvent.setup()
+    const openWordLists = vi.fn()
+    render(<Collection words={words} loading={false} refresh={vi.fn()} onOpenWordLists={openWordLists} />)
+    const add = screen.getByRole('region', { name: 'Add a word' })
+    expect(within(add).getByRole('textbox', { name: 'Word' })).toBeVisible()
+    expect(within(add).getByRole('button', { name: 'Add word' })).toBeVisible()
+    await user.click(within(add).getByRole('button', { name: 'Word lists' }))
+    expect(openWordLists).toHaveBeenCalledOnce()
+    expect(screen.getByRole('searchbox', { name: 'Search words' })).toBeVisible()
+  })
+
+  it('keeps disabled-language words visible and filterable without a search', async () => {
     const user = userEvent.setup()
     render(<Collection words={words} loading={false} refresh={vi.fn()} preferences={{ enabled: ['fr'], defaultLanguage: 'fr' }} />)
-    expect(screen.getByRole('rowheader', { name: 'Français' })).toBeInTheDocument()
-    expect(screen.getByRole('rowheader', { name: 'Deutsch (off)' })).toBeInTheDocument()
-    expect(screen.getByRole('rowheader', { name: 'English (off)' })).toBeInTheDocument()
-    expect(screen.getByText('Total words').nextElementSibling).toHaveTextContent('2')
+    const languageFilter = screen.getByRole('combobox', { name: 'Filter by language' })
+    expect(within(languageFilter).getByRole('option', { name: 'Français' })).toBeInTheDocument()
+    expect(within(languageFilter).getByRole('option', { name: 'Deutsch (off)' })).toBeInTheDocument()
+    expect(within(languageFilter).getByRole('option', { name: 'English (off)' })).toBeInTheDocument()
+    expect(screen.getByText('beautiful')).toBeVisible()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by language' }), 'de')
+    expect(screen.queryByText('beautiful')).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Search words'), 'Straße')
     expect(screen.getByText('Straße')).toBeInTheDocument()
   })
 
-  it('shows the local practice date and time in search results while preserving the server timestamp', async () => {
-    const user = userEvent.setup()
+  it('preserves local practice dates and the original server timestamp on individual words', () => {
     const timestamp = '2026-10-22T12:34:56Z'
     const { container } = render(<Collection words={[{ ...words[0], last_practiced_at: timestamp }]} loading={false} refresh={vi.fn()} />)
-    await user.type(screen.getByLabelText('Search words'), 'Straße')
+    expect(screen.getByText('Straße')).toBeVisible()
     const time = container.querySelector('time')
     expect(time).toHaveAttribute('dateTime', timestamp)
     expect(time).toHaveTextContent(new Date(timestamp).toLocaleString('en-GB'))
   })
 
-  it('opens with an aggregate overview, not the full list of spellings', () => {
+  it('opens with the defined words and filters, not aggregate statistics', () => {
     render(<Collection words={words} loading={false} refresh={vi.fn()} />)
-    expect(screen.queryByText('Straße')).not.toBeInTheDocument()
-    expect(screen.queryByText('beautiful')).not.toBeInTheDocument()
-    const table = screen.getByRole('table', { name: 'Words by language and category' })
-    const rows = within(table).getAllByRole('row')
-    expect(within(rows[1]).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['1', '0', '0', '1'])
-    expect(within(rows[2]).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['0', '1', '0', '1'])
-    expect(screen.getByText('Total words').nextElementSibling).toHaveTextContent('2')
-    expect(screen.getByText('Not practiced').nextElementSibling).toHaveTextContent('2')
+    expect(screen.getByText('Straße')).toBeVisible()
+    expect(screen.getByText('beautiful')).toBeVisible()
+    expect(screen.getByRole('combobox', { name: 'Filter by language' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: 'Category' })).toBeVisible()
+    expect(screen.queryByText('Total words')).not.toBeInTheDocument()
   })
 
   it('filters by language without changing the underlying word list', async () => {
     const user = userEvent.setup()
     render(<Collection words={words} loading={false} refresh={vi.fn()} />)
-    await user.type(screen.getByLabelText('Search words'), 'a')
-    await user.click(screen.getByRole('button', { name: 'English' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by language' }), 'en')
     expect(screen.queryByText('Straße')).not.toBeInTheDocument()
     expect(screen.getByText('beautiful')).toBeInTheDocument()
-    expect(screen.getByText(/1 mistake in a row/)).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), 'new')
+    expect(screen.queryByText('beautiful')).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), 'plus')
+    expect(screen.getByText('beautiful')).toBeVisible()
+    await user.type(screen.getByLabelText('Search words'), 'absent')
+    expect(screen.getByText('No matching words.')).toBeVisible()
+    await user.clear(screen.getByLabelText('Search words'))
+    expect(screen.getByText('beautiful')).toBeVisible()
+    expect(screen.queryByText('Straße')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Filter by language' })).toHaveValue('en')
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveValue('plus')
   })
 
   it('requires an explicit delete confirmation and lets the parent keep the word', async () => {
@@ -64,14 +84,18 @@ describe('word collection', () => {
     expect(screen.getByText('Straße')).toBeInTheDocument()
   })
 
-  it('limits broad searches and clearing the search hides the word list again', async () => {
+  it('shows more words and restores the defined list when a search is cleared', async () => {
     const user = userEvent.setup()
     render(<Collection words={Array.from({ length: 30 }, (_, index) => ({ ...words[0], id: String(index), text: `Word${index}` }))} loading={false} refresh={vi.fn()} />)
     const input = screen.getByLabelText('Search words')
     await user.type(input, 'word')
     expect(screen.getAllByRole('listitem')).toHaveLength(20)
-    expect(screen.getByText('Showing 20 of 30 matches. Refine your search.')).toBeInTheDocument()
+    expect(screen.getByText('Showing 20 of 30 words')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Show more words' }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(30)
+    expect(screen.queryByRole('button', { name: 'Show more words' })).not.toBeInTheDocument()
     await user.clear(input)
-    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(20)
+    expect(screen.getByText('Word0')).toBeVisible()
   })
 })

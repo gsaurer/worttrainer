@@ -4,9 +4,9 @@ import { FileStore } from './store.js'
 import { ocrConfiguration } from './ocr.js'
 
 const production = process.env.NODE_ENV === 'production'
-const port = Number(process.env.PORT ?? (production ? 3000 : 3001))
+const port = Number(process.env.PORT ?? (production ? 3000 : 3002))
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port.')
-const origin = process.env.APP_ORIGIN ?? (production ? '' : 'http://localhost:5173')
+const origin = process.env.APP_ORIGIN ?? (production ? '' : 'http://localhost:5182')
 if (!origin || new URL(origin).origin !== origin) throw new Error('APP_ORIGIN must be the exact public origin, without a trailing slash.')
 const secureSetting = process.env.COOKIE_SECURE
 if (secureSetting && !['true', 'false'].includes(secureSetting)) throw new Error('COOKIE_SECURE must be true or false.')

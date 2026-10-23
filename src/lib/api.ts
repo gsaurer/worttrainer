@@ -1,4 +1,5 @@
-import type { AccountDataExport, AuthState, Language, LanguagePreferences, PhotoRound, PhotoStatus, WebsiteLanguage, Word } from '../../shared/model'
+import type { AccountDataExport, AuthState, Language, LanguagePreferences, NavigationTiming, Challenge, ChallengeStatus, ChallengeCheckInput, WebsiteLanguage, Word } from '../../shared/model'
+import type { AddedWordList, ResourceImport, WordResource } from '../../shared/model'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -33,18 +34,21 @@ export const api = {
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),
   words: () => request<Word[]>('/words', 'GET', undefined, true),
+  addedWordLists: () => request<AddedWordList[]>('/word-lists', 'GET', undefined, true),
   languagePreferences: () => request<LanguagePreferences>('/languages', 'GET', undefined, true),
   saveLanguagePreferences: (preferences: LanguagePreferences) => request<LanguagePreferences>('/languages', 'POST', preferences, true),
   exportData: () => request<AccountDataExport>('/export', 'GET', undefined, true),
   addWord: (text: string, language: Language) => request<Word>('/words', 'POST', { text, language }, true),
+  wordResources: () => request<WordResource[]>('/word-resources', 'GET', undefined, true),
+  importWordResource: (resourceId: string, sectionIds: string[], enableLanguage: boolean) => request<ResourceImport>('/word-resources/import', 'POST', { resourceId, sectionIds, enableLanguage }, true),
   deleteWord: (id: string) => request<void>(`/words/${encodeURIComponent(id)}`, 'DELETE', {}, true),
   mark: (wordId: string, correct: boolean, attemptId: string) => request<Word>('/practice', 'POST', { wordId, correct, attemptId }, true),
-  photoStatus: () => request<PhotoStatus>('/photo-rounds', 'GET', undefined, true),
-  createPhotoRound: (wordIds: string[]) => request<PhotoRound>('/photo-rounds', 'POST', { wordIds }, true),
-  advancePhotoRound: (id: string, nextIndex: number) => request<PhotoRound>(`/photo-rounds/${encodeURIComponent(id)}/advance`, 'POST', { nextIndex }, true),
-  readPhoto: async (id: string, photo: File) => readResponse<PhotoRound>(await fetch(`/api/photo-rounds/${encodeURIComponent(id)}/photo`, {
+  challengeStatus: () => request<ChallengeStatus>('/challenges', 'GET', undefined, true),
+  createChallenge: (wordIds: string[]) => request<Challenge>('/challenges', 'POST', { wordIds }, true),
+  advanceChallenge: (id: string, nextIndex: number, timing: NavigationTiming) => request<Challenge>(`/challenges/${encodeURIComponent(id)}/advance`, 'POST', { nextIndex, ...timing }, true),
+  readPhoto: async (id: string, photo: File) => readResponse<Challenge>(await fetch(`/api/challenges/${encodeURIComponent(id)}/photo`, {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': photo.type }, body: photo,
   }), true),
-  reviewPhotoRound: (id: string, results: boolean[]) => request<PhotoRound>(`/photo-rounds/${encodeURIComponent(id)}/review`, 'POST', { results }, true),
-  deletePhotoRound: (id: string) => request<void>(`/photo-rounds/${encodeURIComponent(id)}`, 'DELETE', {}, true),
+  reviewChallenge: (id: string, results: boolean[], check: ChallengeCheckInput) => request<Challenge>(`/challenges/${encodeURIComponent(id)}/review`, 'POST', { results, check }, true),
+  deleteChallenge: (id: string) => request<void>(`/challenges/${encodeURIComponent(id)}`, 'DELETE', {}, true),
 }

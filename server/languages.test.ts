@@ -7,6 +7,7 @@ import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { FileStore } from './store.js'
+import { resourceCatalogSchema, wordResources } from './word-resources.js'
 
 const origin = 'http://localhost:5173'
 let directory: string
@@ -37,10 +38,107 @@ beforeEach(async () => {
 })
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
+describe('centrally managed word resources', () => {
+  it.each([
+    { id: 'demo-deutsche-stolperwoerter', language: 'de' },
+    { id: 'demo-english-spelling-traps', language: 'en' },
+  ])('offers 50 unique spelling-trap words in the $language demo list', async ({ id, language }) => {
+    const resources = wordResources.filter(resource => resource.id === id)
+    expect(resources).toHaveLength(1)
+    const resource = resources[0]
+    expect(resource.language).toBe(language)
+    expect(resource.sections).toHaveLength(5)
+    expect(resource.sections.every(section => section.entries.length === 10)).toBe(true)
+    const entries = resource.sections.flatMap(section => section.entries)
+    expect(entries).toHaveLength(50)
+    expect(new Set(entries.map(entry => entry.word.toLocaleLowerCase(language))).size).toBe(50)
+    await post('/api/word-resources/import', {
+      resourceId: id, sectionIds: resource.sections.map(section => section.id), enableLanguage: false,
+    }).expect(200).expect({ added: 50, existing: 0, language })
+    expect(store.words(first.id)).toHaveLength(50)
+  })
+
+  it('validates resources, sections, sentences and multilingual translations', () => {
+    expect(resourceCatalogSchema.parse(wordResources)).toEqual(wordResources)
+    const resource = wordResources[0]
+    expect(resourceCatalogSchema.safeParse([resource, resource]).success).toBe(false)
+    expect(resourceCatalogSchema.safeParse([{ ...resource, sections: [resource.sections[0], resource.sections[0]] }]).success).toBe(false)
+    expect(resourceCatalogSchema.safeParse([{ ...resource, language: 'unknown' }]).success).toBe(false)
+    const entry = resource.sections[0].entries[0]
+    for (const invalid of [{ ...entry, word: 'two\nlines' }, { ...entry, sentence: '' }, { ...entry, translations: [{ language: 'unknown', word: 'test' }] }]) {
+      expect(resourceCatalogSchema.safeParse([{ ...resource, sections: [{ ...resource.sections[0], entries: [invalid] }] }]).success).toBe(false)
+    }
+  })
+
+  it('imports selected sections privately, preserves existing progress and survives retry and restart', async () => {
+    const existing = await store.addWord(first.id, 'BOOK', 'en')
+    await store.mark(first.id, existing.id, true, randomUUID())
+    const before = store.words(first.id)[0]
+    const otherFile = join(directory, 'store.accounts', `${second.id}.json`)
+    const otherBefore = await readFile(otherFile, 'utf8')
+    const indexBefore = await readFile(file, 'utf8')
+    const catalog = (await get('/api/word-resources').expect(200)).body
+    expect(catalog).toEqual(wordResources)
+    const input = { resourceId: 'everyday-english', sectionIds: ['at-school'], enableLanguage: false }
+    await post('/api/word-resources/import', input).expect(200).expect({ added: 4, existing: 1, language: 'en' })
+    await post('/api/word-resources/import', input).expect(200).expect({ added: 0, existing: 5, language: 'en' })
+    const lists = (await get('/api/word-lists').expect(200)).body
+    expect(lists).toEqual([{
+      resourceId: 'everyday-english', title: expect.any(String), language: 'en', sectionIds: ['at-school'],
+      wordIds: expect.arrayContaining([existing.id]),
+    }])
+    expect(lists[0].wordIds).toHaveLength(5)
+    await get('/api/word-lists', second.cookie).expect(200).expect([])
+    expect((await get(`/api/word-lists?accountId=${second.id}`)).body).toEqual(lists)
+    const reopened = await FileStore.open(file)
+    expect(reopened.addedWordLists(first.id)).toEqual(lists)
+    expect(reopened.words(first.id)).toHaveLength(5)
+    expect(reopened.words(first.id).find(word => word.id === existing.id)).toEqual(before)
+    expect(reopened.words(first.id).some(word => word.text === 'house')).toBe(false)
+    expect(reopened.exportData(first.id).attempts).toHaveLength(1)
+    expect(reopened.exportData(first.id).words).toEqual(reopened.words(first.id))
+    expect(reopened.words(second.id)).toEqual([])
+    expect(await readFile(otherFile, 'utf8')).toBe(otherBefore)
+    expect(await readFile(file, 'utf8')).toBe(indexBefore)
+  })
+
+  it('requires explicit language enablement and keeps concurrent imports duplicate-free', async () => {
+    const input = { resourceId: 'premiers-mots', sectionIds: ['a-la-maison', 'dans-le-jardin'], enableLanguage: false }
+    await post('/api/word-resources/import', input).expect(409)
+    expect(store.words(first.id)).toEqual([])
+    expect(store.languagePreferences(first.id).enabled).not.toContain('fr')
+    const responses = await Promise.all([post('/api/word-resources/import', { ...input, enableLanguage: true }), post('/api/word-resources/import', { ...input, enableLanguage: true })])
+    expect(responses.map(response => response.status)).toEqual([200, 200])
+    expect(responses.reduce((total, response) => total + response.body.added, 0)).toBe(10)
+    expect(store.words(first.id)).toHaveLength(10)
+    expect(store.words(first.id).every(word => word.language === 'fr' && word.category === 'new')).toBe(true)
+    expect(store.languagePreferences(first.id)).toEqual({ enabled: ['de', 'en', 'fr'], defaultLanguage: 'de' })
+    expect(store.languagePreferences(second.id).enabled).not.toContain('fr')
+  })
+
+  it('rejects unauthenticated, forged, invalid, foreign-section and cross-origin imports without writes', async () => {
+    const input = { resourceId: 'everyday-english', sectionIds: ['at-school'], enableLanguage: false }
+    const accountFile = join(directory, 'store.accounts', `${first.id}.json`)
+    const before = await readFile(accountFile, 'utf8')
+    await request(app).get('/api/word-resources').expect(401)
+    await request(app).get('/api/word-lists').expect(401)
+    await post('/api/word-resources/import', input, '').expect(401)
+    await request(app).post('/api/word-resources/import').set('Origin', 'https://untrusted.example').set('Cookie', first.cookie).send(input).expect(403)
+    await post('/api/word-resources/import', { ...input, resourceId: 'missing' }).expect(404)
+    for (const invalid of [
+      { ...input, sectionIds: [] }, { ...input, sectionIds: ['at-school', 'at-school'] },
+      { ...input, sectionIds: ['a-la-maison'] }, { ...input, sectionIds: ['at-school', 'missing'] },
+      { ...input, accountId: second.id }, { ...input, words: [{ word: 'forged' }] },
+      { ...input, enableLanguage: 'yes' },
+    ]) await post('/api/word-resources/import', invalid).expect(400)
+    expect(await readFile(accountFile, 'utf8')).toBe(before)
+  })
+})
+
 describe('account language preferences', () => {
   it('saves the website language in only its account file and syncs it in sessions and exports after restart', async () => {
     const word = await store.addWord(first.id, 'beautiful', 'en')
-    const round = await store.createPhotoRound(first.id, [word.id])
+    const challenge = await store.createChallenge(first.id, [word.id])
     const indexBefore = await readFile(file, 'utf8')
     const otherFile = join(directory, 'store.accounts', `${second.id}.json`)
     const otherBefore = await readFile(otherFile, 'utf8')
@@ -53,9 +151,9 @@ describe('account language preferences', () => {
     app = createApp({ store: reopened, origin, secureCookie: false })
     expect((await get('/api/session')).body.websiteLanguage).toBe('de')
     expect((await get('/api/export')).body).toMatchObject({
-      schemaVersion: 3, websiteLanguage: 'de',
+      schemaVersion: 5, websiteLanguage: 'de',
       languagePreferences: { enabled: ['de', 'en'], defaultLanguage: 'de' },
-      words: [word], rounds: [round], attempts: [],
+      words: [word], challenges: [challenge], attempts: [],
     })
     await post('/api/website-language', { websiteLanguage: 'en' }).expect(200)
     expect((await FileStore.open(file)).websiteLanguage(first.id)).toBe('en')
@@ -105,7 +203,7 @@ describe('account language preferences', () => {
     const reopened = await FileStore.open(file)
     expect(reopened.languagePreferences(first.id)).toEqual(preferences)
     expect(reopened.languagePreferences(second.id)).toEqual({ enabled: ['de', 'en'], defaultLanguage: 'de' })
-    expect((await get('/api/export')).body).toMatchObject({ schemaVersion: 3, websiteLanguage: 'en', languagePreferences: preferences })
+    expect((await get('/api/export')).body).toMatchObject({ schemaVersion: 5, websiteLanguage: 'en', languagePreferences: preferences })
     const clone = reopened.languagePreferences(first.id)
     clone.enabled.push('en')
     expect(reopened.languagePreferences(first.id)).toEqual(preferences)
@@ -129,32 +227,32 @@ describe('account language preferences', () => {
     await post('/api/words', { text: 'papillon', language: 'fr' }).expect(409)
     await post('/api/languages', { enabled: ['de', 'fr'], defaultLanguage: 'fr' }).expect(200)
     const word = (await post('/api/words', { text: 'papillon', language: 'fr' }).expect(201)).body
-    const round = (await post('/api/photo-rounds', { wordIds: [word.id] }).expect(201)).body
-    expect(round.words[0]).toMatchObject({ text: 'papillon', language: 'fr' })
+    const challenge = (await post('/api/challenges', { wordIds: [word.id] }).expect(201)).body
+    expect(challenge.words[0]).toMatchObject({ text: 'papillon', language: 'fr' })
     await post('/api/languages', { enabled: ['de'], defaultLanguage: 'de' }).expect(200)
     await post('/api/words', { text: 'bonjour', language: 'fr' }).expect(409)
-    await post('/api/photo-rounds', { wordIds: [word.id] }).expect(409)
-    await post(`/api/photo-rounds/${round.id}/advance`, { nextIndex: 1 }).expect(200)
-    await post(`/api/photo-rounds/${round.id}/review`, { results: [true] }).expect(200)
+    await post('/api/challenges', { wordIds: [word.id] }).expect(409)
+    await post(`/api/challenges/${challenge.id}/advance`, { nextIndex: 1, fromIndex: 0, elapsedMs: 5000, intervalSeconds: 5, automatic: false, action: 'next' }).expect(200)
+    await post(`/api/challenges/${challenge.id}/review`, { results: [true], check: { method: 'manual', spellings: ['papillon'] } }).expect(200)
     const reopened = await FileStore.open(file)
-    expect(reopened.words(first.id)).toEqual([expect.objectContaining({ id: word.id, language: 'fr', category: 'plus' })])
-    expect(reopened.photoRound(first.id, round.id).results).toEqual([true])
+    expect(reopened.words(first.id)).toEqual([expect.objectContaining({ id: word.id, language: 'fr', category: 'new' })])
+    expect(reopened.challenge(first.id, challenge.id).results).toEqual([true])
     const exported = reopened.exportData(first.id)
     expect(exported.attempts).toHaveLength(1)
     expect(exported.statistics).toMatchObject({ correct: 1, accuracy: 100 })
     await post('/api/languages', { enabled: ['fr'], defaultLanguage: 'fr' }).expect(200)
     expect((await get('/api/words')).body[0].id).toBe(word.id)
-    await post('/api/photo-rounds', { wordIds: [word.id] }).expect(201)
+    await post('/api/challenges', { wordIds: [word.id] }).expect(201)
   })
 
   it('migrates older version-2 accounts with Deutsch/English defaults and preserves their original data', async () => {
     const word = await store.addWord(first.id, 'Straße', 'de')
-    const round = await store.createPhotoRound(first.id, [word.id])
+    const challenge = await store.createChallenge(first.id, [word.id])
     const data = JSON.parse(await readFile(file, 'utf8'))
     data.version = 2
     for (const account of data.accounts) {
       const practice = JSON.parse(await readFile(join(directory, 'store.accounts', `${account.id}.json`), 'utf8'))
-      Object.assign(account, { words: practice.words, attempts: practice.attempts, photoRounds: practice.photoRounds })
+      Object.assign(account, { words: practice.words, attempts: practice.attempts, challenges: practice.challenges })
     }
     const legacy = JSON.stringify(data)
     const oldFile = join(directory, 'legacy.json')
@@ -162,7 +260,7 @@ describe('account language preferences', () => {
     const reopened = await FileStore.open(oldFile)
     expect(reopened.languagePreferences(first.id)).toEqual({ enabled: ['de', 'en'], defaultLanguage: 'de' })
     expect(reopened.words(first.id)).toEqual([word])
-    expect(reopened.photoRounds(first.id)).toEqual([round])
+    expect(reopened.challenges(first.id)).toEqual([challenge])
     expect(await readFile(`${oldFile}.v2.bak`, 'utf8')).toBe(legacy)
     await reopened.setLanguagePreferences(first.id, { enabled: ['de', 'fr'], defaultLanguage: 'fr' })
     expect((await FileStore.open(oldFile)).words(first.id)).toEqual([word])
