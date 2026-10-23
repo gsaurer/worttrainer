@@ -211,28 +211,38 @@ Never put the parent account password in `.env`; the secure browser form sets it
 
 ## Practice together
 
-1. Add the **correct spelling** of a tricky word and choose Deutsch or English.
-   Duplicate words in the same account and language are rejected
-   (case-insensitive); different accounts can practice the same word independently.
-2. Open **Let's practice**, choose a language and category, then choose a round
-   size: **10, 15, 20, or 25 words** (default 10). These are size presets, not
-   learning categories. Each round randomly selects distinct matching words;
-   when fewer match than requested, all matching words are used. The button shows
-   the actual number that will be dictated. **Start round** saves that numbered
-   word list before dictation begins. Resuming an existing round keeps its
-   original words and length, regardless of the current size setting.
+1. On **Home**, enter the **correct spelling**, choose Deutsch or English,
+   then press **Add word** or Enter. The field clears and stays focused for
+   the next word; the selected language is kept.
+   Existing words are flagged as you type (case-insensitive, ignoring edge
+   spaces), and adding is disabled for that language. The server also rejects
+   duplicates, including simultaneous additions from another device. Different
+   languages and accounts can keep the same spelling independently.
+2. On the same home page, press **Start 10 words**, **Start 15 words**,
+   **Start 20 words**, or **Start 25 words**. One press saves and opens the
+   numbered round. Use **Change words** for optional language/category filters.
+   Each round randomly selects distinct matching words. Smaller collections show
+   only the available sizes, without duplicate buttons: eight matching words
+   give one **Start 8 words** button; twelve give **Start 10 words** and
+   **Start 12 words**. Resuming a saved round keeps its original words and length.
 3. Tap **Listen** and write the answer on paper, numbered **1, 2, 3...**.
    Spelling stays concealed, including from the accessibility tree, throughout
-   dictation. Tap **Written — next word** to save your position.
+   dictation. Tap **Next word** to save your position, or **Check answers** after
+   the last word.
 4. After the whole round is written, choose **Review the sheet manually** or
    upload one photo for recognition suggestions. Mark each answer, then
    **Confirm all results**. No results change progress until this confirmation.
    A failed/uncertain save can be retried without counting it twice.
 
-**Pause and return to rounds** retains the numbered list and writing position.
+**Pause** retains the numbered list and writing position.
 Use **Continue round** on any signed-in device to resume. There is no timer, and
 pausing never marks unanswered words incorrect. Checking each word immediately
 is no longer a separate practice mode; all practice now uses saved rounds.
+
+**Collection** is a separate overview: total words, practiced/unpracticed counts,
+and language/category totals. Spellings are not listed by default. Use
+**Search words** to find a spelling, inspect its progress, or delete it with
+confirmation. Searches show up to 20 matches; refine the query to find others.
 
 | Practice result | Category and consecutive-mistake count |
 | --- | --- |
@@ -277,8 +287,9 @@ All rounds support manual review without OCR configuration. To use one photo:
 
 1. Start a numbered round. Each word is dictated without displaying its spelling.
    Write one answer per line, numbered **1, 2, 3...** in dictation order. A sheet
-   supports 1–100 words; a short round is much easier to photograph/read.
-2. Tap **Written — next word**. The server saves the ordered word snapshots,
+   uses up to 25 words; older saved rounds of up to 100 words still work.
+2. Tap **Next word**, then **Check answers** after the last word.
+   The server saves the ordered word snapshots,
    current position, start time, and writing-finished time. Pause and reopen
    **Round history** on either device to continue.
 3. At the end, photograph the entire numbered sheet clearly, upright, flat,
