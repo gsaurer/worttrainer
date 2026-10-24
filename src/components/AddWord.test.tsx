@@ -55,7 +55,7 @@ describe('quick word entry', () => {
     const insert = vi.spyOn(api, 'addWord')
     render(<AddWord words={[word]} loading={false} refresh={vi.fn()} />)
     await user.type(screen.getByLabelText('Word'), '  STRAßE  ')
-    expect(screen.getByRole('status')).toHaveTextContent('Already in Deutsch · New.')
+    expect(screen.getByRole('status')).toHaveTextContent('Already in Deutsch · Default.')
     expect(screen.getByLabelText('Word')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByRole('button', { name: 'Add word' })).toBeDisabled()
     await user.keyboard('{Enter}')

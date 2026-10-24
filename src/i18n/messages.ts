@@ -308,7 +308,7 @@ export const german = {
   'Confirm all {count} results': 'Alle {count} Ergebnisse bestätigen',
   'All {count} parent-confirmed results are saved to your account.': 'Alle {count} von dir bestätigten Ergebnisse sind in deinem Konto gespeichert.',
   'Spoken dictation is not supported in this browser. Try a current Chrome, Edge, or Safari browser.': 'Dieser Browser unterstützt kein Diktieren. Nutze eine aktuelle Version von Chrome, Edge oder Safari.',
-  'No {language} voice is available yet. Enable a {language} speech voice in your device settings, wait a moment, then try Listen again.': 'Noch keine Stimme für {language} verfügbar. Aktiviere eine passende Stimme in den Geräteeinstellungen, warte kurz und versuche es erneut mit Anhören.',
+  'No {language} voice is available yet. Enable a {language} speech voice in your device settings, wait a moment, then try Listen again.': 'Noch keine Stimme für {language} verfügbar. Aktiviere eine Stimme für {language} in den Geräteeinstellungen, warte kurz und versuche es erneut mit Anhören.',
   'Dictation could not play ({error}). Check your device audio and try Listen again.': 'Diktieren fehlgeschlagen ({error}). Prüfe die Audioeinstellungen und versuche es erneut mit Anhören.',
   'Dictation could not start: {error}': 'Diktieren konnte nicht gestartet werden: {error}',
   'Dictation could not start: Please try again.': 'Diktieren konnte nicht gestartet werden. Bitte versuche es erneut.',

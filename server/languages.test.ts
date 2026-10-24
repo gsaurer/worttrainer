@@ -49,14 +49,14 @@ describe('centrally managed word resources', () => {
   })
 
   const bookUnits = [
-    { unit: 1, count: 33, firstWord: 'to agree', lastWord: 'Me neither.' },
-    { unit: 2, count: 35, firstWord: 'coincidence', lastWord: 'to try out' },
-    { unit: 3, count: 35, firstWord: 'to become', lastWord: 'to recommend' },
-    { unit: 4, count: 37, firstWord: 'cub', lastWord: 'politician' },
-    { unit: 5, count: 33, firstWord: 'alarm clock', lastWord: 'seriously' },
-    { unit: 6, count: 34, firstWord: 'stadium', lastWord: 'to sign' },
-    { unit: 7, count: 28, firstWord: 'It\'s none of my business.', lastWord: 'unwell' },
-    { unit: 8, count: 39, firstWord: 'bacon', lastWord: 'to support' },
+    { unit: 1, count: 40, firstWord: 'to give sth. a try', lastWord: 'Me neither.', untranslated: 7 },
+    { unit: 2, count: 42, firstWord: 'to buy sth.', lastWord: 'to try out', untranslated: 7 },
+    { unit: 3, count: 54, firstWord: 'to get to (the airport)', lastWord: 'to recommend', untranslated: 19 },
+    { unit: 4, count: 46, firstWord: 'poisonous', lastWord: 'politician', untranslated: 9 },
+    { unit: 5, count: 41, firstWord: 'to be unlucky', lastWord: 'seriously', untranslated: 8 },
+    { unit: 6, count: 45, firstWord: 'park', lastWord: 'to sign', untranslated: 11 },
+    { unit: 7, count: 34, firstWord: 'to fall out with sb.', lastWord: 'unwell', untranslated: 6 },
+    { unit: 8, count: 47, firstWord: 'to invent', lastWord: 'to support', untranslated: 8 },
     { unit: 9, count: 39, firstWord: 'to dye your hair', lastWord: 'to sort out', untranslated: 16 },
     { unit: 10, count: 53, firstWord: 'to hand out leaflets', lastWord: 'organisation', untranslated: 12 },
     { unit: 11, count: 37, firstWord: 'canyon', lastWord: 'totally', untranslated: 8 },
@@ -93,16 +93,16 @@ describe('centrally managed word resources', () => {
     const resource = wordResources.find(resource => resource.id === 'more-book-3')!
     await post('/api/word-resources/import', {
       resourceId: resource.id, sectionIds: ['unit-7'], enableLanguage: false,
-    }).expect(200).expect({ added: 28, existing: 0, language: 'en' })
+    }).expect(200).expect({ added: 34, existing: 0, language: 'en' })
     const sharedWord = store.words(first.id).find(word => word.text === 'to move')!
     await store.mark(first.id, sharedWord.id, true, randomUUID())
     const before = store.words(first.id).find(word => word.id === sharedWord.id)
     const entries = resource.sections.flatMap(section => section.entries)
-    expect(entries).toHaveLength(524)
+    expect(entries).toHaveLength(599)
     const unique = new Set(entries.map(entry => entry.word.toLowerCase())).size
-    expect(unique).toBe(523)
+    expect(unique).toBe(597)
     const input = { resourceId: resource.id, sectionIds: resource.sections.map(section => section.id), enableLanguage: false }
-    await post('/api/word-resources/import', input).expect(200).expect({ added: unique - 28, existing: 28, language: 'en' })
+    await post('/api/word-resources/import', input).expect(200).expect({ added: unique - 34, existing: 34, language: 'en' })
     expect(store.words(first.id)).toHaveLength(unique)
     expect(store.words(first.id).find(word => word.id === sharedWord.id)).toEqual(before)
     expect(store.exportData(first.id).attempts).toHaveLength(1)
@@ -111,11 +111,18 @@ describe('centrally managed word resources', () => {
     for (const sectionId of ['unit-7', 'unit-13']) {
       expect(list.sections.find(section => section.id === sectionId)?.wordIds).toContain(sharedWord.id)
     }
+    const sharedActivity = store.words(first.id).find(word => word.text === 'to try out')!
+    for (const sectionId of ['unit-2', 'unit-8']) {
+      expect(list.sections.find(section => section.id === sectionId)?.wordIds).toContain(sharedActivity.id)
+    }
     await post('/api/word-resources/import', input).expect(200).expect({ added: 0, existing: unique, language: 'en' })
     expect(store.words(second.id)).toEqual([])
   })
 
   it.each([
+    { unit: 4, previousPageLast: 'cuddly', nextPageFirst: 'cub' },
+    { unit: 5, previousPageLast: 'to believe in superstitions', nextPageFirst: 'alarm clock' },
+    { unit: 6, previousPageLast: 'shopping centre', nextPageFirst: 'stadium' },
     { unit: 8, previousPageLast: 'invention', nextPageFirst: 'crowd' },
     { unit: 10, previousPageLast: 'compromise', nextPageFirst: 'Good point.' },
   ])('merges continuation pages in order into a single Unit $unit section', ({ unit, previousPageLast, nextPageFirst }) => {

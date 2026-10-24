@@ -8,6 +8,48 @@
       "title": "Unit 1",
       "entries": [
         {
+          "id": "to-give-sth-a-try",
+          "word": "to give sth. a try",
+          "sentence": "to give sth. a try",
+          "translations": []
+        },
+        {
+          "id": "to-give-up",
+          "word": "to give up",
+          "sentence": "to give up",
+          "translations": []
+        },
+        {
+          "id": "audition",
+          "word": "audition",
+          "sentence": "audition",
+          "translations": []
+        },
+        {
+          "id": "to-have-got-what-it-takes",
+          "word": "to have got what it takes",
+          "sentence": "to have got what it takes",
+          "translations": []
+        },
+        {
+          "id": "to-make-it",
+          "word": "to make it",
+          "sentence": "to make it",
+          "translations": []
+        },
+        {
+          "id": "to-be-on-the-way-up",
+          "word": "to be on the way up",
+          "sentence": "to be on the way up",
+          "translations": []
+        },
+        {
+          "id": "to-get-back-to-sb",
+          "word": "to get back to sb.",
+          "sentence": "to get back to sb.",
+          "translations": []
+        },
+        {
           "id": "to-agree",
           "word": "to agree",
           "sentence": "I couldn't agree more.",
@@ -376,6 +418,48 @@
       "id": "unit-2",
       "title": "Unit 2",
       "entries": [
+        {
+          "id": "to-buy-sth",
+          "word": "to buy sth.",
+          "sentence": "to buy sth.",
+          "translations": []
+        },
+        {
+          "id": "to-drink-eat-sth",
+          "word": "to drink/eat sth.",
+          "sentence": "to drink/eat sth.",
+          "translations": []
+        },
+        {
+          "id": "to-listen-to-music",
+          "word": "to listen to music",
+          "sentence": "to listen to music",
+          "translations": []
+        },
+        {
+          "id": "to-look-at-sth",
+          "word": "to look at sth.",
+          "sentence": "to look at sth.",
+          "translations": []
+        },
+        {
+          "id": "to-try-on-sunglasses",
+          "word": "to try on sunglasses",
+          "sentence": "to try on sunglasses",
+          "translations": []
+        },
+        {
+          "id": "to-talk-on-the-mobile",
+          "word": "to talk on the mobile",
+          "sentence": "to talk on the mobile",
+          "translations": []
+        },
+        {
+          "id": "to-pay-the-bill",
+          "word": "to pay the bill",
+          "sentence": "to pay the bill",
+          "translations": []
+        },
         {
           "id": "coincidence",
           "word": "coincidence",
@@ -768,6 +852,120 @@
       "title": "Unit 3",
       "entries": [
         {
+          "id": "to-get-to-the-airport",
+          "word": "to get to (the airport)",
+          "sentence": "to get to (the airport)",
+          "translations": []
+        },
+        {
+          "id": "to-take-off",
+          "word": "to take off",
+          "sentence": "to take off",
+          "translations": []
+        },
+        {
+          "id": "to-get-on-a-plane",
+          "word": "to get on (a plane)",
+          "sentence": "to get on (a plane)",
+          "translations": []
+        },
+        {
+          "id": "to-fly-back",
+          "word": "to fly (back)",
+          "sentence": "to fly (back)",
+          "translations": []
+        },
+        {
+          "id": "to-get-off-the-plane",
+          "word": "to get off (the plane)",
+          "sentence": "to get off (the plane)",
+          "translations": []
+        },
+        {
+          "id": "to-suffer-from-altitude-sickness",
+          "word": "to suffer from altitude sickness",
+          "sentence": "to suffer from altitude sickness",
+          "translations": []
+        },
+        {
+          "id": "to-land",
+          "word": "to land",
+          "sentence": "to land",
+          "translations": []
+        },
+        {
+          "id": "it-takes-an-hour",
+          "word": "it takes (an hour)",
+          "sentence": "it takes (an hour)",
+          "translations": []
+        },
+        {
+          "id": "to-get-into-a-car",
+          "word": "to get into (a car)",
+          "sentence": "to get into (a car)",
+          "translations": []
+        },
+        {
+          "id": "to-rent-a-car",
+          "word": "to rent (a car)",
+          "sentence": "to rent (a car)",
+          "translations": []
+        },
+        {
+          "id": "to-get-out-of-the-car",
+          "word": "to get out of (the car)",
+          "sentence": "to get out of (the car)",
+          "translations": []
+        },
+        {
+          "id": "to-drive-home",
+          "word": "to drive (home)",
+          "sentence": "to drive (home)",
+          "translations": []
+        },
+        {
+          "id": "to-set-off-for-work",
+          "word": "to set off (for work)",
+          "sentence": "to set off (for work)",
+          "translations": []
+        },
+        {
+          "id": "to-work-on-a-blog",
+          "word": "to work on (a blog)",
+          "sentence": "to work on (a blog)",
+          "translations": []
+        },
+        {
+          "id": "to-get-close-to-nature",
+          "word": "to get close to (nature)",
+          "sentence": "to get close to (nature)",
+          "translations": []
+        },
+        {
+          "id": "to-sleep-in-a-tent",
+          "word": "to sleep in a tent",
+          "sentence": "to sleep in a tent",
+          "translations": []
+        },
+        {
+          "id": "to-escape-the-midday-heat",
+          "word": "to escape (the midday heat)",
+          "sentence": "to escape (the midday heat)",
+          "translations": []
+        },
+        {
+          "id": "to-cross-a-river",
+          "word": "to cross (a river)",
+          "sentence": "to cross (a river)",
+          "translations": []
+        },
+        {
+          "id": "to-meet-up-with-people",
+          "word": "to meet up with (people)",
+          "sentence": "to meet up with (people)",
+          "translations": []
+        },
+        {
           "id": "to-become",
           "word": "to become",
           "sentence": "His feet hurt so badly that walking became difficult.",
@@ -1158,6 +1356,60 @@
       "id": "unit-4",
       "title": "Unit 4",
       "entries": [
+        {
+          "id": "poisonous",
+          "word": "poisonous",
+          "sentence": "poisonous",
+          "translations": []
+        },
+        {
+          "id": "deadly",
+          "word": "deadly",
+          "sentence": "deadly",
+          "translations": []
+        },
+        {
+          "id": "dangerous",
+          "word": "dangerous",
+          "sentence": "dangerous",
+          "translations": []
+        },
+        {
+          "id": "aggressive",
+          "word": "aggressive",
+          "sentence": "aggressive",
+          "translations": []
+        },
+        {
+          "id": "elegant",
+          "word": "elegant",
+          "sentence": "elegant",
+          "translations": []
+        },
+        {
+          "id": "stunning",
+          "word": "stunning",
+          "sentence": "stunning",
+          "translations": []
+        },
+        {
+          "id": "cute",
+          "word": "cute",
+          "sentence": "cute",
+          "translations": []
+        },
+        {
+          "id": "furry",
+          "word": "furry",
+          "sentence": "furry",
+          "translations": []
+        },
+        {
+          "id": "cuddly",
+          "word": "cuddly",
+          "sentence": "cuddly",
+          "translations": []
+        },
         {
           "id": "cub",
           "word": "cub",
@@ -1572,6 +1824,54 @@
       "title": "Unit 5",
       "entries": [
         {
+          "id": "to-be-unlucky",
+          "word": "to be unlucky",
+          "sentence": "to be unlucky",
+          "translations": []
+        },
+        {
+          "id": "to-make-a-wish",
+          "word": "to make a wish",
+          "sentence": "to make a wish",
+          "translations": []
+        },
+        {
+          "id": "to-wish-for-sth",
+          "word": "to wish for sth.",
+          "sentence": "to wish for sth.",
+          "translations": []
+        },
+        {
+          "id": "to-bring-good-bad-luck",
+          "word": "to bring (good/bad) luck",
+          "sentence": "to bring (good/bad) luck",
+          "translations": []
+        },
+        {
+          "id": "to-come-true",
+          "word": "to come true",
+          "sentence": "to come true",
+          "translations": []
+        },
+        {
+          "id": "to-have-good-bad-luck",
+          "word": "to have (good/bad) luck",
+          "sentence": "to have (good/bad) luck",
+          "translations": []
+        },
+        {
+          "id": "spooky",
+          "word": "spooky",
+          "sentence": "spooky",
+          "translations": []
+        },
+        {
+          "id": "to-believe-in-superstitions",
+          "word": "to believe in superstitions",
+          "sentence": "to believe in superstitions",
+          "translations": []
+        },
+        {
           "id": "alarm-clock",
           "word": "alarm clock",
           "sentence": "I really didn't want to get up when my alarm clock rang.",
@@ -1940,6 +2240,72 @@
       "id": "unit-6",
       "title": "Unit 6",
       "entries": [
+        {
+          "id": "park",
+          "word": "park",
+          "sentence": "park",
+          "translations": []
+        },
+        {
+          "id": "tower",
+          "word": "tower",
+          "sentence": "tower",
+          "translations": []
+        },
+        {
+          "id": "district",
+          "word": "district",
+          "sentence": "district",
+          "translations": []
+        },
+        {
+          "id": "square",
+          "word": "square",
+          "sentence": "square",
+          "translations": []
+        },
+        {
+          "id": "shop",
+          "word": "shop",
+          "sentence": "shop",
+          "translations": []
+        },
+        {
+          "id": "river",
+          "word": "river",
+          "sentence": "river",
+          "translations": []
+        },
+        {
+          "id": "building",
+          "word": "building",
+          "sentence": "building",
+          "translations": []
+        },
+        {
+          "id": "art-gallery",
+          "word": "art gallery",
+          "sentence": "art gallery",
+          "translations": []
+        },
+        {
+          "id": "bridge",
+          "word": "bridge",
+          "sentence": "bridge",
+          "translations": []
+        },
+        {
+          "id": "street",
+          "word": "street",
+          "sentence": "street",
+          "translations": []
+        },
+        {
+          "id": "shopping-centre",
+          "word": "shopping centre",
+          "sentence": "shopping centre",
+          "translations": []
+        },
         {
           "id": "stadium",
           "word": "stadium",
@@ -2321,6 +2687,42 @@
       "title": "Unit 7",
       "entries": [
         {
+          "id": "to-fall-out-with-sb",
+          "word": "to fall out with sb.",
+          "sentence": "to fall out with sb.",
+          "translations": []
+        },
+        {
+          "id": "to-storm-out-of",
+          "word": "to storm out of",
+          "sentence": "to storm out of",
+          "translations": []
+        },
+        {
+          "id": "to-break-up-with-sb",
+          "word": "to break up with sb.",
+          "sentence": "to break up with sb.",
+          "translations": []
+        },
+        {
+          "id": "to-mind-your-own-business",
+          "word": "to mind your own business",
+          "sentence": "to mind your own business",
+          "translations": []
+        },
+        {
+          "id": "to-make-up-with-sb",
+          "word": "to make up with sb.",
+          "sentence": "to make up with sb.",
+          "translations": []
+        },
+        {
+          "id": "to-get-on-well-with-sb",
+          "word": "to get on well with sb.",
+          "sentence": "to get on well with sb.",
+          "translations": []
+        },
+        {
           "id": "its-none-of-my-business",
           "word": "It's none of my business.",
           "sentence": "It's none of my business.",
@@ -2634,6 +3036,54 @@
       "id": "unit-8",
       "title": "Unit 8",
       "entries": [
+        {
+          "id": "to-invent",
+          "word": "to invent",
+          "sentence": "to invent",
+          "translations": []
+        },
+        {
+          "id": "to-experiment",
+          "word": "to experiment",
+          "sentence": "to experiment",
+          "translations": []
+        },
+        {
+          "id": "to-improve",
+          "word": "to improve",
+          "sentence": "to improve",
+          "translations": []
+        },
+        {
+          "id": "to-discover",
+          "word": "to discover",
+          "sentence": "to discover",
+          "translations": []
+        },
+        {
+          "id": "to-work-sth-out",
+          "word": "to work sth. out",
+          "sentence": "to work sth. out",
+          "translations": []
+        },
+        {
+          "id": "to-design",
+          "word": "to design",
+          "sentence": "to design",
+          "translations": []
+        },
+        {
+          "id": "to-try-out",
+          "word": "to try out",
+          "sentence": "to try out",
+          "translations": []
+        },
+        {
+          "id": "to-produce",
+          "word": "to produce",
+          "sentence": "to produce",
+          "translations": []
+        },
         {
           "id": "bacon",
           "word": "bacon",
