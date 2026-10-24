@@ -1,0 +1,5515 @@
+{
+  "id": "more-book-3",
+  "title": "MORE! Book 3",
+  "language": "en",
+  "sections": [
+    {
+      "id": "unit-1",
+      "title": "Unit 1",
+      "entries": [
+        {
+          "id": "to-agree",
+          "word": "to agree",
+          "sentence": "I couldn't agree more.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zustimmen"
+            }
+          ]
+        },
+        {
+          "id": "to-belong-to",
+          "word": "to belong to",
+          "sentence": "It probably belonged to my great-grandparents.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "gehören"
+            }
+          ]
+        },
+        {
+          "id": "to-celebrate",
+          "word": "to celebrate",
+          "sentence": "To celebrate music, I thought I'd share with you my favourite musical facts.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "feiern"
+            }
+          ]
+        },
+        {
+          "id": "extremely",
+          "word": "extremely",
+          "sentence": "He was also extremely talented.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "extrem"
+            }
+          ]
+        },
+        {
+          "id": "flute",
+          "word": "flute",
+          "sentence": "The oldest musical instrument is the flute.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Flöte"
+            }
+          ]
+        },
+        {
+          "id": "singer",
+          "word": "singer",
+          "sentence": "You can choose from 11 million singers and bands on Spotify.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sänger/Sängerin"
+            }
+          ]
+        },
+        {
+          "id": "successful",
+          "word": "successful",
+          "sentence": "The song was so successful that they even built a statue.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erfolgreich"
+            }
+          ]
+        },
+        {
+          "id": "talented",
+          "word": "talented",
+          "sentence": "She was very talented.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "talentiert, begabt"
+            }
+          ]
+        },
+        {
+          "id": "to-spill",
+          "word": "to spill",
+          "sentence": "I hope she didn't spill any coffee on it!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verschütten"
+            }
+          ]
+        },
+        {
+          "id": "whole",
+          "word": "whole",
+          "sentence": "Your driver will drive you behind your favourite star for the whole day.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ganze/r/s"
+            }
+          ]
+        },
+        {
+          "id": "critic",
+          "word": "critic",
+          "sentence": "Paul Sacks and Sally Green are critics on Superstar.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Kritiker/Kritikerin"
+            }
+          ]
+        },
+        {
+          "id": "brave",
+          "word": "brave",
+          "sentence": "You're a brave man.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "mutig"
+            }
+          ]
+        },
+        {
+          "id": "not-even",
+          "word": "not even",
+          "sentence": "In fact, you're not even going to be a background singer.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(noch) nicht einmal"
+            }
+          ]
+        },
+        {
+          "id": "suit",
+          "word": "suit",
+          "sentence": "Sing at home when you're not wearing that suit.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Anzug"
+            }
+          ]
+        },
+        {
+          "id": "unhappy",
+          "word": "unhappy",
+          "sentence": "Don't be too unhappy.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unglücklich"
+            }
+          ]
+        },
+        {
+          "id": "to-waste",
+          "word": "to waste",
+          "sentence": "Don't waste our time.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verschwenden"
+            }
+          ]
+        },
+        {
+          "id": "to-feel",
+          "word": "to feel",
+          "sentence": "I feel bad about it.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(sich) fühlen"
+            }
+          ]
+        },
+        {
+          "id": "to-get-tired-of-sth",
+          "word": "to get tired of sth.",
+          "sentence": "I never get tired of listening to music.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "etw. satt haben"
+            }
+          ]
+        },
+        {
+          "id": "lyrics",
+          "word": "lyrics",
+          "sentence": "The lyrics in a song should be meaningful.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Liedtext"
+            }
+          ]
+        },
+        {
+          "id": "to-make-up",
+          "word": "to make up",
+          "sentence": "I make up special dances for my fans.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erfinden, sich ausdenken"
+            }
+          ]
+        },
+        {
+          "id": "record",
+          "word": "record",
+          "sentence": "I buy a record every week.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(Schall-)Platte"
+            }
+          ]
+        },
+        {
+          "id": "to-seem",
+          "word": "to seem",
+          "sentence": "She doesn't seem to get old.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "wirken, scheinen"
+            }
+          ]
+        },
+        {
+          "id": "to-sing-along",
+          "word": "to sing along",
+          "sentence": "I always sing along to the songs I like.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "mitsingen"
+            }
+          ]
+        },
+        {
+          "id": "tune",
+          "word": "tune",
+          "sentence": "I like songs with a good tune.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Melodie"
+            }
+          ]
+        },
+        {
+          "id": "i-cant-stand-it",
+          "word": "I can't stand it.",
+          "sentence": "I can't stand it.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ich kann es nicht ausstehen."
+            }
+          ]
+        },
+        {
+          "id": "i-dont-mind-it",
+          "word": "I don't mind (it).",
+          "sentence": "I don't mind (it).",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ich habe nichts dagegen."
+            }
+          ]
+        },
+        {
+          "id": "to-come-along",
+          "word": "to come along",
+          "sentence": "James wanted to come along.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "mitkommen"
+            }
+          ]
+        },
+        {
+          "id": "to-take-place",
+          "word": "to take place",
+          "sentence": "Where did the concert take place?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "stattfinden"
+            }
+          ]
+        },
+        {
+          "id": "afterwards",
+          "word": "afterwards",
+          "sentence": "We'll go to the cinema and afterwards to the restaurant.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "danach, anschließend"
+            }
+          ]
+        },
+        {
+          "id": "apart-from",
+          "word": "apart from",
+          "sentence": "Apart from his bad taste in music, my dad's cool.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "abgesehen von"
+            }
+          ]
+        },
+        {
+          "id": "in-my-opinion",
+          "word": "in my opinion",
+          "sentence": "In my opinion, it's the best they've done.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "meiner Meinung nach"
+            }
+          ]
+        },
+        {
+          "id": "to-be-interested-in",
+          "word": "to be interested in",
+          "sentence": "He seems to be interested in her music.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "an etw. interessiert sein"
+            }
+          ]
+        },
+        {
+          "id": "me-neither",
+          "word": "Me neither.",
+          "sentence": "Me neither.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ich auch nicht."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-2",
+      "title": "Unit 2",
+      "entries": [
+        {
+          "id": "coincidence",
+          "word": "coincidence",
+          "sentence": "What a coincidence!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zufall"
+            }
+          ]
+        },
+        {
+          "id": "married",
+          "word": "married",
+          "sentence": "When they got married, his wife changed her name.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verheiratet"
+            }
+          ]
+        },
+        {
+          "id": "similar",
+          "word": "similar",
+          "sentence": "They both like similar clothes.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ähnlich"
+            }
+          ]
+        },
+        {
+          "id": "to-return",
+          "word": "to return",
+          "sentence": "Please return the balloon to the following address.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zurückgeben; zurückkehren"
+            }
+          ]
+        },
+        {
+          "id": "what-a",
+          "word": "What a ...!",
+          "sentence": "What a ...!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Was für ein/e ...!"
+            }
+          ]
+        },
+        {
+          "id": "author",
+          "word": "author",
+          "sentence": "This author wrote a lot of novels.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Autor/Autorin"
+            }
+          ]
+        },
+        {
+          "id": "member",
+          "word": "member",
+          "sentence": "A member of the crew remembered the famous ship.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Mitglied"
+            }
+          ]
+        },
+        {
+          "id": "passenger",
+          "word": "passenger",
+          "sentence": "Of the 2,200 passengers, only 705 survived.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Passagier/Passagierin"
+            }
+          ]
+        },
+        {
+          "id": "to-sink",
+          "word": "to sink",
+          "sentence": "When the ship sank, most of its 2,500 passengers died.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sinken"
+            }
+          ]
+        },
+        {
+          "id": "to-survive",
+          "word": "to survive",
+          "sentence": "Most people didn't survive.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "überleben"
+            }
+          ]
+        },
+        {
+          "id": "careless",
+          "word": "careless",
+          "sentence": "I've lost my phone because I was careless.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unvorsichtig, leichtsinnig"
+            }
+          ]
+        },
+        {
+          "id": "handbag",
+          "word": "handbag",
+          "sentence": "She put the phone in her handbag.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Handtasche"
+            }
+          ]
+        },
+        {
+          "id": "i-beg-your-pardon",
+          "word": "I beg your pardon.",
+          "sentence": "I beg your pardon.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Entschuldigung., Verzeihen Sie bitte."
+            }
+          ]
+        },
+        {
+          "id": "to-steal",
+          "word": "to steal",
+          "sentence": "The thief wanted to steal the woman's money.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "stehlen"
+            }
+          ]
+        },
+        {
+          "id": "thief",
+          "word": "thief (pl thieves)",
+          "sentence": "The thief was watching the two boys.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Dieb/Diebin"
+            }
+          ]
+        },
+        {
+          "id": "north-pole",
+          "word": "North Pole",
+          "sentence": "I want to travel to the North Pole one day.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Nordpol"
+            }
+          ]
+        },
+        {
+          "id": "south-pole",
+          "word": "South Pole",
+          "sentence": "An imaginary line connects the North and the South Pole.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Südpol"
+            }
+          ]
+        },
+        {
+          "id": "awful",
+          "word": "awful",
+          "sentence": "There is an awful smell.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "furchtbar, schrecklich, scheußlich"
+            }
+          ]
+        },
+        {
+          "id": "entrance",
+          "word": "entrance",
+          "sentence": "They were all queuing up at the entrance.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Eingang"
+            }
+          ]
+        },
+        {
+          "id": "to-hand-sth-in",
+          "word": "to hand sth. in",
+          "sentence": "I'm sure someone found it and handed it in.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "einreichen, abgeben"
+            }
+          ]
+        },
+        {
+          "id": "hold-on",
+          "word": "Hold on!",
+          "sentence": "Hold on!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Warte(t)!"
+            }
+          ]
+        },
+        {
+          "id": "to-leave-sb-alone",
+          "word": "to leave sb. alone",
+          "sentence": "Lucas didn't leave his sister alone.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. in Ruhe lassen"
+            }
+          ]
+        },
+        {
+          "id": "to-look-forward-to-sth",
+          "word": "to look forward to sth.",
+          "sentence": "Lucas was very much looking forward to it.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich auf etw. freuen"
+            }
+          ]
+        },
+        {
+          "id": "queue",
+          "word": "queue",
+          "sentence": "The queue was getting shorter and shorter.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Warteschlange"
+            }
+          ]
+        },
+        {
+          "id": "to-queue-up",
+          "word": "to queue (up)",
+          "sentence": "They were all queuing up to get in the museum.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich anstellen"
+            }
+          ]
+        },
+        {
+          "id": "to-wave",
+          "word": "to wave",
+          "sentence": "Someone is waving at us from the front of the queue.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "winken"
+            }
+          ]
+        },
+        {
+          "id": "date-of-birth",
+          "word": "date of birth",
+          "sentence": "We talked about our date of birth.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Geburtsdatum"
+            }
+          ]
+        },
+        {
+          "id": "hang-on-a-minute",
+          "word": "Hang on a minute.",
+          "sentence": "Hang on a minute.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Einen Augenblick (mal)."
+            }
+          ]
+        },
+        {
+          "id": "to-achieve-a-goal",
+          "word": "to achieve (a goal)",
+          "sentence": "Think of a time you were trying to achieve a goal.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(ein Ziel) erreichen"
+            }
+          ]
+        },
+        {
+          "id": "laugh",
+          "word": "laugh",
+          "sentence": "I got no laugh for my jokes.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Lachen"
+            }
+          ]
+        },
+        {
+          "id": "note",
+          "word": "note",
+          "sentence": "The £50 note was mine.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hier: Geldschein"
+            }
+          ]
+        },
+        {
+          "id": "per-cent",
+          "word": "per cent",
+          "sentence": "50 per cent of the jokes weren't even funny.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Prozent"
+            }
+          ]
+        },
+        {
+          "id": "speech",
+          "word": "speech",
+          "sentence": "I'm writing a motivational speech.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Rede, Ansprache"
+            }
+          ]
+        },
+        {
+          "id": "stage",
+          "word": "stage",
+          "sentence": "I went to the front of the stage.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Bühne"
+            }
+          ]
+        },
+        {
+          "id": "to-try-out",
+          "word": "to try out",
+          "sentence": "Try out your jokes before you go on stage.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ausprobieren"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-3",
+      "title": "Unit 3",
+      "entries": [
+        {
+          "id": "to-become",
+          "word": "to become",
+          "sentence": "His feet hurt so badly that walking became difficult.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "werden"
+            }
+          ]
+        },
+        {
+          "id": "curious",
+          "word": "curious",
+          "sentence": "Reading about all these places makes me curious.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "neugierig"
+            }
+          ]
+        },
+        {
+          "id": "decision",
+          "word": "decision",
+          "sentence": "Starting to travel was the best decision in his life.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Entscheidung"
+            }
+          ]
+        },
+        {
+          "id": "experience",
+          "word": "experience",
+          "sentence": "And in China he had a very painful experience.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Erfahrung"
+            }
+          ]
+        },
+        {
+          "id": "to-explore",
+          "word": "to explore",
+          "sentence": "He started to explore the streets of London.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erkunden, erforschen"
+            }
+          ]
+        },
+        {
+          "id": "journey",
+          "word": "journey",
+          "sentence": "His first journey took him to France.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Reise"
+            }
+          ]
+        },
+        {
+          "id": "on-foot",
+          "word": "on foot",
+          "sentence": "He crossed Zanzibar and Tasmania on foot.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zu Fuß"
+            }
+          ]
+        },
+        {
+          "id": "painful",
+          "word": "painful",
+          "sentence": "Getting attacked by wasps can be very painful.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "schmerzhaft"
+            }
+          ]
+        },
+        {
+          "id": "to-reach",
+          "word": "to reach",
+          "sentence": "He became the first blind person to reach the top of Mount Vesuvius.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(er-)reichen"
+            }
+          ]
+        },
+        {
+          "id": "to-sail",
+          "word": "to sail",
+          "sentence": "He got on board of a ship to sail across the Atlantic.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "segeln"
+            }
+          ]
+        },
+        {
+          "id": "traveller",
+          "word": "traveller",
+          "sentence": "James Holman was a record traveller.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Reisender/Reisende"
+            }
+          ]
+        },
+        {
+          "id": "lonely",
+          "word": "lonely",
+          "sentence": "Holman found his first journey to France lonely.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "einsam"
+            }
+          ]
+        },
+        {
+          "id": "to-criticise",
+          "word": "to criticise",
+          "sentence": "She criticised the Europeans.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "kritisieren"
+            }
+          ]
+        },
+        {
+          "id": "explorer",
+          "word": "explorer",
+          "sentence": "She was a great female explorer in the 19th century.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Entdecker/Entdeckerin"
+            }
+          ]
+        },
+        {
+          "id": "even-though",
+          "word": "even though",
+          "sentence": "Even though my bike is old, I still like it.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "obwohl"
+            }
+          ]
+        },
+        {
+          "id": "hut",
+          "word": "hut",
+          "sentence": "She lived with the people in their huts.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Hütte"
+            }
+          ]
+        },
+        {
+          "id": "to-turn-out",
+          "word": "to turn out",
+          "sentence": "The Fang turned out to be quite friendly.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich herausstellen"
+            }
+          ]
+        },
+        {
+          "id": "wilderness",
+          "word": "wilderness",
+          "sentence": "In the wilderness she looked like a lady.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wildnis"
+            }
+          ]
+        },
+        {
+          "id": "to-behave",
+          "word": "to behave",
+          "sentence": "You should behave well in other countries.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verhalten"
+            }
+          ]
+        },
+        {
+          "id": "all-in-all",
+          "word": "all in all",
+          "sentence": "All in all, we had a great time.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "alles in allem"
+            }
+          ]
+        },
+        {
+          "id": "awake",
+          "word": "awake",
+          "sentence": "By the time we got back, we felt really awake.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "wach"
+            }
+          ]
+        },
+        {
+          "id": "pretty",
+          "word": "pretty",
+          "sentence": "The lake was pretty cold.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hier: ziemlich"
+            }
+          ]
+        },
+        {
+          "id": "unfortunately",
+          "word": "unfortunately",
+          "sentence": "Unfortunately all good things come to an end.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "leider"
+            }
+          ]
+        },
+        {
+          "id": "departure",
+          "word": "departure",
+          "sentence": "The check-in is two hours before departure.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Abflug; Abfahrt"
+            }
+          ]
+        },
+        {
+          "id": "flight",
+          "word": "flight",
+          "sentence": "There's another flight to London at 3 p.m.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Flug"
+            }
+          ]
+        },
+        {
+          "id": "to-make-a-reservation",
+          "word": "to make a reservation",
+          "sentence": "I want to make a reservation for dinner tonight.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "eine Reservierung vornehmen"
+            }
+          ]
+        },
+        {
+          "id": "to-note",
+          "word": "to note",
+          "sentence": "Please note that you have to check in early.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "beachten, feststellen"
+            }
+          ]
+        },
+        {
+          "id": "to-fix-sth",
+          "word": "to fix sth.",
+          "sentence": "It took him exactly one minute to fix the problem.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "etw. beheben, reparieren"
+            }
+          ]
+        },
+        {
+          "id": "thirsty",
+          "word": "thirsty",
+          "sentence": "I felt really thirsty so I asked for a glass of water.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "durstig"
+            }
+          ]
+        },
+        {
+          "id": "impossible",
+          "word": "impossible",
+          "sentence": "It was impossible to get some sleep.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unmöglich"
+            }
+          ]
+        },
+        {
+          "id": "recently",
+          "word": "recently",
+          "sentence": "Your family went for a short holiday recently.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "vor Kurzem, letztens"
+            }
+          ]
+        },
+        {
+          "id": "to-get-lost",
+          "word": "to get lost",
+          "sentence": "We got lost on the way.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich verirren"
+            }
+          ]
+        },
+        {
+          "id": "to-get-to-know-sb-sth",
+          "word": "to get to know sb./sth.",
+          "sentence": "I want to get to know the countryside.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn./etw. näher kennenlernen"
+            }
+          ]
+        },
+        {
+          "id": "to-promise",
+          "word": "to promise",
+          "sentence": "I'll call you tomorrow, I promise.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "versprechen"
+            }
+          ]
+        },
+        {
+          "id": "to-recommend",
+          "word": "to recommend",
+          "sentence": "I can recommend some very interesting books.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "empfehlen"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-4",
+      "title": "Unit 4",
+      "entries": [
+        {
+          "id": "cub",
+          "word": "cub",
+          "sentence": "A baby bear is called a 'cub'.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(Bären-)Junges"
+            }
+          ]
+        },
+        {
+          "id": "good-luck",
+          "word": "Good luck!",
+          "sentence": "Good luck!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Viel Glück!"
+            }
+          ]
+        },
+        {
+          "id": "polar-bear",
+          "word": "polar bear",
+          "sentence": "There are 3,000 polar bears on the Svalbard Islands in Norway.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Eisbär"
+            }
+          ]
+        },
+        {
+          "id": "adorable",
+          "word": "adorable",
+          "sentence": "The baby seal's parents are not as adorable.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "bezaubernd, liebenswert"
+            }
+          ]
+        },
+        {
+          "id": "bite",
+          "word": "bite",
+          "sentence": "A bite from a slow loris can be deadly.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Biss"
+            }
+          ]
+        },
+        {
+          "id": "to-cause",
+          "word": "to cause",
+          "sentence": "One bite can cause a lot of pain and could even kill you.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verursachen"
+            }
+          ]
+        },
+        {
+          "id": "poison",
+          "word": "poison",
+          "sentence": "The slow loris produces a poison to protect its young.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gift"
+            }
+          ]
+        },
+        {
+          "id": "rabies",
+          "word": "rabies",
+          "sentence": "Chipmunks can spread diseases like rabies.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Tollwut"
+            }
+          ]
+        },
+        {
+          "id": "seal",
+          "word": "seal",
+          "sentence": "Everyone loves a baby leopard seal.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Robbe"
+            }
+          ]
+        },
+        {
+          "id": "swan",
+          "word": "swan",
+          "sentence": "Swans are commonly found on lakes and rivers.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schwan"
+            }
+          ]
+        },
+        {
+          "id": "to-bite-off",
+          "word": "to bite (off)",
+          "sentence": "His lizard tried to bite my finger off.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(ab-)beißen"
+            }
+          ]
+        },
+        {
+          "id": "lizard",
+          "word": "lizard",
+          "sentence": "Dave's got a new lizard as a pet.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Eidechse"
+            }
+          ]
+        },
+        {
+          "id": "to-chase-away",
+          "word": "to chase away",
+          "sentence": "He managed to chase the big fish away.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verjagen"
+            }
+          ]
+        },
+        {
+          "id": "to-complain",
+          "word": "to complain",
+          "sentence": "She smiles a lot and never complains.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich beschweren"
+            }
+          ]
+        },
+        {
+          "id": "injury",
+          "word": "injury",
+          "sentence": "Charlie saw that his daughter had terrible injuries.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Verletzung"
+            }
+          ]
+        },
+        {
+          "id": "to-lift",
+          "word": "to lift",
+          "sentence": "He dived into the water, and tried to lift the girl out.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aufheben"
+            }
+          ]
+        },
+        {
+          "id": "to-pull-down",
+          "word": "to pull down",
+          "sentence": "There was a big bull shark, and it was pulling Paige down into the water.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hinunterziehen"
+            }
+          ]
+        },
+        {
+          "id": "to-accept",
+          "word": "to accept",
+          "sentence": "Paige tries to accept her situation.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "akzeptieren"
+            }
+          ]
+        },
+        {
+          "id": "immediately",
+          "word": "immediately",
+          "sentence": "Why didn't they go back to the café immediately?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sofort"
+            }
+          ]
+        },
+        {
+          "id": "to-advise-sb-against-sth",
+          "word": "to advise (sb.) against sth.",
+          "sentence": "I would advise against surfing or swimming out too far.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(jdm.) von etw. abraten, (jdn.) vor etw. warnen"
+            }
+          ]
+        },
+        {
+          "id": "to-bleed",
+          "word": "to bleed",
+          "sentence": "The great white shark lets people bleed to death.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "bluten"
+            }
+          ]
+        },
+        {
+          "id": "death",
+          "word": "death",
+          "sentence": "Great white sharks watch their victims bleed to death.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Tod"
+            }
+          ]
+        },
+        {
+          "id": "to-defend",
+          "word": "to defend",
+          "sentence": "Sharks attack to defend their territory.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verteidigen"
+            }
+          ]
+        },
+        {
+          "id": "to-mistake-sth-for-sth",
+          "word": "to mistake sth. for sth.",
+          "sentence": "They attack humans because they mistake them for seals or sea lions.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "etw. mit etw. verwechseln"
+            }
+          ]
+        },
+        {
+          "id": "on-average",
+          "word": "on average",
+          "sentence": "They only kill one person every eight years on average.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "durchschnittlich, im Durchschnitt"
+            }
+          ]
+        },
+        {
+          "id": "scuba-diver",
+          "word": "scuba diver",
+          "sentence": "Swimmers are in more danger than a scuba diver.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sporttaucher/Sporttaucherin"
+            }
+          ]
+        },
+        {
+          "id": "shape",
+          "word": "shape",
+          "sentence": "From below, the shape of a swimmer can look like a seal to a shark.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Form"
+            }
+          ]
+        },
+        {
+          "id": "to-suppose",
+          "word": "to suppose",
+          "sentence": "I suppose so.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "vermuten, annehmen"
+            }
+          ]
+        },
+        {
+          "id": "to-take-care",
+          "word": "to take care",
+          "sentence": "People should take care when they go swimming.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aufpassen, sich hüten"
+            }
+          ]
+        },
+        {
+          "id": "victim",
+          "word": "victim",
+          "sentence": "Sharks watch their victims bleed before returning to eat.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Opfer"
+            }
+          ]
+        },
+        {
+          "id": "to-communicate",
+          "word": "to communicate",
+          "sentence": "Soon they find out that Troodons can communicate.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "kommunizieren"
+            }
+          ]
+        },
+        {
+          "id": "audience",
+          "word": "audience",
+          "sentence": "There are different ways to reach an audience.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Publikum"
+            }
+          ]
+        },
+        {
+          "id": "environment",
+          "word": "environment",
+          "sentence": "Foxes are a part of our environment.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Umwelt"
+            }
+          ]
+        },
+        {
+          "id": "hands-off",
+          "word": "Hands off!",
+          "sentence": "Hands off!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Finger weg!"
+            }
+          ]
+        },
+        {
+          "id": "to-inform",
+          "word": "to inform",
+          "sentence": "You need to inform the public about changes to the voting system.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "informieren"
+            }
+          ]
+        },
+        {
+          "id": "to-lock-sb-up",
+          "word": "to lock sb. up",
+          "sentence": "You should lock up the chickens at night.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. einsperren"
+            }
+          ]
+        },
+        {
+          "id": "politician",
+          "word": "politician",
+          "sentence": "They're asking for the local politicians to get the foxes off our streets.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Politiker/Politikerin"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-5",
+      "title": "Unit 5",
+      "entries": [
+        {
+          "id": "alarm-clock",
+          "word": "alarm clock",
+          "sentence": "I really didn't want to get up when my alarm clock rang.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wecker"
+            }
+          ]
+        },
+        {
+          "id": "any-luck",
+          "word": "Any luck?",
+          "sentence": "Any luck?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Hattest du Glück?"
+            }
+          ]
+        },
+        {
+          "id": "beside",
+          "word": "beside",
+          "sentence": "Mr Wallis, the teacher, arrives and sits down beside them.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "neben"
+            }
+          ]
+        },
+        {
+          "id": "do-you-mind",
+          "word": "Do you mind ...?",
+          "sentence": "Do you mind ...?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Macht es dir etwas aus ...?"
+            }
+          ]
+        },
+        {
+          "id": "evil",
+          "word": "evil",
+          "sentence": "Candyman is an evil spirit.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "böse"
+            }
+          ]
+        },
+        {
+          "id": "im-joking",
+          "word": "I'm joking.",
+          "sentence": "I'm joking.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ich scherze nur."
+            }
+          ]
+        },
+        {
+          "id": "to-ignore",
+          "word": "to ignore",
+          "sentence": "Ignore him – he's just being silly.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ignorieren"
+            }
+          ]
+        },
+        {
+          "id": "satisfied",
+          "word": "satisfied",
+          "sentence": "I am not really satisfied with your answer.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zufrieden"
+            }
+          ]
+        },
+        {
+          "id": "scream",
+          "word": "scream",
+          "sentence": "I heard your scream in the middle of the night.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schrei"
+            }
+          ]
+        },
+        {
+          "id": "sleeping-bag",
+          "word": "sleeping bag",
+          "sentence": "Nick is lying in his sleeping bag.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schlafsack"
+            }
+          ]
+        },
+        {
+          "id": "spirit",
+          "word": "spirit",
+          "sentence": "There is a spirit by the name of Candyman.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Geist"
+            }
+          ]
+        },
+        {
+          "id": "superstition",
+          "word": "superstition",
+          "sentence": "It's only a silly superstition, after all.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Aberglaube"
+            }
+          ]
+        },
+        {
+          "id": "to-attract",
+          "word": "to attract",
+          "sentence": "If you whistle, you'll attract rain.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "anziehen, anlocken"
+            }
+          ]
+        },
+        {
+          "id": "to-enter",
+          "word": "to enter",
+          "sentence": "When you want to enter your home, you have to turn sharply to the left or right.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "betreten, eintreten"
+            }
+          ]
+        },
+        {
+          "id": "haircut",
+          "word": "haircut",
+          "sentence": "If you get a haircut before an exam, you'll forget everything.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Haarschnitt"
+            }
+          ]
+        },
+        {
+          "id": "obvious",
+          "word": "obvious",
+          "sentence": "Isn't it obvious that you should watch your handbag carefully?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "offensichtlich"
+            }
+          ]
+        },
+        {
+          "id": "traditional",
+          "word": "traditional",
+          "sentence": "Traditional homes in China have large spirit screens.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "traditionell"
+            }
+          ]
+        },
+        {
+          "id": "to-trick",
+          "word": "to trick",
+          "sentence": "Some homes in China have spirit screens to trick ghosts.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "austricksen"
+            }
+          ]
+        },
+        {
+          "id": "unlucky",
+          "word": "unlucky",
+          "sentence": "In Italy, the unlucky number is 17.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unglücklich, glücklos"
+            }
+          ]
+        },
+        {
+          "id": "to-whistle",
+          "word": "to whistle",
+          "sentence": "If you whistle when the sun is shining, it will shine for more than two hours.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "pfeifen"
+            }
+          ]
+        },
+        {
+          "id": "crack",
+          "word": "crack",
+          "sentence": "You'll have bad luck if you walk on the cracks in the pavement.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Riss, Spalt; hier: Fuge"
+            }
+          ]
+        },
+        {
+          "id": "cuckoo",
+          "word": "cuckoo",
+          "sentence": "I can hear a cuckoo in the woods.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Kuckuck"
+            }
+          ]
+        },
+        {
+          "id": "pavement",
+          "word": "pavement",
+          "sentence": "I sometimes don't walk on the cracks in the pavement.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gehsteig"
+            }
+          ]
+        },
+        {
+          "id": "rich",
+          "word": "rich",
+          "sentence": "You'll get rich if you hear a cuckoo and shake your money.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "reich"
+            }
+          ]
+        },
+        {
+          "id": "to-shake",
+          "word": "to shake",
+          "sentence": "I always shake the money in my pocket if I hear a cuckoo.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "schütteln"
+            }
+          ]
+        },
+        {
+          "id": "superstitious",
+          "word": "superstitious",
+          "sentence": "Are you superstitious?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "abergläubisch"
+            }
+          ]
+        },
+        {
+          "id": "to-catch-a-cold",
+          "word": "to catch a cold",
+          "sentence": "If you don't wear a jacket, you'll catch a cold.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich verkühlen"
+            }
+          ]
+        },
+        {
+          "id": "toothbrush",
+          "word": "toothbrush",
+          "sentence": "If you drop your toothbrush, you'll have to wash it.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zahnbürste"
+            }
+          ]
+        },
+        {
+          "id": "to-arrange",
+          "word": "to arrange",
+          "sentence": "Have you got something else arranged?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "vereinbaren, arrangieren"
+            }
+          ]
+        },
+        {
+          "id": "im-sure",
+          "word": "I'm sure.",
+          "sentence": "I'm sure.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ich bin mir sicher."
+            }
+          ]
+        },
+        {
+          "id": "lucky-charm",
+          "word": "lucky charm",
+          "sentence": "I just found a lucky charm.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Glücksbringer"
+            }
+          ]
+        },
+        {
+          "id": "salt",
+          "word": "salt",
+          "sentence": "Oh no, I spilled the salt on the table.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Salz"
+            }
+          ]
+        },
+        {
+          "id": "seriously",
+          "word": "seriously",
+          "sentence": "You seriously believe in all these things?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ernsthaft, im Ernst"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-6",
+      "title": "Unit 6",
+      "entries": [
+        {
+          "id": "stadium",
+          "word": "stadium",
+          "sentence": "This stadium is home to the England national football team.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Stadion"
+            }
+          ]
+        },
+        {
+          "id": "to-burn-down",
+          "word": "to burn down",
+          "sentence": "The old Globe Theatre burnt down, but there's a new one.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "niederbrennen"
+            }
+          ]
+        },
+        {
+          "id": "collection",
+          "word": "collection",
+          "sentence": "This is an art gallery whose collection of modern art is one of the best in the world.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sammlung"
+            }
+          ]
+        },
+        {
+          "id": "government",
+          "word": "government",
+          "sentence": "It is where the British government meets.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Regierung"
+            }
+          ]
+        },
+        {
+          "id": "the-houses-of-parliament",
+          "word": "the Houses of Parliament",
+          "sentence": "The government meets at the Houses of Parliament.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "das Parlament (von Großbritannien)"
+            }
+          ]
+        },
+        {
+          "id": "in-advance",
+          "word": "in advance",
+          "sentence": "If you want to avoid the long queues – book in advance.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "im Voraus"
+            }
+          ]
+        },
+        {
+          "id": "to-photograph",
+          "word": "to photograph",
+          "sentence": "A lot of people photograph these places in London.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "fotografieren"
+            }
+          ]
+        },
+        {
+          "id": "play",
+          "word": "play",
+          "sentence": "You can watch a Shakespeare play at the Globe.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Theaterstück"
+            }
+          ]
+        },
+        {
+          "id": "prison",
+          "word": "prison",
+          "sentence": "It was built in 1078 as a castle, later it was a prison.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gefängnis"
+            }
+          ]
+        },
+        {
+          "id": "to-raise",
+          "word": "to raise",
+          "sentence": "They can raise the bridge for big ships.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "anheben, erhöhen"
+            }
+          ]
+        },
+        {
+          "id": "raven",
+          "word": "raven",
+          "sentence": "The ravens should never leave the Tower of London.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Rabe"
+            }
+          ]
+        },
+        {
+          "id": "to-take-a-walk",
+          "word": "to take a walk",
+          "sentence": "Take a walk along the banks of the river.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "einen Spaziergang machen"
+            }
+          ]
+        },
+        {
+          "id": "theatre",
+          "word": "theatre",
+          "sentence": "There was a round theatre here, where Shakespeare acted.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Theater"
+            }
+          ]
+        },
+        {
+          "id": "view",
+          "word": "view",
+          "sentence": "The 25-minute ride on the wheel gives you some of the best views of London.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ausblick, Aussicht"
+            }
+          ]
+        },
+        {
+          "id": "visitor",
+          "word": "visitor",
+          "sentence": "More than 3.5 million visitors take a ride on the wheel each year.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Besucher/Besucherin"
+            }
+          ]
+        },
+        {
+          "id": "thrilling",
+          "word": "thrilling",
+          "sentence": "Let's throw a thrilling party on Thursday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aufregend"
+            }
+          ]
+        },
+        {
+          "id": "approximately",
+          "word": "approximately",
+          "sentence": "The Great Plague killed approximately 100,000 people in London.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ungefähr"
+            }
+          ]
+        },
+        {
+          "id": "to-cough-up",
+          "word": "to cough (up)",
+          "sentence": "Usual symptoms were fever and coughing up blood.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(aus-)husten"
+            }
+          ]
+        },
+        {
+          "id": "cruel",
+          "word": "cruel",
+          "sentence": "The Great Plague was a cruel killer.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "grausam"
+            }
+          ]
+        },
+        {
+          "id": "empty",
+          "word": "empty",
+          "sentence": "The streets were empty. There were no people.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "leer"
+            }
+          ]
+        },
+        {
+          "id": "fever",
+          "word": "fever",
+          "sentence": "If you had the Plague, you also had fever.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Fieber"
+            }
+          ]
+        },
+        {
+          "id": "to-report",
+          "word": "to report",
+          "sentence": "Many people didn't report their symptoms.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "berichten, melden"
+            }
+          ]
+        },
+        {
+          "id": "path",
+          "word": "path",
+          "sentence": "There's a long path, a lake and lots of trees.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Weg"
+            }
+          ]
+        },
+        {
+          "id": "spectacular",
+          "word": "spectacular",
+          "sentence": "What I loved most was the spectacular light show.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "spektakulär"
+            }
+          ]
+        },
+        {
+          "id": "tourist-attraction",
+          "word": "tourist attraction",
+          "sentence": "Madame Tussauds has been a popular tourist attraction for many years.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sehenswürdigkeit"
+            }
+          ]
+        },
+        {
+          "id": "to-experience",
+          "word": "to experience",
+          "sentence": "You can experience one of the many interactive attractions.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erleben, erfahren"
+            }
+          ]
+        },
+        {
+          "id": "traffic",
+          "word": "traffic",
+          "sentence": "There's a lot of traffic on the street. It's very noisy.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Verkehr"
+            }
+          ]
+        },
+        {
+          "id": "multicultural",
+          "word": "multicultural",
+          "sentence": "London is very multicultural.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "multikulturell"
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "word": "contract",
+          "sentence": "We signed a contract.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Vertrag"
+            }
+          ]
+        },
+        {
+          "id": "to-lead",
+          "word": "to lead",
+          "sentence": "I should be helping Dad to lead a healthier lifestyle.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "führen"
+            }
+          ]
+        },
+        {
+          "id": "sugar",
+          "word": "sugar",
+          "sentence": "I want to eat less sugar.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zucker"
+            }
+          ]
+        },
+        {
+          "id": "to-earn-money",
+          "word": "to earn (money)",
+          "sentence": "My other job earns me £10 a week.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(Geld) verdienen"
+            }
+          ]
+        },
+        {
+          "id": "to-save-up-for",
+          "word": "to save up for",
+          "sentence": "I need to save up money for our new project.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ansparen"
+            }
+          ]
+        },
+        {
+          "id": "to-sign",
+          "word": "to sign",
+          "sentence": "He agreed and signed the contract.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unterschreiben"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-7",
+      "title": "Unit 7",
+      "entries": [
+        {
+          "id": "its-none-of-my-business",
+          "word": "It's none of my business.",
+          "sentence": "It's none of my business.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Das geht mich nichts an."
+            }
+          ]
+        },
+        {
+          "id": "to-laugh-at-sb",
+          "word": "to laugh at sb.",
+          "sentence": "Some of the kids laughed at me at school.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. auslachen"
+            }
+          ]
+        },
+        {
+          "id": "to-make-up-ones-mind",
+          "word": "to make up one's mind",
+          "sentence": "Once she has made up her mind about something, she doesn't let go.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "einen Entschluss fassen"
+            }
+          ]
+        },
+        {
+          "id": "to-make-fun-of-sb",
+          "word": "to make fun of sb.",
+          "sentence": "Then one day, a kid was making fun of her at school.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich über jdn. lustig machen"
+            }
+          ]
+        },
+        {
+          "id": "to-move",
+          "word": "to move",
+          "sentence": "My parents want to move to California.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "umziehen, übersiedeln"
+            }
+          ]
+        },
+        {
+          "id": "soft-toy",
+          "word": "soft toy",
+          "sentence": "I've had these soft toys since I was a baby.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Stofftier"
+            }
+          ]
+        },
+        {
+          "id": "to-step-in",
+          "word": "to step in",
+          "sentence": "If a kid makes fun of your friend, you should step in.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hier: eingreifen, dazwischen gehen"
+            }
+          ]
+        },
+        {
+          "id": "relationship",
+          "word": "relationship",
+          "sentence": "George's relationship with Alessia changes over time.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Beziehung"
+            }
+          ]
+        },
+        {
+          "id": "to-own",
+          "word": "to own",
+          "sentence": "Which of the things you own do you like a lot?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "besitzen"
+            }
+          ]
+        },
+        {
+          "id": "childhood",
+          "word": "childhood (no pl)",
+          "sentence": "I have lived in this house since my childhood.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Kindheit"
+            }
+          ]
+        },
+        {
+          "id": "earring",
+          "word": "earring",
+          "sentence": "I lost my earring in the sea.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ohrring"
+            }
+          ]
+        },
+        {
+          "id": "jealous",
+          "word": "jealous",
+          "sentence": "Your best friend has a new friend and you are feeling a bit jealous.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "eifersüchtig"
+            }
+          ]
+        },
+        {
+          "id": "to-keep-a-secret",
+          "word": "to keep (a) secret",
+          "sentence": "My best friend can keep a secret.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ein Geheimnis für sich behalten"
+            }
+          ]
+        },
+        {
+          "id": "questionnaire",
+          "word": "questionnaire",
+          "sentence": "Do the questionnaire to find out if you're a good friend.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Fragebogen"
+            }
+          ]
+        },
+        {
+          "id": "to-tell-sb-off",
+          "word": "to tell sb. off",
+          "sentence": "Your teacher tells you off in front of the class for not doing your homework.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "mit jdm. schimpfen"
+            }
+          ]
+        },
+        {
+          "id": "to-solve",
+          "word": "to solve",
+          "sentence": "This solves all our problems.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "lösen"
+            }
+          ]
+        },
+        {
+          "id": "beloved",
+          "word": "beloved",
+          "sentence": "With a broken heart Stallone sold his beloved dog.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "geliebt"
+            }
+          ]
+        },
+        {
+          "id": "nowhere",
+          "word": "nowhere",
+          "sentence": "Stallone had no money left and nowhere to sleep.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "nirgends"
+            }
+          ]
+        },
+        {
+          "id": "script",
+          "word": "script",
+          "sentence": "Stallone was trying to sell his script.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Drehbuch"
+            }
+          ]
+        },
+        {
+          "id": "to-struggle",
+          "word": "to struggle",
+          "sentence": "As an actor he struggled a lot.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "kämpfen, sich abmühen"
+            }
+          ]
+        },
+        {
+          "id": "to-lie-to-sb",
+          "word": "to lie to sb.",
+          "sentence": "A good friend never lies to you.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. anlügen"
+            }
+          ]
+        },
+        {
+          "id": "to-admit",
+          "word": "to admit",
+          "sentence": "I told Tom to admit what happened.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zugeben"
+            }
+          ]
+        },
+        {
+          "id": "to-blackmail",
+          "word": "to blackmail",
+          "sentence": "Ollie saw me and then he tried to blackmail me.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erpressen"
+            }
+          ]
+        },
+        {
+          "id": "clumsy",
+          "word": "clumsy",
+          "sentence": "He knocked the books into the sink because he is so clumsy.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ungeschickt"
+            }
+          ]
+        },
+        {
+          "id": "honest",
+          "word": "honest",
+          "sentence": "She lies a lot and is never honest.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ehrlich"
+            }
+          ]
+        },
+        {
+          "id": "a-pile-of",
+          "word": "a pile of",
+          "sentence": "I put my homework on the pile of books.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ein Stapel an"
+            }
+          ]
+        },
+        {
+          "id": "rash",
+          "word": "rash",
+          "sentence": "My skin's a bit red – I think it's a rash.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Hautausschlag"
+            }
+          ]
+        },
+        {
+          "id": "unwell",
+          "word": "unwell",
+          "sentence": "She looks a bit unwell.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unwohl, krank"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-8",
+      "title": "Unit 8",
+      "entries": [
+        {
+          "id": "bacon",
+          "word": "bacon",
+          "sentence": "Lots of people love bacon and egg for breakfast.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Speck"
+            }
+          ]
+        },
+        {
+          "id": "to-decorate",
+          "word": "to decorate",
+          "sentence": "Then someone invented electric lights to decorate houses.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "dekorieren"
+            }
+          ]
+        },
+        {
+          "id": "dish",
+          "word": "dish",
+          "sentence": "I invented a new dish with the cook of the restaurant.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gericht"
+            }
+          ]
+        },
+        {
+          "id": "fat",
+          "word": "fat",
+          "sentence": "I like bacon with less fat.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Fett"
+            }
+          ]
+        },
+        {
+          "id": "invention",
+          "word": "invention",
+          "sentence": "He worked on his invention for a number of years.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Erfindung"
+            }
+          ]
+        },
+        {
+          "id": "crowd",
+          "word": "crowd",
+          "sentence": "He can make a huge crowd laugh.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Publikum, Menschenmenge"
+            }
+          ]
+        },
+        {
+          "id": "current",
+          "word": "current",
+          "sentence": "He passed current through his body.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(elektrischer) Strom"
+            }
+          ]
+        },
+        {
+          "id": "to-develop",
+          "word": "to develop",
+          "sentence": "In the late 1880s, Tesla developed a new kind of electricity.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "entwickeln"
+            }
+          ]
+        },
+        {
+          "id": "electric-motor",
+          "word": "electric (motor)",
+          "sentence": "Tesla invented the electric motor.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "elektrisch; (Elektromotor)"
+            }
+          ]
+        },
+        {
+          "id": "energy",
+          "word": "energy",
+          "sentence": "He said he could send energy waves through water.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Energie; Strom"
+            }
+          ]
+        },
+        {
+          "id": "influence",
+          "word": "influence",
+          "sentence": "Edison used his influence to tell people that AC was too dangerous.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Einfluss"
+            }
+          ]
+        },
+        {
+          "id": "inventor",
+          "word": "inventor",
+          "sentence": "Thomas Edison was perhaps the most famous inventor of his time.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Erfinder/Erfinderin"
+            }
+          ]
+        },
+        {
+          "id": "to-invest",
+          "word": "to invest",
+          "sentence": "Edison invested all his money in DC.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "investieren"
+            }
+          ]
+        },
+        {
+          "id": "perhaps",
+          "word": "perhaps",
+          "sentence": "Perhaps it was his most important invention.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "vielleicht, eventuell"
+            }
+          ]
+        },
+        {
+          "id": "to-be-responsible-for",
+          "word": "to be responsible for",
+          "sentence": "The invention was also responsible for his bad luck.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "für etw. verantwortlich sein"
+            }
+          ]
+        },
+        {
+          "id": "to-shoot",
+          "word": "to shoot",
+          "sentence": "He used the Tesla coil to shoot large electric lightning bolts into the crowd.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "schießen"
+            }
+          ]
+        },
+        {
+          "id": "confident",
+          "word": "confident",
+          "sentence": "I'm quite confident it will work.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(selbst-)sicher; zuversichtlich"
+            }
+          ]
+        },
+        {
+          "id": "to-impress",
+          "word": "to impress",
+          "sentence": "I've invented something that I think might impress my teacher.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "beeindrucken"
+            }
+          ]
+        },
+        {
+          "id": "soap",
+          "word": "soap",
+          "sentence": "Use soap to wash your hands.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Seife"
+            }
+          ]
+        },
+        {
+          "id": "device",
+          "word": "device",
+          "sentence": "This device allows people to talk under water.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gerät"
+            }
+          ]
+        },
+        {
+          "id": "product",
+          "word": "product",
+          "sentence": "He started a company to produce his product.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Produkt"
+            }
+          ]
+        },
+        {
+          "id": "remarkable",
+          "word": "remarkable",
+          "sentence": "Kids can sometimes produce something quite remarkable.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "bemerkenswert"
+            }
+          ]
+        },
+        {
+          "id": "to-research",
+          "word": "to research",
+          "sentence": "He decided to research underwater acoustics.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erforschen, recherchieren"
+            }
+          ]
+        },
+        {
+          "id": "wrist",
+          "word": "wrist",
+          "sentence": "Her wrist was hurting from the cold.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Handgelenk"
+            }
+          ]
+        },
+        {
+          "id": "crutches",
+          "word": "crutches",
+          "sentence": "She uses a walker or crutches to move about.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Krücken"
+            }
+          ]
+        },
+        {
+          "id": "illness",
+          "word": "illness",
+          "sentence": "Her illness had stopped Sadie from entering the competition.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Krankheit"
+            }
+          ]
+        },
+        {
+          "id": "ramp",
+          "word": "ramp",
+          "sentence": "She needs to look for ramps to get up and down steps.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Rampe"
+            }
+          ]
+        },
+        {
+          "id": "wheelchair",
+          "word": "wheelchair",
+          "sentence": "A wheelchair helps her get around.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Rollstuhl"
+            }
+          ]
+        },
+        {
+          "id": "to-adapt",
+          "word": "to adapt",
+          "sentence": "She is able to adapt easily to different situations.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "anpassen"
+            }
+          ]
+        },
+        {
+          "id": "to-attach",
+          "word": "to attach",
+          "sentence": "I'll attach a picture to my email.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "anfügen, anhängen"
+            }
+          ]
+        },
+        {
+          "id": "glove",
+          "word": "glove",
+          "sentence": "Wear some gloves to keep your hands warm in winter.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Handschuh"
+            }
+          ]
+        },
+        {
+          "id": "housework",
+          "word": "housework",
+          "sentence": "Busy parents don't have enough time for housework.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Hausarbeit"
+            }
+          ]
+        },
+        {
+          "id": "automatically",
+          "word": "automatically",
+          "sentence": "When the cat wants to go inside, the flap opens automatically.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "automatisch"
+            }
+          ]
+        },
+        {
+          "id": "collar",
+          "word": "collar",
+          "sentence": "I've created a collar for our cat.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Kragen; hier: Halsband"
+            }
+          ]
+        },
+        {
+          "id": "computer-science",
+          "word": "computer science",
+          "sentence": "His best subject at school is computer science.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Informatik"
+            }
+          ]
+        },
+        {
+          "id": "engineer",
+          "word": "engineer",
+          "sentence": "What subjects do you need to study to be an engineer?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Techniker/Technikerin"
+            }
+          ]
+        },
+        {
+          "id": "inspiration",
+          "word": "inspiration",
+          "sentence": "This is not the kind of inspiration I'm looking for right now.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Inspiration"
+            }
+          ]
+        },
+        {
+          "id": "to-repair",
+          "word": "to repair",
+          "sentence": "I love repairing things and playing around with new ideas.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "reparieren"
+            }
+          ]
+        },
+        {
+          "id": "to-support",
+          "word": "to support",
+          "sentence": "I want to do things that will support my dream for the future.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unterstützen"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-9",
+      "title": "Unit 9",
+      "entries": [
+        {
+          "id": "to-dye-your-hair",
+          "word": "to dye your hair",
+          "sentence": "to dye your hair",
+          "translations": []
+        },
+        {
+          "id": "to-get-a-tattoo",
+          "word": "to get a tattoo",
+          "sentence": "to get a tattoo",
+          "translations": []
+        },
+        {
+          "id": "to-hang-out-in-shopping-centres",
+          "word": "to hang out in shopping centres",
+          "sentence": "to hang out in shopping centres",
+          "translations": []
+        },
+        {
+          "id": "to-go-roller-skating-without-pads",
+          "word": "to go roller-skating without pads",
+          "sentence": "to go roller-skating without pads",
+          "translations": []
+        },
+        {
+          "id": "to-get-a-nose-stud",
+          "word": "to get a nose stud",
+          "sentence": "to get a nose stud",
+          "translations": []
+        },
+        {
+          "id": "to-scroll-through-your-phone",
+          "word": "to scroll through your phone",
+          "sentence": "to scroll through your phone",
+          "translations": []
+        },
+        {
+          "id": "to-have-a-party-at-home",
+          "word": "to have a party at home",
+          "sentence": "to have a party at home",
+          "translations": []
+        },
+        {
+          "id": "to-eat-too-many-sweets",
+          "word": "to eat too many sweets",
+          "sentence": "to eat too many sweets",
+          "translations": []
+        },
+        {
+          "id": "to-wear-earrings",
+          "word": "to wear earrings",
+          "sentence": "to wear earrings",
+          "translations": []
+        },
+        {
+          "id": "to-buy-your-own-clothes",
+          "word": "to buy your own clothes",
+          "sentence": "to buy your own clothes",
+          "translations": []
+        },
+        {
+          "id": "to-ride-your-bike-without-a-helmet",
+          "word": "to ride your bike without a helmet",
+          "sentence": "to ride your bike without a helmet",
+          "translations": []
+        },
+        {
+          "id": "to-come-home-after-ten",
+          "word": "to come home after ten",
+          "sentence": "to come home after ten",
+          "translations": []
+        },
+        {
+          "id": "to-turn-your-music-up-loud",
+          "word": "to turn your music up loud",
+          "sentence": "to turn your music up loud",
+          "translations": []
+        },
+        {
+          "id": "to-go-to-the-disco",
+          "word": "to go to the disco",
+          "sentence": "to go to the disco",
+          "translations": []
+        },
+        {
+          "id": "to-play-video-games-all-day",
+          "word": "to play video games all day",
+          "sentence": "to play video games all day",
+          "translations": []
+        },
+        {
+          "id": "to-watch-tv-after-10-oclock",
+          "word": "to watch TV after 10 o'clock",
+          "sentence": "to watch TV after 10 o'clock",
+          "translations": []
+        },
+        {
+          "id": "to-be-allowed-to-do-sth",
+          "word": "to be allowed to do sth.",
+          "sentence": "They are allowed to hold and feed the animals.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "etw. tun dürfen"
+            }
+          ]
+        },
+        {
+          "id": "its-a-pity",
+          "word": "It's a pity.",
+          "sentence": "It's a pity.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Das ist schade."
+            }
+          ]
+        },
+        {
+          "id": "strict",
+          "word": "strict",
+          "sentence": "Mum's very strict about that.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "streng"
+            }
+          ]
+        },
+        {
+          "id": "to-adopt",
+          "word": "to adopt",
+          "sentence": "The Amish are known for being slow to adopt modern technology.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hier: annehmen"
+            }
+          ]
+        },
+        {
+          "id": "community",
+          "word": "community",
+          "sentence": "There are many different groups, but the strongest community is the Old Order Amish.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gemeinschaft, Gemeinde"
+            }
+          ]
+        },
+        {
+          "id": "conservative",
+          "word": "conservative",
+          "sentence": "The most conservative Amish groups don't allow the use of machines.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "konservativ"
+            }
+          ]
+        },
+        {
+          "id": "modern-technology",
+          "word": "modern technology",
+          "sentence": "Most Amish groups don't use modern technology.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "moderne Technologie"
+            }
+          ]
+        },
+        {
+          "id": "plenty",
+          "word": "plenty",
+          "sentence": "We're a church group of 35 families, and we've got plenty to do.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "reichlich"
+            }
+          ]
+        },
+        {
+          "id": "to-pray",
+          "word": "to pray",
+          "sentence": "We often get together and pray.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "beten"
+            }
+          ]
+        },
+        {
+          "id": "to-punish",
+          "word": "to punish",
+          "sentence": "You can go to parties and your parents don't punish you for it.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "bestrafen"
+            }
+          ]
+        },
+        {
+          "id": "it-depends",
+          "word": "It depends.",
+          "sentence": "It depends.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Es kommt darauf an."
+            }
+          ]
+        },
+        {
+          "id": "to-stay-up",
+          "word": "to stay up",
+          "sentence": "Well, I can stay up, but only on Saturdays.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aufbleiben"
+            }
+          ]
+        },
+        {
+          "id": "to-invite-sb-over",
+          "word": "to invite sb. over",
+          "sentence": "Are you allowed to invite friends over?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. zu sich einladen"
+            }
+          ]
+        },
+        {
+          "id": "for-a-change",
+          "word": "for a change",
+          "sentence": "I'll write something positive about young people for a change.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zur Abwechslung"
+            }
+          ]
+        },
+        {
+          "id": "journalist",
+          "word": "journalist",
+          "sentence": "My dad's friend works as a journalist at the local paper.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Journalist/Journalistin"
+            }
+          ]
+        },
+        {
+          "id": "litter-picking",
+          "word": "litter-picking",
+          "sentence": "How about we organise a litter-picking day?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Müllsammeln"
+            }
+          ]
+        },
+        {
+          "id": "rude",
+          "word": "rude",
+          "sentence": "When some people asked them to stop, they were rude.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unhöflich, unverschämt"
+            }
+          ]
+        },
+        {
+          "id": "unbelievable",
+          "word": "unbelievable",
+          "sentence": "They left their rubbish all over the place. It's unbelievable.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unglaublich"
+            }
+          ]
+        },
+        {
+          "id": "to-freeze",
+          "word": "to freeze",
+          "sentence": "She's from a hot country. She'll freeze over here.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(er-)frieren"
+            }
+          ]
+        },
+        {
+          "id": "to-lend",
+          "word": "to lend",
+          "sentence": "I could lend her some of my clothes if you like.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(ver-)leihen"
+            }
+          ]
+        },
+        {
+          "id": "never-mind",
+          "word": "Never mind!",
+          "sentence": "Never mind!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Egal, Schon gut!"
+            }
+          ]
+        },
+        {
+          "id": "to-remind-sb",
+          "word": "to remind sb.",
+          "sentence": "Kate reminds him that Laura is from Portugal.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. erinnern"
+            }
+          ]
+        },
+        {
+          "id": "to-sort-out",
+          "word": "to sort out",
+          "sentence": "I'm going to sort out my clothes for Bianca.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aussortieren"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-10",
+      "title": "Unit 10",
+      "entries": [
+        {
+          "id": "to-hand-out-leaflets",
+          "word": "to hand out leaflets",
+          "sentence": "to hand out leaflets",
+          "translations": []
+        },
+        {
+          "id": "to-sign-a-petition",
+          "word": "to sign a petition",
+          "sentence": "to sign a petition",
+          "translations": []
+        },
+        {
+          "id": "to-go-on-a-protest-march",
+          "word": "to go on a protest march",
+          "sentence": "to go on a protest march",
+          "translations": []
+        },
+        {
+          "id": "to-organise-a-meeting",
+          "word": "to organise a meeting",
+          "sentence": "to organise a meeting",
+          "translations": []
+        },
+        {
+          "id": "to-send-out-emails",
+          "word": "to send out emails",
+          "sentence": "to send out emails",
+          "translations": []
+        },
+        {
+          "id": "to-recycle-paper-glass-plastic-and-cans",
+          "word": "to recycle paper, glass, plastic and cans",
+          "sentence": "to recycle paper, glass, plastic and cans",
+          "translations": []
+        },
+        {
+          "id": "to-save-water-and-energy",
+          "word": "to save water and energy",
+          "sentence": "to save water and energy",
+          "translations": []
+        },
+        {
+          "id": "to-buy-locally-produced-food",
+          "word": "to buy locally produced food",
+          "sentence": "to buy locally produced food",
+          "translations": []
+        },
+        {
+          "id": "dont-drop-litter",
+          "word": "Don't drop litter.",
+          "sentence": "Don't drop litter.",
+          "translations": []
+        },
+        {
+          "id": "dont-drive-short-distances",
+          "word": "Don't drive short distances.",
+          "sentence": "Don't drive short distances.",
+          "translations": []
+        },
+        {
+          "id": "dont-leave-bottles-or-cans-on-the-beach",
+          "word": "Don't leave bottles or cans on the beach.",
+          "sentence": "Don't leave bottles or cans on the beach.",
+          "translations": []
+        },
+        {
+          "id": "dont-buy-a-new-bag-bring-your-own",
+          "word": "Don't buy a new bag. Bring your own.",
+          "sentence": "Don't buy a new bag. Bring your own.",
+          "translations": []
+        },
+        {
+          "id": "ability",
+          "word": "ability",
+          "sentence": "You have the ability to make a lot of people happy.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Fähigkeit"
+            }
+          ]
+        },
+        {
+          "id": "to-exist",
+          "word": "to exist",
+          "sentence": "In fact, the Convention on the Rights of the Child didn't exist until 1990.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "existieren"
+            }
+          ]
+        },
+        {
+          "id": "rights",
+          "word": "right(s)",
+          "sentence": "The UN lists the rights that all people around the world must have.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Recht(e)"
+            }
+          ]
+        },
+        {
+          "id": "in-general",
+          "word": "in general",
+          "sentence": "In general, kids these days are lucky.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "im Allgemeinen"
+            }
+          ]
+        },
+        {
+          "id": "quality",
+          "word": "quality",
+          "sentence": "You have the right to a good quality education.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Qualität"
+            }
+          ]
+        },
+        {
+          "id": "to-be-able-to-do",
+          "word": "to be able to do",
+          "sentence": "I haven't been able to talk to him for a few days.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "fähig sein, etw. zu tun"
+            }
+          ]
+        },
+        {
+          "id": "cottage",
+          "word": "cottage",
+          "sentence": "40 cottages here in the fields?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "kleines Landhaus; Ferienhaus"
+            }
+          ]
+        },
+        {
+          "id": "compromise",
+          "word": "compromise",
+          "sentence": "I've heard they're working on some kind of compromise.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Kompromiss"
+            }
+          ]
+        },
+        {
+          "id": "good-point",
+          "word": "Good point.",
+          "sentence": "Good point.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Da ist was dran., Gutes Argument."
+            }
+          ]
+        },
+        {
+          "id": "to-take-action",
+          "word": "to take action",
+          "sentence": "They take action straightaway to protest against the building plans.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "etw. unternehmen, aktiv werden"
+            }
+          ]
+        },
+        {
+          "id": "town-hall",
+          "word": "town hall",
+          "sentence": "There's going to be a public meeting in the town hall next week.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Rathaus, Gemeindeamt"
+            }
+          ]
+        },
+        {
+          "id": "way-out",
+          "word": "way out",
+          "sentence": "The politicians are trying to find a way out of the dilemma.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ausweg"
+            }
+          ]
+        },
+        {
+          "id": "majority",
+          "word": "majority",
+          "sentence": "Well, 40% is not a majority.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Mehrheit"
+            }
+          ]
+        },
+        {
+          "id": "argument",
+          "word": "argument",
+          "sentence": "Which side of the argument do you agree with?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Argument; hier: Streit"
+            }
+          ]
+        },
+        {
+          "id": "to-protest",
+          "word": "to protest",
+          "sentence": "We have to protest against the building plans.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "protestieren"
+            }
+          ]
+        },
+        {
+          "id": "city-council",
+          "word": "city council",
+          "sentence": "We could write an email to the city council.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Stadtrat"
+            }
+          ]
+        },
+        {
+          "id": "cloth-bag",
+          "word": "cloth bag",
+          "sentence": "I always take a basket or a cloth bag when shopping.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Stofftasche"
+            }
+          ]
+        },
+        {
+          "id": "hardly-ever",
+          "word": "hardly ever",
+          "sentence": "I hardly ever waste water.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "fast nie"
+            }
+          ]
+        },
+        {
+          "id": "lazy",
+          "word": "lazy",
+          "sentence": "You probably know what you should do, but you are too lazy.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "faul"
+            }
+          ]
+        },
+        {
+          "id": "wrapping",
+          "word": "wrapping",
+          "sentence": "Don't throw paper, wrappings or bottles into the street.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Verpackung"
+            }
+          ]
+        },
+        {
+          "id": "to-stand-up-for",
+          "word": "to stand up for",
+          "sentence": "You have to stand up for your rights.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "für etw. eintreten"
+            }
+          ]
+        },
+        {
+          "id": "suffrage",
+          "word": "suffrage",
+          "sentence": "It's about suffrage, which is the right of women to vote.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wahlrecht"
+            }
+          ]
+        },
+        {
+          "id": "suffragette",
+          "word": "suffragette",
+          "sentence": "The suffragettes fought for their right to vote.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Frauenrechtlerin"
+            }
+          ]
+        },
+        {
+          "id": "to-vote",
+          "word": "to vote",
+          "sentence": "In the early 20th century, women wanted the right to vote.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "wählen"
+            }
+          ]
+        },
+        {
+          "id": "to-attend",
+          "word": "to attend",
+          "sentence": "However, girls were still not allowed to attend university.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "besuchen (Universität, Veranstaltung)"
+            }
+          ]
+        },
+        {
+          "id": "to-be-equal",
+          "word": "to be equal",
+          "sentence": "Men and women should be equal.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "gleichberechtigt sein"
+            }
+          ]
+        },
+        {
+          "id": "law",
+          "word": "law",
+          "sentence": "In 1993, a law was passed that said men and women should be treated as equals.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gesetz"
+            }
+          ]
+        },
+        {
+          "id": "nowadays",
+          "word": "nowadays",
+          "sentence": "The situation is much better nowadays.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "heutzutage"
+            }
+          ]
+        },
+        {
+          "id": "to-treat",
+          "word": "to treat",
+          "sentence": "Men and women should be treated as equals.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "behandeln"
+            }
+          ]
+        },
+        {
+          "id": "arrest",
+          "word": "arrest",
+          "sentence": "After Rosa Parks' arrest, there was a 381-day bus boycott.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Verhaftung, Festnahme"
+            }
+          ]
+        },
+        {
+          "id": "education",
+          "word": "education",
+          "sentence": "The Malala Fund fights for education for women all over the world.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(Aus-)Bildung"
+            }
+          ]
+        },
+        {
+          "id": "to-speak-out",
+          "word": "to speak out",
+          "sentence": "Malala speaks out for girls' right to go to school.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich für etw./jdn. aussprechen, seine Meinung sagen"
+            }
+          ]
+        },
+        {
+          "id": "to-refuse",
+          "word": "to refuse",
+          "sentence": "Rosa Parks refused to give up her seat on the bus.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(ver-)weigern"
+            }
+          ]
+        },
+        {
+          "id": "to-close-down",
+          "word": "to close down",
+          "sentence": "They didn't get their jobs back, because the company closed down.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "schließen"
+            }
+          ]
+        },
+        {
+          "id": "non-violent",
+          "word": "non-violent",
+          "sentence": "Ghandi taught his people how to protest in a non-violent way.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "gewaltfrei"
+            }
+          ]
+        },
+        {
+          "id": "businessman",
+          "word": "businessman (pl businessmen)",
+          "sentence": "A rich local businessman gave the school some money.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Geschäftsmann"
+            }
+          ]
+        },
+        {
+          "id": "concern",
+          "word": "concern",
+          "sentence": "Each group plans its argument in support of their concerns.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Anliegen, Sorge"
+            }
+          ]
+        },
+        {
+          "id": "debate",
+          "word": "debate",
+          "sentence": "All social groups should be part of the debate.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Debatte"
+            }
+          ]
+        },
+        {
+          "id": "headteacher",
+          "word": "headteacher",
+          "sentence": "The headteacher could make the decision.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schulleiter/Schulleiterin"
+            }
+          ]
+        },
+        {
+          "id": "to-involve",
+          "word": "to involve",
+          "sentence": "We want to involve children, teachers and parents in the decision.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "involvieren, einbeziehen"
+            }
+          ]
+        },
+        {
+          "id": "organisation",
+          "word": "organisation",
+          "sentence": "The school council is an organisation for the students.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Organisation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-11",
+      "title": "Unit 11",
+      "entries": [
+        {
+          "id": "canyon",
+          "word": "canyon",
+          "sentence": "canyon",
+          "translations": []
+        },
+        {
+          "id": "dirt-road",
+          "word": "dirt road",
+          "sentence": "dirt road",
+          "translations": []
+        },
+        {
+          "id": "ridge",
+          "word": "ridge",
+          "sentence": "ridge",
+          "translations": []
+        },
+        {
+          "id": "headquarters",
+          "word": "headquarters (pl)",
+          "sentence": "headquarters (pl)",
+          "translations": []
+        },
+        {
+          "id": "to-spot-sth",
+          "word": "to spot sth.",
+          "sentence": "to spot sth.",
+          "translations": []
+        },
+        {
+          "id": "a-dry-place",
+          "word": "a dry place",
+          "sentence": "a dry place",
+          "translations": []
+        },
+        {
+          "id": "to-have-no-signal",
+          "word": "to have no signal",
+          "sentence": "to have no signal",
+          "translations": []
+        },
+        {
+          "id": "backpack",
+          "word": "backpack",
+          "sentence": "backpack",
+          "translations": []
+        },
+        {
+          "id": "fabulous",
+          "word": "fabulous",
+          "sentence": "Don't forget our fabulous national parks.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "fabelhaft"
+            }
+          ]
+        },
+        {
+          "id": "height",
+          "word": "height",
+          "sentence": "The giant redwood trees can reach heights of more than 100 m.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Höhe"
+            }
+          ]
+        },
+        {
+          "id": "capital",
+          "word": "capital",
+          "sentence": "Which city is the state capital of California?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Hauptstadt"
+            }
+          ]
+        },
+        {
+          "id": "independent",
+          "word": "independent",
+          "sentence": "California was an independent country for one month in 1846.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unabhängig"
+            }
+          ]
+        },
+        {
+          "id": "innovation",
+          "word": "innovation",
+          "sentence": "California is famous for its innovations.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Neuerung, Innovation"
+            }
+          ]
+        },
+        {
+          "id": "state",
+          "word": "state",
+          "sentence": "There are about 40 million people living in the state of California.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Staat"
+            }
+          ]
+        },
+        {
+          "id": "to-commute",
+          "word": "to commute",
+          "sentence": "My mum commuted to the Valley every day.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "pendeln"
+            }
+          ]
+        },
+        {
+          "id": "connection",
+          "word": "connection",
+          "sentence": "His internet connection was slow.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Verbindung"
+            }
+          ]
+        },
+        {
+          "id": "programmer",
+          "word": "programmer",
+          "sentence": "Your mum works as a programmer.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Programmierer/Programmiererin"
+            }
+          ]
+        },
+        {
+          "id": "steep",
+          "word": "steep",
+          "sentence": "A canyon is deep with steep sides of rock.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "steil"
+            }
+          ]
+        },
+        {
+          "id": "to-crack",
+          "word": "to crack",
+          "sentence": "My mouth was dry and my lips began to crack.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aufbrechen; zerbrechen"
+            }
+          ]
+        },
+        {
+          "id": "four-wheel-drive",
+          "word": "four-wheel drive",
+          "sentence": "We need a jeep with four-wheel drive in the desert.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Allradantrieb"
+            }
+          ]
+        },
+        {
+          "id": "gold-digger",
+          "word": "gold digger",
+          "sentence": "Gold diggers were the people trying to find gold.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Goldgräber/Goldgräberin"
+            }
+          ]
+        },
+        {
+          "id": "gold-rush",
+          "word": "gold rush",
+          "sentence": "The California gold rush began in 1849.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Goldrausch"
+            }
+          ]
+        },
+        {
+          "id": "lip",
+          "word": "lip",
+          "sentence": "Her lips were shaking and she started to cry.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Lippe"
+            }
+          ]
+        },
+        {
+          "id": "mountain-range",
+          "word": "mountain range",
+          "sentence": "The valley is situated between two mountain ranges.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Bergkette"
+            }
+          ]
+        },
+        {
+          "id": "shade",
+          "word": "shade (no pl)",
+          "sentence": "I stayed in the shade of a giant rock.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schatten"
+            }
+          ]
+        },
+        {
+          "id": "to-be-situated",
+          "word": "to be situated",
+          "sentence": "Where is Death Valley situated?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "liegen, sich befinden"
+            }
+          ]
+        },
+        {
+          "id": "thirst",
+          "word": "thirst",
+          "sentence": "A group of gold diggers got lost in the valley and died of thirst.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Durst"
+            }
+          ]
+        },
+        {
+          "id": "criminal",
+          "word": "criminal",
+          "sentence": "Alcatraz was home to some famous criminals.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Krimineller/Kriminelle"
+            }
+          ]
+        },
+        {
+          "id": "cyclist",
+          "word": "cyclist",
+          "sentence": "On Sundays, the road is only open to cyclists and roller skaters.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Radfahrer/Radfahrerin"
+            }
+          ]
+        },
+        {
+          "id": "familiar",
+          "word": "familiar",
+          "sentence": "The Golden Gate Bridge is one of the most familiar sights of San Francisco.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "vertraut, bekannt"
+            }
+          ]
+        },
+        {
+          "id": "ferry",
+          "word": "ferry",
+          "sentence": "You can take a ferry to Alcatraz Island.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Fähre"
+            }
+          ]
+        },
+        {
+          "id": "guided",
+          "word": "guided",
+          "sentence": "These days you can go on a guided tour to Alcatraz Island.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "geführt, geleitet"
+            }
+          ]
+        },
+        {
+          "id": "to-take-over",
+          "word": "to take over",
+          "sentence": "On Sundays, the cyclists and roller skaters take over the street.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "übernehmen"
+            }
+          ]
+        },
+        {
+          "id": "to-catch-the-train",
+          "word": "to catch (the train)",
+          "sentence": "They have to go to the other platform to catch the train.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(den Zug) erwischen"
+            }
+          ]
+        },
+        {
+          "id": "information-office",
+          "word": "information office",
+          "sentence": "If you need help, you can ask someone in the information office.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Informationsbüro, Auskunftsbüro"
+            }
+          ]
+        },
+        {
+          "id": "railway",
+          "word": "railway",
+          "sentence": "The railway service to Manchester is leaving from platform 3.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zug, Eisenbahn"
+            }
+          ]
+        },
+        {
+          "id": "totally",
+          "word": "totally",
+          "sentence": "You are totally right about this.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "total"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-12",
+      "title": "Unit 12",
+      "entries": [
+        {
+          "id": "drought",
+          "word": "drought",
+          "sentence": "drought",
+          "translations": []
+        },
+        {
+          "id": "earthquake",
+          "word": "earthquake",
+          "sentence": "earthquake",
+          "translations": []
+        },
+        {
+          "id": "hurricane",
+          "word": "hurricane",
+          "sentence": "hurricane",
+          "translations": []
+        },
+        {
+          "id": "volcanic-eruption",
+          "word": "volcanic eruption",
+          "sentence": "volcanic eruption",
+          "translations": []
+        },
+        {
+          "id": "mudslide",
+          "word": "mudslide",
+          "sentence": "mudslide",
+          "translations": []
+        },
+        {
+          "id": "avalanche",
+          "word": "avalanche",
+          "sentence": "avalanche",
+          "translations": []
+        },
+        {
+          "id": "forest-fire",
+          "word": "forest fire",
+          "sentence": "forest fire",
+          "translations": []
+        },
+        {
+          "id": "tsunami",
+          "word": "tsunami",
+          "sentence": "tsunami",
+          "translations": []
+        },
+        {
+          "id": "flood",
+          "word": "flood",
+          "sentence": "flood",
+          "translations": []
+        },
+        {
+          "id": "fire-drill",
+          "word": "fire drill",
+          "sentence": "fire drill",
+          "translations": []
+        },
+        {
+          "id": "escape-route",
+          "word": "escape route",
+          "sentence": "escape route",
+          "translations": []
+        },
+        {
+          "id": "smoke-detector",
+          "word": "smoke detector",
+          "sentence": "smoke detector",
+          "translations": []
+        },
+        {
+          "id": "meeting-place",
+          "word": "meeting place",
+          "sentence": "meeting place",
+          "translations": []
+        },
+        {
+          "id": "to-check-doors",
+          "word": "to check doors",
+          "sentence": "to check doors",
+          "translations": []
+        },
+        {
+          "id": "to-crawl-low",
+          "word": "to crawl low",
+          "sentence": "to crawl low",
+          "translations": []
+        },
+        {
+          "id": "to-stop-drop-and-roll",
+          "word": "to stop, drop & roll",
+          "sentence": "to stop, drop & roll",
+          "translations": []
+        },
+        {
+          "id": "research",
+          "word": "research",
+          "sentence": "A lot of money is spent on the research of avalanches.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Forschung, Recherche"
+            }
+          ]
+        },
+        {
+          "id": "to-be-trapped",
+          "word": "to be trapped",
+          "sentence": "If you are trapped in an avalanche, no one can hear you.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "gefangen sein, festsitzen"
+            }
+          ]
+        },
+        {
+          "id": "pressure",
+          "word": "pressure",
+          "sentence": "The gas inside a volcano creates a lot of pressure.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Druck"
+            }
+          ]
+        },
+        {
+          "id": "surface",
+          "word": "surface",
+          "sentence": "There's a pool of magma under the surface of the Earth.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Oberfläche"
+            }
+          ]
+        },
+        {
+          "id": "undersea",
+          "word": "undersea",
+          "sentence": "There are also undersea volcanoes that can erupt.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unter Wasser"
+            }
+          ]
+        },
+        {
+          "id": "border",
+          "word": "border",
+          "sentence": "There were fights at the Mexican border with North America.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Grenze"
+            }
+          ]
+        },
+        {
+          "id": "damage",
+          "word": "damage",
+          "sentence": "The damage caused by the earthquake was bad.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schaden"
+            }
+          ]
+        },
+        {
+          "id": "to-evacuate",
+          "word": "to evacuate",
+          "sentence": "Hundreds of people were evacuated by air.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "evakuieren"
+            }
+          ]
+        },
+        {
+          "id": "to-measure",
+          "word": "to measure",
+          "sentence": "The earthquake measured 7.0 on the Richter scale.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "messen"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "word": "region",
+          "sentence": "The region was hit by long periods without rain.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Region, Gebiet"
+            }
+          ]
+        },
+        {
+          "id": "violent",
+          "word": "violent",
+          "sentence": "Droughts have led to violent conflicts between the regions.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "gewalttätig"
+            }
+          ]
+        },
+        {
+          "id": "to-keep-away-from",
+          "word": "to keep away from",
+          "sentence": "Keep away from heavy furniture that might fall over.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "fernbleiben von"
+            }
+          ]
+        },
+        {
+          "id": "to-fall-down",
+          "word": "to fall down",
+          "sentence": "A few trees fell down because of the earthquake.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hinunterfallen"
+            }
+          ]
+        },
+        {
+          "id": "to-realise",
+          "word": "to realise",
+          "sentence": "I realised it was serious when I saw people running away.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "realisieren, erkennen"
+            }
+          ]
+        },
+        {
+          "id": "survival",
+          "word": "survival",
+          "sentence": "We are looking for people with amazing survival stories.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Überleben"
+            }
+          ]
+        },
+        {
+          "id": "underneath",
+          "word": "underneath",
+          "sentence": "I just got underneath the kitchen table.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unter"
+            }
+          ]
+        },
+        {
+          "id": "ash",
+          "word": "ash",
+          "sentence": "He used ash from the fire to draw a face on the ball.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Asche"
+            }
+          ]
+        },
+        {
+          "id": "castaway",
+          "word": "castaway",
+          "sentence": "How would you spend your time if you were a castaway?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schiffbrüchiger/Schiffbrüchige"
+            }
+          ]
+        },
+        {
+          "id": "to-deliver",
+          "word": "to deliver",
+          "sentence": "He still hoped to deliver the parcels unopened one day.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zustellen, liefern"
+            }
+          ]
+        },
+        {
+          "id": "delivery-company",
+          "word": "delivery company",
+          "sentence": "Chuck worked for a worldwide delivery company.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zustelldienst"
+            }
+          ]
+        },
+        {
+          "id": "flame",
+          "word": "flame",
+          "sentence": "He was trying to make fire and finally he saw a flame.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Flamme"
+            }
+          ]
+        },
+        {
+          "id": "to-get-used-to",
+          "word": "to get used to",
+          "sentence": "As the years went by, Chuck got used to the island.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sich an etw. gewöhnen"
+            }
+          ]
+        },
+        {
+          "id": "hometown",
+          "word": "hometown",
+          "sentence": "Chuck knew the island as well as his hometown.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Heimatstadt"
+            }
+          ]
+        },
+        {
+          "id": "joy",
+          "word": "joy",
+          "sentence": "He laughed with joy.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Freude"
+            }
+          ]
+        },
+        {
+          "id": "parcel",
+          "word": "parcel",
+          "sentence": "He put the unopened parcel next to him.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Paket"
+            }
+          ]
+        },
+        {
+          "id": "raft",
+          "word": "raft",
+          "sentence": "Chuck built a raft to escape the island.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Floß"
+            }
+          ]
+        },
+        {
+          "id": "shelter",
+          "word": "shelter",
+          "sentence": "He built himself a shelter from the rain.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Unterschlupf, Unterkunft"
+            }
+          ]
+        },
+        {
+          "id": "to-turn-into",
+          "word": "to turn into",
+          "sentence": "The rainfall quickly turned into heavy snowfall.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verwandeln, hier: zu etw. werden"
+            }
+          ]
+        },
+        {
+          "id": "miracle",
+          "word": "miracle",
+          "sentence": "It's a miracle that we survived the earthquake.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wunder"
+            }
+          ]
+        },
+        {
+          "id": "desert-island",
+          "word": "desert island",
+          "sentence": "What would you take on a desert island?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "einsame Insel"
+            }
+          ]
+        },
+        {
+          "id": "pleasure",
+          "word": "pleasure (no pl)",
+          "sentence": "It's a pleasure to be here.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Freude, Vergnügen"
+            }
+          ]
+        },
+        {
+          "id": "in-case-of",
+          "word": "in case of",
+          "sentence": "In case of fire go outside!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "im Falle von"
+            }
+          ]
+        },
+        {
+          "id": "lighter",
+          "word": "lighter",
+          "sentence": "Don't play with lighters.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Feuerzeug"
+            }
+          ]
+        },
+        {
+          "id": "to-collapse",
+          "word": "to collapse",
+          "sentence": "The house could collapse during an earthquake.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "zusammenbrechen"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-13",
+      "title": "Unit 13",
+      "entries": [
+        {
+          "id": "to-make-up-your-mind",
+          "word": "to make up your mind",
+          "sentence": "to make up your mind",
+          "translations": []
+        },
+        {
+          "id": "to-sleep-on-it",
+          "word": "to sleep on it",
+          "sentence": "to sleep on it",
+          "translations": []
+        },
+        {
+          "id": "to-find-a-way-out-of-a-dilemma",
+          "word": "to find a way out of a dilemma",
+          "sentence": "to find a way out of a dilemma",
+          "translations": []
+        },
+        {
+          "id": "to-be-in-two-minds-about-sth",
+          "word": "to be in two minds about sth.",
+          "sentence": "to be in two minds about sth.",
+          "translations": []
+        },
+        {
+          "id": "to-have-second-thoughts-about-sth",
+          "word": "to have second thoughts about sth.",
+          "sentence": "to have second thoughts about sth.",
+          "translations": []
+        },
+        {
+          "id": "to-be-at-a-loss",
+          "word": "to be at a loss",
+          "sentence": "to be at a loss",
+          "translations": []
+        },
+        {
+          "id": "dilemma",
+          "word": "dilemma",
+          "sentence": "I'm sure we'll find a way out of this dilemma.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Dilemma, Zwangslage"
+            }
+          ]
+        },
+        {
+          "id": "to-reach-a-decision",
+          "word": "to reach a decision",
+          "sentence": "I'm happy we could reach a decision.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "eine Entscheidung treffen"
+            }
+          ]
+        },
+        {
+          "id": "to-cancel",
+          "word": "to cancel",
+          "sentence": "You can't just cancel because you want to play football.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "absagen"
+            }
+          ]
+        },
+        {
+          "id": "disappointment",
+          "word": "disappointment",
+          "sentence": "It's a big disappointment that you can't play on Saturday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Enttäuschung"
+            }
+          ]
+        },
+        {
+          "id": "granddad",
+          "word": "granddad",
+          "sentence": "We are going to visit granddad in the afternoon.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Opa"
+            }
+          ]
+        },
+        {
+          "id": "to-kick-sb-off",
+          "word": "to kick sb. off",
+          "sentence": "My coach is going to kick me off the team.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "rausschmeißen"
+            }
+          ]
+        },
+        {
+          "id": "to-move",
+          "word": "to move",
+          "sentence": "They have asked to move the game to Saturday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(sich) bewegen; umziehen; hier: verschieben"
+            }
+          ]
+        },
+        {
+          "id": "to-rethink",
+          "word": "to rethink",
+          "sentence": "I'll have to rethink my decision.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "überdenken"
+            }
+          ]
+        },
+        {
+          "id": "to-deserve",
+          "word": "to deserve",
+          "sentence": "You deserve to feel special on your birthday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verdienen"
+            }
+          ]
+        },
+        {
+          "id": "except",
+          "word": "except",
+          "sentence": "Everyone knew – except you.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "außer"
+            }
+          ]
+        },
+        {
+          "id": "its-a-shame",
+          "word": "It's a shame.",
+          "sentence": "It's a shame.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Das ist schade."
+            }
+          ]
+        },
+        {
+          "id": "lift",
+          "word": "lift",
+          "sentence": "Can you give me a lift home?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hier: Mitfahrgelegenheit"
+            }
+          ]
+        },
+        {
+          "id": "alibi",
+          "word": "alibi",
+          "sentence": "Your brother asked you to give him an alibi for last night.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Alibi"
+            }
+          ]
+        },
+        {
+          "id": "id-identification",
+          "word": "ID (=identification)",
+          "sentence": "Can I see your ID?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Personalausweis"
+            }
+          ]
+        },
+        {
+          "id": "to-keep-quiet",
+          "word": "to keep quiet",
+          "sentence": "I'd keep quiet if the teacher asked me what happened.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "still sein, schweigen"
+            }
+          ]
+        },
+        {
+          "id": "to-tell-on-sb",
+          "word": "to tell on sb.",
+          "sentence": "I'm not going to tell on my friend.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. verpetzen"
+            }
+          ]
+        },
+        {
+          "id": "detention",
+          "word": "detention",
+          "sentence": "If you didn't say anything, you'd probably get detention.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Nachsitzen"
+            }
+          ]
+        },
+        {
+          "id": "to-put-up",
+          "word": "to put up",
+          "sentence": "I put up a note on the fridge.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "aufhängen"
+            }
+          ]
+        },
+        {
+          "id": "to-ask-sb-out",
+          "word": "to ask sb. out",
+          "sentence": "Jim has asked me out, but I don't want to go out with him.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "jdn. nach einem Date fragen"
+            }
+          ]
+        },
+        {
+          "id": "accidentally",
+          "word": "accidentally",
+          "sentence": "When running down the stairs, you accidentally broke a vase.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "versehentlich"
+            }
+          ]
+        },
+        {
+          "id": "to-argue",
+          "word": "to argue",
+          "sentence": "I don't like to argue with my parents.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "streiten, diskutieren"
+            }
+          ]
+        },
+        {
+          "id": "to-look-the-other-way",
+          "word": "to look the other way",
+          "sentence": "If someone needs help, don't look the other way.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "wegschauen"
+            }
+          ]
+        },
+        {
+          "id": "to-pretend",
+          "word": "to pretend",
+          "sentence": "Would you pretend you weren't my friend?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "vortäuschen, so tun, als ob"
+            }
+          ]
+        },
+        {
+          "id": "to-reject",
+          "word": "to reject",
+          "sentence": "Tania just rejected my advice.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ablehnen, zurückweisen"
+            }
+          ]
+        },
+        {
+          "id": "homemade",
+          "word": "homemade",
+          "sentence": "I could give him some homemade vouchers.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "hausgemacht"
+            }
+          ]
+        },
+        {
+          "id": "neither-of",
+          "word": "neither of",
+          "sentence": "Neither of us has any money.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "keiner von"
+            }
+          ]
+        },
+        {
+          "id": "voucher",
+          "word": "voucher",
+          "sentence": "I make a voucher that says: maths homework.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Gutschein"
+            }
+          ]
+        },
+        {
+          "id": "to-wrap",
+          "word": "to wrap",
+          "sentence": "I'll wrap the present and give it to him.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "verpacken"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit-14",
+      "title": "Unit 14",
+      "entries": [
+        {
+          "id": "to-plan-a-trip",
+          "word": "to plan a trip",
+          "sentence": "to plan a trip",
+          "translations": []
+        },
+        {
+          "id": "to-book-a-holiday",
+          "word": "to book a holiday",
+          "sentence": "to book a holiday",
+          "translations": []
+        },
+        {
+          "id": "to-make-a-hotel-reservation",
+          "word": "to make a hotel reservation",
+          "sentence": "to make a hotel reservation",
+          "translations": []
+        },
+        {
+          "id": "to-hire-a-car",
+          "word": "to hire a car",
+          "sentence": "to hire a car",
+          "translations": []
+        },
+        {
+          "id": "to-check-the-area-out-online",
+          "word": "to check the area out online",
+          "sentence": "to check the area out online",
+          "translations": []
+        },
+        {
+          "id": "to-buy-a-dictionary",
+          "word": "to buy a dictionary",
+          "sentence": "to buy a dictionary",
+          "translations": []
+        },
+        {
+          "id": "to-find-out-about-good-restaurants",
+          "word": "to find out about good restaurants",
+          "sentence": "to find out about good restaurants",
+          "translations": []
+        },
+        {
+          "id": "to-find-information-about-the-best-beaches",
+          "word": "to find information about the best beaches",
+          "sentence": "to find information about the best beaches",
+          "translations": []
+        },
+        {
+          "id": "to-look-at-a-map-of-the-area",
+          "word": "to look at a map of the area",
+          "sentence": "to look at a map of the area",
+          "translations": []
+        },
+        {
+          "id": "to-find-out-what-to-do-there",
+          "word": "to find out what to do there",
+          "sentence": "to find out what to do there",
+          "translations": []
+        },
+        {
+          "id": "bug",
+          "word": "bug",
+          "sentence": "We built a hotel for all kinds of bugs.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Insekt"
+            }
+          ]
+        },
+        {
+          "id": "to-prefer",
+          "word": "to prefer",
+          "sentence": "I like bananas, but I prefer apples.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "bevorzugen"
+            }
+          ]
+        },
+        {
+          "id": "official-language",
+          "word": "official language",
+          "sentence": "The official language in Botswana is English.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Amtssprache"
+            }
+          ]
+        },
+        {
+          "id": "balcony",
+          "word": "balcony",
+          "sentence": "I saw a man on the balcony next to our room.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Balkon"
+            }
+          ]
+        },
+        {
+          "id": "crime",
+          "word": "crime",
+          "sentence": "Killing leopards is a crime.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Verbrechen"
+            }
+          ]
+        },
+        {
+          "id": "to-dig",
+          "word": "to dig",
+          "sentence": "I'm going to dig for diamonds tomorrow.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "graben"
+            }
+          ]
+        },
+        {
+          "id": "shocked",
+          "word": "shocked",
+          "sentence": "I was really shocked when I saw the car crash.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "schockiert"
+            }
+          ]
+        },
+        {
+          "id": "wild-animal",
+          "word": "wild animal",
+          "sentence": "There are lots of wild animals in Botswana.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wildtier"
+            }
+          ]
+        },
+        {
+          "id": "wetland",
+          "word": "wetland",
+          "sentence": "The Okavango is a large wetland.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sumpfgebiet"
+            }
+          ]
+        },
+        {
+          "id": "otherwise",
+          "word": "otherwise",
+          "sentence": "We need to protect the leopards. Otherwise they'll die out.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "andernfalls, sonst"
+            }
+          ]
+        },
+        {
+          "id": "stuffed",
+          "word": "stuffed",
+          "sentence": "Stuffed baby crocodiles are an illegal wildlife souvenir.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ausgestopft"
+            }
+          ]
+        },
+        {
+          "id": "wildlife",
+          "word": "wildlife",
+          "sentence": "Tourists take about 50,000 illegal wildlife souvenirs back to Britain!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "wilde Tierwelt"
+            }
+          ]
+        },
+        {
+          "id": "at-once",
+          "word": "at once",
+          "sentence": "If you see him, tell me at once!",
+          "translations": [
+            {
+              "language": "de",
+              "word": "sofort"
+            }
+          ]
+        },
+        {
+          "id": "branch",
+          "word": "branch",
+          "sentence": "Leopards like to climb trees and sleep on the branches.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ast"
+            }
+          ]
+        },
+        {
+          "id": "by-the-way",
+          "word": "by the way",
+          "sentence": "Oh, by the way, I was really glad to see you again.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "übrigens"
+            }
+          ]
+        },
+        {
+          "id": "impolite",
+          "word": "impolite",
+          "sentence": "I didn't say anything because I didn't want to be impolite.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unhöflich"
+            }
+          ]
+        },
+        {
+          "id": "round-a-bend",
+          "word": "round a bend",
+          "sentence": "We followed the car and drove round a bend.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "um eine Ecke, um eine Kurve"
+            }
+          ]
+        },
+        {
+          "id": "bush",
+          "word": "bush",
+          "sentence": "There's a black car in the bushes over there.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Busch"
+            }
+          ]
+        },
+        {
+          "id": "cut",
+          "word": "cut",
+          "sentence": "The man had a cut on his head.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schnitt(-wunde)"
+            }
+          ]
+        },
+        {
+          "id": "to-drive-off",
+          "word": "to drive off",
+          "sentence": "Suddenly, the black car drove off very fast.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "wegfahren"
+            }
+          ]
+        },
+        {
+          "id": "engine",
+          "word": "engine",
+          "sentence": "He stopped the car and switched the engine off.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Motor"
+            }
+          ]
+        },
+        {
+          "id": "front-seat",
+          "word": "front seat",
+          "sentence": "I was sitting in the front seat of the big Land Rover.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Vordersitz"
+            }
+          ]
+        },
+        {
+          "id": "park-ranger",
+          "word": "park ranger",
+          "sentence": "Alex took out his walkie-talkie and called the park rangers.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Parkwächter/Parkwächterin"
+            }
+          ]
+        },
+        {
+          "id": "sunburn",
+          "word": "sunburn",
+          "sentence": "Hippos stay under water because they're afraid of getting a sunburn.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sonnenbrand"
+            }
+          ]
+        },
+        {
+          "id": "to-turn-over",
+          "word": "to turn over",
+          "sentence": "The Land Rover turned over and landed on its roof.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "(sich) überschlagen"
+            }
+          ]
+        },
+        {
+          "id": "to-whisper",
+          "word": "to whisper",
+          "sentence": "He whispered the secret in my ear.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "flüstern"
+            }
+          ]
+        },
+        {
+          "id": "crash",
+          "word": "crash",
+          "sentence": "There was a car crash on May Street.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Unfall, Zusammenstoß"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

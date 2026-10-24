@@ -1,0 +1,129 @@
+{
+  "id": "everyday-english",
+  "title": "Everyday English",
+  "language": "en",
+  "sections": [
+    {
+      "id": "at-school",
+      "title": "At school",
+      "entries": [
+        {
+          "id": "book",
+          "word": "book",
+          "sentence": "The book is on the table.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Buch"
+            }
+          ]
+        },
+        {
+          "id": "pencil",
+          "word": "pencil",
+          "sentence": "I write with a pencil.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Stift"
+            }
+          ]
+        },
+        {
+          "id": "school",
+          "word": "school",
+          "sentence": "We walk to school.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schule"
+            }
+          ]
+        },
+        {
+          "id": "teacher",
+          "word": "teacher",
+          "sentence": "The teacher reads a story.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Lehrer"
+            }
+          ]
+        },
+        {
+          "id": "friend",
+          "word": "friend",
+          "sentence": "My friend sits next to me.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Freund"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "at-home",
+      "title": "At home",
+      "entries": [
+        {
+          "id": "house",
+          "word": "house",
+          "sentence": "Our house has a garden.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Haus"
+            }
+          ]
+        },
+        {
+          "id": "window",
+          "word": "window",
+          "sentence": "The window is open.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Fenster"
+            }
+          ]
+        },
+        {
+          "id": "water",
+          "word": "water",
+          "sentence": "I drink a glass of water.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wasser"
+            }
+          ]
+        },
+        {
+          "id": "apple",
+          "word": "apple",
+          "sentence": "The apple is red.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Apfel"
+            }
+          ]
+        },
+        {
+          "id": "cat",
+          "word": "cat",
+          "sentence": "The cat sleeps on a chair.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Katze"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -163,6 +163,10 @@ form .button { margin-top: 24px; }
 .settings-panel { padding: 24px; }
 .settings-panel h2 { margin-bottom: 16px; }
 .settings-panel .fine-print { margin: 12px 0 0; }
+.reminder-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.reminder-toggle input { width: 18px; height: 18px; flex: 0 0 auto; margin: 0; }
+.reminder-time { display: grid; gap: 6px; margin-top: 16px; }
+.reminder-time input { width: 100%; min-width: 0; box-sizing: border-box; }
 .settings-email { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; margin-bottom: 12px; }
 .language-settings { max-width: 650px; padding: 24px; margin: 0 auto; }
 .language-settings fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
@@ -299,13 +303,11 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .answer-camera video { display: block; width: 100%; aspect-ratio: 3 / 4; max-height: 480px; object-fit: contain; background: #17251f; border-radius: 8px; }
 .camera-actions { display: flex; justify-content: center; gap: 10px; margin: 14px 0; }
 .photo-intro .answer-sheet-preview { max-height: 480px; }
-.practice-source { max-width: 416px; min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
-.practice-source label { font-size: .85rem; }
-.practice-source select { width: 100%; max-width: 100%; text-overflow: ellipsis; }
 .challenge-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; padding: 0; border: 0; min-width: 0; }
-.challenge-filters { grid-template-columns: repeat(2, minmax(0, 200px)); gap: 10px 16px; margin: 22px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.challenge-filters { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 16px; margin: 22px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.challenge-filters > div { min-width: 0; }
 .challenge-filters label { font-size: .75rem; color: var(--muted); margin-bottom: 5px; }
-.challenge-filters select { padding: 8px 10px; min-height: 40px; font-size: .85rem; }
+.challenge-filters select { width: 100%; max-width: 100%; text-overflow: ellipsis; padding: 8px 10px; min-height: 40px; font-size: .85rem; }
 .challenge-ready > p:not(.selection-summary) { max-width: 54ch; margin-inline: auto; line-height: 1.7; }
 .challenge-starts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 20px 0 12px; }
 .challenge-starts .button { flex-direction: column; gap: 6px; min-height: 100px; padding: 14px 8px; }

@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
     "rootDir": ".",
     "outDir": "dist-server",
     "strict": true,
@@ -11,6 +12,6 @@
     "noUnusedParameters": true,
     "types": ["node"]
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts"],
+  "include": ["server/**/*.ts", "server/word-lists/*.json", "shared/**/*.ts"],
   "exclude": ["server/**/*.test.ts", "shared/**/*.test.ts"]
 }

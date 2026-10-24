@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleUserRound, LogOut, Settings } from 'lucide-react'
+import { ChevronDown, CircleUserRound, Download, LogOut, Settings } from 'lucide-react'
 import type { AuthState, WebsiteLanguage } from '../shared/model'
 import { api } from './lib/api'
 import { errorMessage } from './lib/words'
@@ -14,6 +14,8 @@ import { DataExport } from './components/DataExport'
 import { WordResources } from './components/WordResources'
 import { LanguageSettings } from './components/LanguageSettings'
 import { WebsiteLanguageSettings } from './components/WebsiteLanguageSettings'
+import { InstallWebApp, ReminderSettings } from './components/WebAppSettings'
+import { currentPushSubscription, installedWebApp } from './lib/pwa'
 import { I18nProvider } from './i18n/I18n'
 import { useI18n } from './i18n/context'
 
@@ -87,6 +89,15 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
   const accountToggle = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const openPractice = (event: MessageEvent) => {
+      if (event.data?.type === 'OPEN_PRACTICE') { setTab('home'); setAccountOpen(false) }
+    }
+    navigator.serviceWorker.addEventListener('message', openPractice)
+    return () => navigator.serviceWorker.removeEventListener('message', openPractice)
+  }, [])
+
+  useEffect(() => {
     if (!accountOpen) return
     const outside = (event: PointerEvent) => {
       if (event.target instanceof Node && !accountMenu.current?.contains(event.target)) setAccountOpen(false)
@@ -102,7 +113,12 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
   async function signOut() {
     setSigningOut(true)
     setAuthError('')
-    try { await api.logout(); onSignedOut() }
+    try {
+      const subscription = await currentPushSubscription()
+      if (subscription) { await api.removeReminder(subscription.endpoint); await subscription.unsubscribe() }
+      await api.logout()
+      onSignedOut()
+    }
     catch (error) { setAuthError(errorMessage(error)) }
     finally { setSigningOut(false) }
   }
@@ -116,6 +132,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
       {accountOpen && <div id="account-actions" className="account-panel" role="group" aria-label={t('Account')}>
         <p className="account-identity">{email}</p>
         <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Settings size={18} />{t('Settings')}</button>
+        {!installedWebApp() && <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Download size={18} />{t('Install app')}</button>}
         <button disabled={signingOut} onClick={() => void signOut()}><LogOut size={18} />{t(signingOut ? 'Signing out…' : 'Sign out')}</button>
       </div>}
     </div></header>
@@ -127,6 +144,8 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
       {tab === 'settings' ? <div className="settings-layout">
         <div>{preferences ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : !error && <p role="status">{t('Loading your languages…')}</p>}</div>
         <div className="settings-secondary">
+          <InstallWebApp />
+          <ReminderSettings />
           <WebsiteLanguageSettings onSaved={onWebsiteLanguageSaved} />
           <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
           <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>

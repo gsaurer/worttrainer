@@ -1,0 +1,149 @@
+{
+  "id": "premiers-mots",
+  "title": "Premiers mots",
+  "language": "fr",
+  "sections": [
+    {
+      "id": "a-la-maison",
+      "title": "La maison",
+      "entries": [
+        {
+          "id": "maison",
+          "word": "maison",
+          "sentence": "La maison a un jardin.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "house"
+            },
+            {
+              "language": "de",
+              "word": "Haus"
+            }
+          ]
+        },
+        {
+          "id": "livre",
+          "word": "livre",
+          "sentence": "Le livre est sur la table.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "book"
+            },
+            {
+              "language": "de",
+              "word": "Buch"
+            }
+          ]
+        },
+        {
+          "id": "eau",
+          "word": "eau",
+          "sentence": "Je bois de l'eau.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "water"
+            },
+            {
+              "language": "de",
+              "word": "Wasser"
+            }
+          ]
+        },
+        {
+          "id": "pomme",
+          "word": "pomme",
+          "sentence": "La pomme est rouge.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "apple"
+            },
+            {
+              "language": "de",
+              "word": "Apfel"
+            }
+          ]
+        },
+        {
+          "id": "chat",
+          "word": "chat",
+          "sentence": "Le chat dort.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "cat"
+            },
+            {
+              "language": "de",
+              "word": "Katze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dans-le-jardin",
+      "title": "Le jardin",
+      "entries": [
+        {
+          "id": "jardin",
+          "word": "jardin",
+          "sentence": "Le jardin est grand.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "garden"
+            }
+          ]
+        },
+        {
+          "id": "soleil",
+          "word": "soleil",
+          "sentence": "Le soleil brille.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "sun"
+            }
+          ]
+        },
+        {
+          "id": "chien",
+          "word": "chien",
+          "sentence": "Le chien joue.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "dog"
+            }
+          ]
+        },
+        {
+          "id": "arbre",
+          "word": "arbre",
+          "sentence": "Un oiseau est dans l'arbre.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "tree"
+            }
+          ]
+        },
+        {
+          "id": "fleur",
+          "word": "fleur",
+          "sentence": "La fleur est rouge.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "flower"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -40,6 +40,32 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
 describe('one private practice file per account', () => {
+  it('exposes only imported sections and owned word IDs for practice without changing progress or storage', async () => {
+    const resource = wordResources.find(resource => resource.id === 'everyday-english')!
+    const [section, unimported] = resource.sections
+    const existing = await store.addWord(first, section.entries[0].word.toUpperCase(), resource.language)
+    const outsideList = await store.addWord(first, unimported.entries[0].word, resource.language)
+    await store.mark(first, existing.id, true, randomUUID())
+    await store.importWordResource(first, resource.id, [section.id], false)
+    await store.importWordResource(second, resource.id, [section.id], false)
+    const before = await readFile(practiceFile(first), 'utf8')
+    const words = store.words(first)
+    const attempts = store.exportData(first).attempts
+    const [list] = store.practiceWordLists(first)
+    expect(list.sections).toEqual([{ id: section.id, title: section.title, wordIds: expect.arrayContaining([existing.id]) }])
+    expect(list.sections[0].wordIds).toHaveLength(list.wordIds.length)
+    expect(list.sections[0].wordIds).not.toContain(outsideList.id)
+    const foreignIds = new Set(store.words(second).map(word => word.id))
+    expect(list.sections[0].wordIds.some(id => foreignIds.has(id))).toBe(false)
+    expect(store.words(first)).toEqual(words)
+    expect(store.exportData(first).attempts).toEqual(attempts)
+    expect(store.exportData(first).wordLists[0]).not.toHaveProperty('sections')
+    expect(await readFile(practiceFile(first), 'utf8')).toBe(before)
+    await store.deleteWord(first, existing.id)
+    expect(store.practiceWordLists(first)[0].sections[0].wordIds).not.toContain(existing.id)
+    expect((await FileStore.open(file)).practiceWordLists(first)).toEqual(store.practiceWordLists(first))
+  })
+
   it('remembers only added list sections and their owned words across imports and restarts', async () => {
     const resource = wordResources[0]
     const section = resource.sections[0]

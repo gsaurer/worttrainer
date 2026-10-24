@@ -12,6 +12,9 @@ services:
       OCR_AZURE_ENDPOINT: ${OCR_AZURE_ENDPOINT:-}
       OCR_AZURE_KEY: ${OCR_AZURE_KEY:-}
       OCR_MONTHLY_LIMIT: ${OCR_MONTHLY_LIMIT:-450}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     volumes:
       - worttrainer-data:/app/data
     read_only: true

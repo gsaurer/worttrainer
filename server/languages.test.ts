@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
@@ -39,6 +39,94 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
 describe('centrally managed word resources', () => {
+  it('loads every server-defined word list from an individual JSON configuration', async () => {
+    const directory = new URL('./word-lists/', import.meta.url)
+    const files = (await readdir(directory)).filter(file => file.endsWith('.json')).sort()
+    const configurations = await Promise.all(files.map(async file => JSON.parse(await readFile(new URL(file, directory), 'utf8'))))
+    expect(files).toEqual(wordResources.map(resource => `${resource.id}.json`).sort())
+    expect(files).toContain('more-book-3.json')
+    expect(resourceCatalogSchema.parse(configurations)).toEqual(wordResources)
+  })
+
+  const bookUnits = [
+    { unit: 1, count: 33, firstWord: 'to agree', lastWord: 'Me neither.' },
+    { unit: 2, count: 35, firstWord: 'coincidence', lastWord: 'to try out' },
+    { unit: 3, count: 35, firstWord: 'to become', lastWord: 'to recommend' },
+    { unit: 4, count: 37, firstWord: 'cub', lastWord: 'politician' },
+    { unit: 5, count: 33, firstWord: 'alarm clock', lastWord: 'seriously' },
+    { unit: 6, count: 34, firstWord: 'stadium', lastWord: 'to sign' },
+    { unit: 7, count: 28, firstWord: 'It\'s none of my business.', lastWord: 'unwell' },
+    { unit: 8, count: 39, firstWord: 'bacon', lastWord: 'to support' },
+    { unit: 9, count: 39, firstWord: 'to dye your hair', lastWord: 'to sort out', untranslated: 16 },
+    { unit: 10, count: 53, firstWord: 'to hand out leaflets', lastWord: 'organisation', untranslated: 12 },
+    { unit: 11, count: 37, firstWord: 'canyon', lastWord: 'totally', untranslated: 8 },
+    { unit: 12, count: 50, firstWord: 'drought', lastWord: 'to collapse', untranslated: 16 },
+    { unit: 13, count: 34, firstWord: 'to make up your mind', lastWord: 'to wrap', untranslated: 6 },
+    { unit: 14, count: 37, firstWord: 'to plan a trip', lastWord: 'crash', untranslated: 10 },
+  ]
+  it.each(bookUnits)('offers and imports only MORE! Book 3 Unit $unit', async ({ unit, count, firstWord, lastWord, untranslated = 0 }) => {
+    const resources = resourceCatalogSchema.parse((await get('/api/word-resources').expect(200)).body)
+    const resource = resources.find(resource => resource.id === 'more-book-3')
+    expect(resource).toBeDefined()
+    expect(resource?.title).toBe('MORE! Book 3')
+    expect(resource?.language).toBe('en')
+    expect(resource?.sections.map(section => section.id)).toEqual(bookUnits.map(({ unit }) => `unit-${unit}`))
+    const section = resource?.sections.find(section => section.id === `unit-${unit}`)
+    expect(section?.title).toBe(`Unit ${unit}`)
+    expect(section?.entries).toHaveLength(count)
+    expect(section?.entries[0].word).toBe(firstWord)
+    expect(section?.entries.at(-1)?.word).toBe(lastWord)
+    expect(section?.entries.every(entry => entry.sentence.length > 0 && entry.translations.length <= 1 && entry.translations.every(translation => translation.language === 'de'))).toBe(true)
+    expect(section?.entries.filter(entry => entry.translations.length === 0)).toHaveLength(untranslated)
+    expect(store.words(first.id)).toEqual([])
+    const input = { resourceId: 'more-book-3', sectionIds: [`unit-${unit}`], enableLanguage: false }
+    await post('/api/word-resources/import', input).expect(200).expect({ added: count, existing: 0, language: 'en' })
+    expect(store.words(first.id).map(word => word.text)).toEqual(section?.entries.map(entry => entry.word))
+    expect(store.practiceWordLists(first.id)[0].sections).toEqual([{
+      id: `unit-${unit}`, title: `Unit ${unit}`, wordIds: store.words(first.id).map(word => word.id),
+    }])
+    await post('/api/word-resources/import', input).expect(200).expect({ added: 0, existing: count, language: 'en' })
+    expect(store.words(second.id)).toEqual([])
+  })
+
+  it('imports the complete MORE! Book 3 without duplicating shared words or resetting progress', async () => {
+    const resource = wordResources.find(resource => resource.id === 'more-book-3')!
+    await post('/api/word-resources/import', {
+      resourceId: resource.id, sectionIds: ['unit-7'], enableLanguage: false,
+    }).expect(200).expect({ added: 28, existing: 0, language: 'en' })
+    const sharedWord = store.words(first.id).find(word => word.text === 'to move')!
+    await store.mark(first.id, sharedWord.id, true, randomUUID())
+    const before = store.words(first.id).find(word => word.id === sharedWord.id)
+    const entries = resource.sections.flatMap(section => section.entries)
+    expect(entries).toHaveLength(524)
+    const unique = new Set(entries.map(entry => entry.word.toLowerCase())).size
+    expect(unique).toBe(523)
+    const input = { resourceId: resource.id, sectionIds: resource.sections.map(section => section.id), enableLanguage: false }
+    await post('/api/word-resources/import', input).expect(200).expect({ added: unique - 28, existing: 28, language: 'en' })
+    expect(store.words(first.id)).toHaveLength(unique)
+    expect(store.words(first.id).find(word => word.id === sharedWord.id)).toEqual(before)
+    expect(store.exportData(first.id).attempts).toHaveLength(1)
+    const list = store.practiceWordLists(first.id)[0]
+    expect(list.sections).toHaveLength(14)
+    for (const sectionId of ['unit-7', 'unit-13']) {
+      expect(list.sections.find(section => section.id === sectionId)?.wordIds).toContain(sharedWord.id)
+    }
+    await post('/api/word-resources/import', input).expect(200).expect({ added: 0, existing: unique, language: 'en' })
+    expect(store.words(second.id)).toEqual([])
+  })
+
+  it.each([
+    { unit: 8, previousPageLast: 'invention', nextPageFirst: 'crowd' },
+    { unit: 10, previousPageLast: 'compromise', nextPageFirst: 'Good point.' },
+  ])('merges continuation pages in order into a single Unit $unit section', ({ unit, previousPageLast, nextPageFirst }) => {
+    const sections = wordResources.find(resource => resource.id === 'more-book-3')?.sections.filter(section => section.id === `unit-${unit}`)
+    expect(sections).toHaveLength(1)
+    const words = sections?.[0].entries.map(entry => entry.word) ?? []
+    const boundary = words.indexOf(previousPageLast)
+    expect(boundary).toBeGreaterThanOrEqual(0)
+    expect(words.slice(boundary, boundary + 2)).toEqual([previousPageLast, nextPageFirst])
+  })
+
   it.each([
     { id: 'demo-deutsche-stolperwoerter', language: 'de' },
     { id: 'demo-english-spelling-traps', language: 'en' },
@@ -86,12 +174,14 @@ describe('centrally managed word resources', () => {
     expect(lists).toEqual([{
       resourceId: 'everyday-english', title: expect.any(String), language: 'en', sectionIds: ['at-school'],
       wordIds: expect.arrayContaining([existing.id]),
+      sections: [{ id: 'at-school', title: expect.any(String), wordIds: expect.arrayContaining([existing.id]) }],
     }])
     expect(lists[0].wordIds).toHaveLength(5)
+    expect(lists[0].sections[0].wordIds).toHaveLength(5)
     await get('/api/word-lists', second.cookie).expect(200).expect([])
     expect((await get(`/api/word-lists?accountId=${second.id}`)).body).toEqual(lists)
     const reopened = await FileStore.open(file)
-    expect(reopened.addedWordLists(first.id)).toEqual(lists)
+    expect(reopened.practiceWordLists(first.id)).toEqual(lists)
     expect(reopened.words(first.id)).toHaveLength(5)
     expect(reopened.words(first.id).find(word => word.id === existing.id)).toEqual(before)
     expect(reopened.words(first.id).some(word => word.text === 'house')).toBe(false)

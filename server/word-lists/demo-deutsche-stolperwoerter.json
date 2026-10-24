@@ -1,0 +1,587 @@
+{
+  "id": "demo-deutsche-stolperwoerter",
+  "title": "Demo: Deutsche Stolperwörter (50 Wörter)",
+  "language": "de",
+  "sections": [
+    {
+      "id": "doppelte-konsonanten",
+      "title": "Doppelte Konsonanten",
+      "entries": [
+        {
+          "id": "adresse",
+          "word": "Adresse",
+          "sentence": "Schreibe deine Adresse auf den Brief.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "address"
+            }
+          ]
+        },
+        {
+          "id": "interessant",
+          "word": "interessant",
+          "sentence": "Ich finde die Geschichte interessant.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "interesting"
+            }
+          ]
+        },
+        {
+          "id": "aggressiv",
+          "word": "aggressiv",
+          "sentence": "Der Hund wirkt aggressiv.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "aggressive"
+            }
+          ]
+        },
+        {
+          "id": "bisschen",
+          "word": "bisschen",
+          "sentence": "Ich brauche ein bisschen Hilfe.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "bit"
+            }
+          ]
+        },
+        {
+          "id": "hoffentlich",
+          "word": "hoffentlich",
+          "sentence": "Hoffentlich scheint morgen die Sonne.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "hopefully"
+            }
+          ]
+        },
+        {
+          "id": "parallel",
+          "word": "parallel",
+          "sentence": "Die beiden Linien verlaufen parallel.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "parallel"
+            }
+          ]
+        },
+        {
+          "id": "karussell",
+          "word": "Karussell",
+          "sentence": "Das Karussell dreht sich langsam.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "carousel"
+            }
+          ]
+        },
+        {
+          "id": "terrasse",
+          "word": "Terrasse",
+          "sentence": "Wir essen auf der Terrasse.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "terrace"
+            }
+          ]
+        },
+        {
+          "id": "appellieren",
+          "word": "appellieren",
+          "sentence": "Wir appellieren an eure Geduld.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "appeal"
+            }
+          ]
+        },
+        {
+          "id": "intelligent",
+          "word": "intelligent",
+          "sentence": "Ihre Antwort ist sehr intelligent.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "intelligent"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "i-ie-und-y",
+      "title": "i, ie und y",
+      "entries": [
+        {
+          "id": "wieder",
+          "word": "wieder",
+          "sentence": "Wir sehen uns morgen wieder.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "again"
+            }
+          ]
+        },
+        {
+          "id": "widerspiegeln",
+          "word": "widerspiegeln",
+          "sentence": "Die Zahlen sollen den Fortschritt widerspiegeln.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "reflect"
+            }
+          ]
+        },
+        {
+          "id": "widerstehen",
+          "word": "widerstehen",
+          "sentence": "Ich kann dem Kuchen kaum widerstehen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "resist"
+            }
+          ]
+        },
+        {
+          "id": "maschine",
+          "word": "Maschine",
+          "sentence": "Die Maschine arbeitet sehr leise.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "machine"
+            }
+          ]
+        },
+        {
+          "id": "rhythmus",
+          "word": "Rhythmus",
+          "sentence": "Wir klatschen im gleichen Rhythmus.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "rhythm"
+            }
+          ]
+        },
+        {
+          "id": "sympathisch",
+          "word": "sympathisch",
+          "sentence": "Unser neuer Nachbar ist sympathisch.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "likeable"
+            }
+          ]
+        },
+        {
+          "id": "ziemlich",
+          "word": "ziemlich",
+          "sentence": "Der Weg ist ziemlich lang.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "quite"
+            }
+          ]
+        },
+        {
+          "id": "schwierig",
+          "word": "schwierig",
+          "sentence": "Diese Aufgabe ist schwierig.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "difficult"
+            }
+          ]
+        },
+        {
+          "id": "fieber",
+          "word": "Fieber",
+          "sentence": "Mit Fieber bleibe ich im Bett.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "fever"
+            }
+          ]
+        },
+        {
+          "id": "vibrieren",
+          "word": "vibrieren",
+          "sentence": "Die Lautsprecher vibrieren beim Spielen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "vibrate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s-ss-und-eszett",
+      "title": "s, ss und ß",
+      "entries": [
+        {
+          "id": "strasse",
+          "word": "Straße",
+          "sentence": "Unsere Straße ist heute gesperrt.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "street"
+            }
+          ]
+        },
+        {
+          "id": "heissen",
+          "word": "heißen",
+          "sentence": "Wie heißen deine Freunde?",
+          "translations": [
+            {
+              "language": "en",
+              "word": "be called"
+            }
+          ]
+        },
+        {
+          "id": "fussball",
+          "word": "Fußball",
+          "sentence": "Wir spielen nach der Schule Fußball.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "football"
+            }
+          ]
+        },
+        {
+          "id": "draussen",
+          "word": "draußen",
+          "sentence": "Die Kinder spielen draußen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "outside"
+            }
+          ]
+        },
+        {
+          "id": "schliesslich",
+          "word": "schließlich",
+          "sentence": "Schließlich fanden wir den richtigen Weg.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "finally"
+            }
+          ]
+        },
+        {
+          "id": "fleissig",
+          "word": "fleißig",
+          "sentence": "Die Klasse übt fleißig für das Diktat.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "diligent"
+            }
+          ]
+        },
+        {
+          "id": "reissen",
+          "word": "reißen",
+          "sentence": "Die dünnen Fäden reißen leicht.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "tear"
+            }
+          ]
+        },
+        {
+          "id": "schliessen",
+          "word": "schließen",
+          "sentence": "Bitte die Fenster schließen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "close"
+            }
+          ]
+        },
+        {
+          "id": "geniessen",
+          "word": "genießen",
+          "sentence": "Wir genießen den sonnigen Tag.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "enjoy"
+            }
+          ]
+        },
+        {
+          "id": "suess",
+          "word": "süß",
+          "sentence": "Die Erdbeeren schmecken süß.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "sweet"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stumme-buchstaben-und-wortbausteine",
+      "title": "Stumme Buchstaben und Wortbausteine",
+      "entries": [
+        {
+          "id": "naemlich",
+          "word": "nämlich",
+          "sentence": "Wir brauchen nur eine Sache, nämlich Geduld.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "namely"
+            }
+          ]
+        },
+        {
+          "id": "gefaehrlich",
+          "word": "gefährlich",
+          "sentence": "Das Spielen auf der Straße ist gefährlich.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "dangerous"
+            }
+          ]
+        },
+        {
+          "id": "ehrlich",
+          "word": "ehrlich",
+          "sentence": "Bitte antworte ehrlich auf die Frage.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "honest"
+            }
+          ]
+        },
+        {
+          "id": "gewohnheit",
+          "word": "Gewohnheit",
+          "sentence": "Tägliches Lesen ist eine gute Gewohnheit.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "habit"
+            }
+          ]
+        },
+        {
+          "id": "waehrend",
+          "word": "während",
+          "sentence": "Während der Pause essen wir einen Apfel.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "during"
+            }
+          ]
+        },
+        {
+          "id": "fahrrad",
+          "word": "Fahrrad",
+          "sentence": "Mein Fahrrad steht vor dem Haus.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "bicycle"
+            }
+          ]
+        },
+        {
+          "id": "geburtstag",
+          "word": "Geburtstag",
+          "sentence": "Zu meinem Geburtstag backen wir einen Kuchen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "birthday"
+            }
+          ]
+        },
+        {
+          "id": "weihnachten",
+          "word": "Weihnachten",
+          "sentence": "An Weihnachten besuchen wir unsere Familie.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "Christmas"
+            }
+          ]
+        },
+        {
+          "id": "fruehstueck",
+          "word": "Frühstück",
+          "sentence": "Zum Frühstück esse ich Brot.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "breakfast"
+            }
+          ]
+        },
+        {
+          "id": "erwachsen",
+          "word": "erwachsen",
+          "sentence": "Wenn ich erwachsen bin, möchte ich reisen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "grown-up"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weitere-stolperwoerter",
+      "title": "Weitere Stolperwörter",
+      "entries": [
+        {
+          "id": "vielleicht",
+          "word": "vielleicht",
+          "sentence": "Vielleicht gehen wir morgen schwimmen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "perhaps"
+            }
+          ]
+        },
+        {
+          "id": "standard",
+          "word": "Standard",
+          "sentence": "Dieses Heft entspricht dem üblichen Standard.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "standard"
+            }
+          ]
+        },
+        {
+          "id": "paket",
+          "word": "Paket",
+          "sentence": "Vor der Tür liegt ein Paket.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "parcel"
+            }
+          ]
+        },
+        {
+          "id": "quittung",
+          "word": "Quittung",
+          "sentence": "Bitte bewahre die Quittung auf.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "receipt"
+            }
+          ]
+        },
+        {
+          "id": "reparatur",
+          "word": "Reparatur",
+          "sentence": "Die Reparatur des Fahrrads dauert einen Tag.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "repair"
+            }
+          ]
+        },
+        {
+          "id": "grammatik",
+          "word": "Grammatik",
+          "sentence": "Wir üben heute die deutsche Grammatik.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "grammar"
+            }
+          ]
+        },
+        {
+          "id": "katastrophe",
+          "word": "Katastrophe",
+          "sentence": "Das Hochwasser war eine Katastrophe.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "disaster"
+            }
+          ]
+        },
+        {
+          "id": "voraussetzung",
+          "word": "Voraussetzung",
+          "sentence": "Geduld ist eine wichtige Voraussetzung.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "prerequisite"
+            }
+          ]
+        },
+        {
+          "id": "ausserdem",
+          "word": "außerdem",
+          "sentence": "Wir brauchen außerdem Papier und einen Stift.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "also"
+            }
+          ]
+        },
+        {
+          "id": "morgens",
+          "word": "morgens",
+          "sentence": "Ich trinke morgens ein Glas Wasser.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "mornings"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

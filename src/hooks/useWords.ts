@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AddedWordList, LanguagePreferences, Word } from '../../shared/model'
+import type { PracticeWordList, LanguagePreferences, Word } from '../../shared/model'
 import { errorMessage } from '../lib/words'
 import { api } from '../lib/api'
 import { useI18n } from '../i18n/context'
@@ -7,7 +7,7 @@ import { useI18n } from '../i18n/context'
 export function useWords(view = 'home') {
   const { t, message } = useI18n()
   const [words, setWords] = useState<Word[]>([])
-  const [wordLists, setWordLists] = useState<AddedWordList[]>([])
+  const [wordLists, setWordLists] = useState<PracticeWordList[]>([])
   const [preferences, setPreferences] = useState<LanguagePreferences | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

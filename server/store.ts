@@ -10,7 +10,7 @@ import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from
 import { HttpError } from './errors.js'
 import { challengeSchema, recognitionSchema } from './challenge-schema.js'
 import { wordResources } from './word-resources.js'
-import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList } from '../shared/model.js'
+import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList, PracticeWordList } from '../shared/model.js'
 
 export const parentEmailSchema = z.string().trim().toLowerCase().email('Enter a valid parent email address.').max(254)
 const credentialsSchema = z.object({
@@ -142,7 +142,7 @@ function missing(error: unknown) {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }
 
-async function writeJson(file: string, data: unknown) {
+export async function writeJson(file: string, data: unknown) {
   const temp = `${file}.${randomUUID()}.tmp`
   try {
     const handle = await open(temp, 'wx', 0o600)
@@ -281,7 +281,20 @@ export class FileStore {
     return item ? { id: item.id, account: { ...item.account } } : null
   }
   words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
+  hasAccount(accountId: string): boolean { return this.state.accounts.some(account => account.id === accountId) }
   addedWordLists(accountId: string): AddedWordList[] { return structuredClone(owned(this.state, accountId).wordLists) }
+  practiceWordLists(accountId: string): PracticeWordList[] {
+    const state = owned(this.state, accountId)
+    return this.addedWordLists(accountId).map(list => {
+      const resource = wordResources.find(resource => resource.id === list.resourceId && resource.language === list.language)
+      const memberIds = new Set(list.wordIds)
+      const memberWords = state.words.filter(word => word.language === list.language && memberIds.has(word.id))
+      return { ...list, sections: (resource?.sections ?? []).filter(section => list.sectionIds.includes(section.id)).map(section => {
+        const spellings = new Set(section.entries.map(entry => entry.word.toLowerCase()))
+        return { id: section.id, title: section.title, wordIds: memberWords.filter(word => spellings.has(word.text.toLowerCase())).map(word => word.id) }
+      }) }
+    })
+  }
   challenges(accountId: string): Challenge[] { return structuredClone(owned(this.state, accountId).challenges) }
   languagePreferences(accountId: string): LanguagePreferences { return structuredClone(owned(this.state, accountId).languagePreferences) }
   websiteLanguage(accountId: string): WebsiteLanguage { return owned(this.state, accountId).websiteLanguage }

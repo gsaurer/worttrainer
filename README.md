@@ -98,6 +98,38 @@ are revoked. Other accounts are unaffected. Use an email not already registered.
 Afterward, sign in on every device with that email and the same password.
 Do not delete the data files or create a fresh account to make this change.
 
+## Word-list configurations
+
+Each server-managed word list is a separate UTF-8 JSON file in
+`server/word-lists/`, named `<list-id>.json`. The server discovers these files
+automatically in filename order and validates the complete catalog on startup.
+Adding a list does not require registering it in TypeScript. Restart the API
+after adding or editing a configuration. Invalid JSON, invalid entries, or
+duplicate IDs stop startup rather than silently dropping vocabulary.
+
+A list defines `id`, `title`, `language`, and `sections`. Each section defines
+`id`, `title`, and `entries`; each entry defines `id`, `word`, `sentence`, and
+`translations` (objects with `language` and `word`). Keep list and section IDs
+stable because imported private collections refer to them. Sentences and
+translations remain in the server catalog; importing a section adds its words
+without resetting existing progress.
+
+[MORE! Book 3](server/word-lists/more-book-3.json) contains 524 entries from the
+supplied screenshots, grouped into Units 1–14. Continuation pages `8-1`/`8-2`
+and `10-1`/`10-2` are merged in page order into their respective units, not
+separate sections. Vocabulary panels above the tables are included as well.
+English phrases, printed example sentences, and German translations are
+retained. Where no example was printed, the phrase itself fills the required
+sentence field. The 68 panel entries without printed translations use an empty
+`translations` array rather than invented translations. Select **Word lists >
+MORE! Book 3** in the app to add the desired units, then choose the book or a
+unit in **Practice from**. Re-adding units preserves existing word progress.
+
+The JSON configurations are included in the compiled server output, so the same
+files are available in the production container. These shared configurations
+are separate from private account data in `data/`; adding a configuration does
+not automatically add words to anyone's collection.
+
 ## Deploy as a container (including on Proxmox)
 
 Run Docker/Compose inside a Linux VM in your Proxmox cluster. A single application
@@ -137,6 +169,47 @@ For an explicitly trusted LAN-only HTTP installation, use its exact
 `http://host:port` as `APP_ORIGIN`, set `COOKIE_SECURE=false`, and bind the port to
 the appropriate LAN interface. HTTP does not encrypt passwords or sessions;
 HTTPS is strongly recommended even on the LAN.
+
+### Phone installation and daily reminders
+
+Open the HTTPS site on the phone and choose **Install app** from the account menu
+or Settings. Android browsers that support the native install prompt show it
+there. On iPhone/iPad, use Safari's **Share > Add to Home Screen**, then open the
+installed app. iOS/iPadOS 16.4 or later is required for Web Push. Installation
+does not enable notifications or provide offline account access; the service
+worker does not cache private pages or API responses.
+
+In **Settings > Daily reminder**, enable **Remind me on this device**, choose a
+time (default **17:00**), and allow notifications. The initial time zone comes
+from the phone and is shown explicitly; a saved zone can be changed to the
+phone's current zone when travelling. The schedule belongs to the account,
+while permission and delivery are per device. Sign-out removes this device's
+registration without disabling another device.
+
+To enable delivery on the server:
+
+1. Generate a VAPID key pair once with `npx web-push generate-vapid-keys`.
+2. Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` in the existing
+  `.env`; use a real `mailto:` contact address or HTTPS contact URL as the subject.
+  Keep the private key secret and preserve the same pair across deployments.
+  Compose forwards these settings to the container. Restart the backend after
+  changing them; leaving all three empty keeps reminders disabled.
+3. Keep one backend process running and permit outbound HTTPS to browser push
+  services. No separate cron service is required. Do not configure real keys
+  in test fixtures or commit them to Git.
+
+The backend checks once a minute and sends only if no challenge's dictation was
+finished on that account's local day; parent checking is not required. A stored
+completion still counts if its challenge is later deleted. Temporary delivery
+failures retry within the following hour; old reminders are not sent after that
+window. Delivery can be delayed or blocked by the phone, browser, or network, so
+17:00 is a target rather than a guaranteed alarm.
+
+Subscriptions, schedule, recent completion, and delivery markers are private in
+the adjacent `store.reminders.json` (or `<DATA_FILE basename>.reminders.json`).
+Back it up with the login index and matching account directory; it is not part
+of the user's word-progress export. Device endpoints are delivery credentials,
+not public URLs. No real phone notification has been verified by automated tests.
 
 ### Important JSON storage boundary
 
@@ -658,7 +731,8 @@ restoring an older backup or deleting it also rolls back that local counter.
   Startup refuses a missing index when the matching account directory is nonempty;
   restore a consistent backup instead of recreating accounts. To intentionally
   wipe an installation while stopped, the operator must remove the index **and**
-  its account directory. Existing migration/volume backups are separate copies
+  its account directory and adjacent reminder file, if present. Existing
+  migration/volume backups are separate copies
   and still contain private data until the operator removes them.
 
 Speech uses the browser's Web Speech API. A voice for each practice language must

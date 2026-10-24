@@ -10,6 +10,7 @@ import { HttpError } from './errors.js'
 import { normalizePhoto, readAzurePhoto, type OcrOptions } from './ocr.js'
 import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
 import { wordResources } from './word-resources.js'
+import { pushSubscriptionSchema, reminderScheduleSchema, type ReminderService } from './reminders.js'
 
 export type AppOptions = {
   store: FileStore
@@ -18,6 +19,7 @@ export type AppOptions = {
   production?: boolean
   trustProxy?: boolean
   ocr?: OcrOptions
+  reminders?: ReminderService
 }
 
 const cookieName = 'worttrainer_session'
@@ -150,6 +152,20 @@ export function createApp(options: AppOptions) {
   })
 
   app.get('/api/languages', requireAuth, (req, res) => { res.json(store.languagePreferences(accountId(req))) })
+  app.get('/api/reminders', requireAuth, (req, res) => {
+    const device = parse(z.string().regex(/^[a-f0-9]{64}$/).optional(), req.query.device)
+    res.json(options.reminders?.settings(accountId(req), device) ?? { time: '17:00', timeZone: 'UTC', enabled: false, deviceEnabled: false, configured: false, publicKey: null })
+  })
+  app.post('/api/reminders', requireAuth, async (req, res) => {
+    const input = parse(reminderScheduleSchema.extend({ subscription: pushSubscriptionSchema }).strict(), req.body)
+    if (!options.reminders) throw new HttpError(503, 'Daily reminders are not configured on this server.')
+    res.json(await options.reminders.configure(accountId(req), input))
+  })
+  app.delete('/api/reminders', requireAuth, async (req, res) => {
+    const input = parse(z.object({ endpoint: pushSubscriptionSchema.shape.endpoint }).strict(), req.body)
+    if (!options.reminders) throw new HttpError(503, 'Daily reminders are not configured on this server.')
+    res.json(await options.reminders.remove(accountId(req), input.endpoint))
+  })
   app.post('/api/website-language', requireAuth, async (req, res) => {
     const input = parse(z.object({ websiteLanguage: websiteLanguageSchema }).strict(), req.body)
     res.json({ websiteLanguage: await store.setWebsiteLanguage(accountId(req), input.websiteLanguage) })
@@ -158,7 +174,7 @@ export function createApp(options: AppOptions) {
     res.json(await store.setLanguagePreferences(accountId(req), parse(languagePreferencesSchema, req.body)))
   })
   app.get('/api/words', requireAuth, (req, res) => { res.json(store.words(accountId(req))) })
-  app.get('/api/word-lists', requireAuth, (req, res) => { res.json(store.addedWordLists(accountId(req))) })
+  app.get('/api/word-lists', requireAuth, (req, res) => { res.json(store.practiceWordLists(accountId(req))) })
   app.get('/api/word-resources', requireAuth, (_req, res) => { res.json(wordResources) })
   app.post('/api/word-resources/import', requireAuth, async (req, res) => {
     const input = parse(z.object({
@@ -201,7 +217,10 @@ export function createApp(options: AppOptions) {
       automatic: z.boolean(),
       action: z.enum(['next', 'previous', 'stop', 'play', 'listen']),
     }).strict(), req.body)
-    res.json(await store.advanceChallenge(accountId(req), id, input.nextIndex, input))
+    const owner = accountId(req)
+    const updated = await store.advanceChallenge(owner, id, input.nextIndex, input)
+    await options.reminders?.recordCompletion(owner, updated.writtenAt)
+    res.json(updated)
   })
   let photoReading = false
   const photoLimiter = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Please wait a minute before sending another photo.' } })
@@ -233,7 +252,10 @@ export function createApp(options: AppOptions) {
     res.json(await store.reviewChallenge(accountId(req), id, input.results, input.check))
   })
   app.delete('/api/challenges/:id', requireAuth, async (req, res) => {
-    await store.deleteChallenge(accountId(req), parse(z.uuid(), req.params.id))
+    const owner = accountId(req)
+    const id = parse(z.uuid(), req.params.id)
+    await options.reminders?.recordCompletion(owner, store.challenge(owner, id).writtenAt)
+    await store.deleteChallenge(owner, id)
     res.status(204).end()
   })
   app.use('/api', (_req, _res, next) => { next(new HttpError(404, 'Unknown API endpoint.')) })

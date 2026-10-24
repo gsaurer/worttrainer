@@ -1,0 +1,129 @@
+{
+  "id": "deutsch-im-alltag",
+  "title": "Deutsch im Alltag",
+  "language": "de",
+  "sections": [
+    {
+      "id": "in-der-schule",
+      "title": "In der Schule",
+      "entries": [
+        {
+          "id": "buch",
+          "word": "Buch",
+          "sentence": "Ich lese ein Buch.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "book"
+            }
+          ]
+        },
+        {
+          "id": "stift",
+          "word": "Stift",
+          "sentence": "Mein Stift ist blau.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "pencil"
+            }
+          ]
+        },
+        {
+          "id": "schule",
+          "word": "Schule",
+          "sentence": "Die Schule ist nah.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "school"
+            }
+          ]
+        },
+        {
+          "id": "wort",
+          "word": "Wort",
+          "sentence": "Wir lernen ein neues Wort.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "word"
+            }
+          ]
+        },
+        {
+          "id": "freund",
+          "word": "Freund",
+          "sentence": "Mein Freund liest mit mir.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "friend"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "zu-hause",
+      "title": "Zu Hause",
+      "entries": [
+        {
+          "id": "haus",
+          "word": "Haus",
+          "sentence": "Unser Haus hat einen Garten.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "house"
+            }
+          ]
+        },
+        {
+          "id": "fenster",
+          "word": "Fenster",
+          "sentence": "Das Fenster ist offen.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "window"
+            }
+          ]
+        },
+        {
+          "id": "wasser",
+          "word": "Wasser",
+          "sentence": "Ich trinke Wasser.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "water"
+            }
+          ]
+        },
+        {
+          "id": "apfel",
+          "word": "Apfel",
+          "sentence": "Der Apfel ist rot.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "apple"
+            }
+          ]
+        },
+        {
+          "id": "katze",
+          "word": "Katze",
+          "sentence": "Die Katze sitzt im Garten.",
+          "translations": [
+            {
+              "language": "en",
+              "word": "cat"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

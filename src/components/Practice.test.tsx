@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AddedWordList, Challenge, Word } from '../../shared/model'
+import type { PracticeWordList, Challenge, Word } from '../../shared/model'
 import { api } from '../lib/api'
 import { Practice } from './Practice'
 import { I18nProvider } from '../i18n/I18n'
 
 const word: Word = { id: '11111111-1111-4111-8111-111111111111', text: 'Schmetterling', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
-const list: AddedWordList = { resourceId: 'school', title: 'School list', language: 'de', sectionIds: ['animals'], wordIds: [word.id] }
+const list: PracticeWordList = { resourceId: 'school', title: 'School list', language: 'de', sectionIds: ['animals'], wordIds: [word.id], sections: [{ id: 'animals', title: 'Animals', wordIds: [word.id] }] }
 const challenge: Challenge = { id: '22222222-2222-4222-8222-222222222222', startedAt: word.created_at, writtenAt: null, reviewedAt: null, nextIndex: 0, words: [{ id: word.id, text: word.text, language: word.language, attemptId: '33333333-3333-4333-8333-333333333333' }], recognition: null, results: null, telemetry: [], check: null, photo: null }
 beforeEach(() => {
   vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn(), speak: vi.fn() })
@@ -17,6 +17,103 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('whole-challenge dictation', () => {
+  it('offers list sections directly in Practice from and starts only the chosen section', async () => {
+    const user = userEvent.setup()
+    const other: Word = { ...word, id: 'home-word', text: 'Fenster' }
+    const create = vi.spyOn(api, 'createChallenge').mockResolvedValue(challenge)
+    render(<Practice words={[word, other]} wordLists={[{ ...list, wordIds: [word.id, other.id], sections: [...list.sections, { id: 'home', title: 'At home', wordIds: [other.id] }] }]} loading={false} onUpdated={vi.fn()} />)
+    const source = screen.getByRole('combobox', { name: 'Practice from' })
+    const section = within(source).getByRole('option', { name: 'Animals · 1 word' })
+    expect(within(source).getByRole('group', { name: 'School list' })).toContainElement(section)
+    expect(within(source).getByRole('option', { name: 'School list · 2 words' })).toBeInTheDocument()
+    await user.selectOptions(source, section)
+    expect(screen.getByText('Deutsch · All categories · School list · Animals · 1 available')).toBeVisible()
+    await user.click(await screen.findByRole('button', { name: 'Start 15 words' }))
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    expect(create).toHaveBeenCalledExactlyOnceWith([word.id])
+  })
+
+  it('uses saved unchecked challenge history to avoid repeating words while other words are unused', async () => {
+    const user = userEvent.setup()
+    const words = Array.from({ length: 20 }, (_, index) => ({ ...word, id: `rotation-${index}`, text: `Word-${index}` }))
+    vi.mocked(api.challengeStatus).mockResolvedValue({ challenges: [{ ...challenge, words: words.slice(0, 10).map(item => ({ id: item.id, text: item.text, language: item.language, attemptId: `attempt-${item.id}` })) }], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
+    const create = vi.spyOn(api, 'createChallenge').mockResolvedValue(challenge)
+    render(<Practice words={words} loading={false} onUpdated={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: 'Start 10 words' }))
+    expect(create).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    expect(create).toHaveBeenCalledExactlyOnceWith(expect.arrayContaining(words.slice(10).map(item => item.id)))
+    expect(create.mock.calls[0][0]).toHaveLength(10)
+  })
+
+  it.each(['all', 'minus'])('starts only owned words from the selected section and %s category', async category => {
+    const user = userEvent.setup()
+    const difficult: Word = { ...word, id: 'difficult', text: 'Straße', category: 'minus', consecutive_mistakes: 2 }
+    const otherSection: Word = { ...word, id: 'home-word', text: 'Fenster' }
+    const outsideList: Word = { ...word, id: 'outside-list', text: 'Baum' }
+    const create = vi.spyOn(api, 'createChallenge').mockResolvedValue(challenge)
+    render(<Practice words={[word, difficult, otherSection, outsideList]} wordLists={[{
+      ...list, wordIds: [word.id, difficult.id, otherSection.id], sections: [
+        { id: 'animals', title: 'Animals', wordIds: [word.id, difficult.id, 'deleted-word', outsideList.id] },
+        { id: 'home', title: 'At home', wordIds: [otherSection.id] },
+        { id: 'empty', title: 'Empty section', wordIds: ['deleted-word'] },
+      ],
+    }]} loading={false} onUpdated={vi.fn()} />)
+    const filters = screen.getByRole('group', { name: 'Filter words' })
+    const source = within(filters).getByRole('combobox', { name: 'Practice from' })
+    expect(within(filters).getByRole('combobox', { name: 'Language' })).toBeVisible()
+    expect(screen.queryByRole('combobox', { name: 'Section' })).not.toBeInTheDocument()
+    expect(source).toHaveValue('')
+    expect(within(source).getAllByRole('option').map(option => option.textContent)).toEqual(['All my words', 'School list · 3 words', 'Animals · 2 words', 'At home · 1 word'])
+    expect(within(filters).getAllByRole('combobox').map(select => select.id)).toEqual(['practice-language', 'practice-source', 'practice-category'])
+    await user.selectOptions(source, within(source).getByRole('option', { name: 'Animals · 2 words' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), category)
+    await user.click(screen.getByRole('button', { name: 'Start 15 words' }))
+    expect(screen.getByRole('heading', { name: 'Ready to write?' })).toBeVisible()
+    expect(create).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    const expected = category === 'all' ? [word.id, difficult.id] : [difficult.id]
+    expect(create).toHaveBeenCalledExactlyOnceWith(expect.arrayContaining(expected))
+    expect(create.mock.calls[0][0]).toHaveLength(expected.length)
+  })
+
+  it('resets the section when switching lists or languages and falls back safely after word deletion', async () => {
+    const user = userEvent.setup()
+    const home: Word = { ...word, id: 'home-word', text: 'Fenster' }
+    const school: PracticeWordList = { ...list, wordIds: [word.id, home.id], sections: [...list.sections, { id: 'home', title: 'At home', wordIds: [home.id] }] }
+    const lists = [school, { ...school, resourceId: 'second', title: 'Second list' }]
+    const { rerender } = render(<Practice words={[word, home]} wordLists={lists} loading={false} onUpdated={vi.fn()} />)
+    const source = screen.getByRole('combobox', { name: 'Practice from' })
+    const animals = (title: string) => within(within(source).getByRole('group', { name: title })).getByRole('option', { name: 'Animals · 1 word' })
+    await user.selectOptions(source, animals('School list'))
+    expect(screen.getByText('Deutsch · All categories · School list · Animals · 1 available')).toBeVisible()
+    await user.selectOptions(source, 'school')
+    expect(screen.getByText('Deutsch · All categories · School list · 2 available')).toBeVisible()
+    await user.selectOptions(source, animals('School list'))
+    await user.selectOptions(source, 'second')
+    expect(source).toHaveDisplayValue('Second list · 2 words')
+    await user.selectOptions(source, animals('Second list'))
+    expect(screen.getByText('Deutsch · All categories · Second list · Animals · 1 available')).toBeVisible()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en')
+    expect(source).toHaveValue('')
+    await user.selectOptions(source, 'school')
+    expect(source).toHaveDisplayValue('School list · 2 words')
+    await user.selectOptions(source, animals('School list'))
+    rerender(<Practice words={[home]} wordLists={lists} loading={false} onUpdated={vi.fn()} />)
+    expect(source).toHaveValue('school')
+    expect(screen.queryByRole('option', { name: /Animals/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Deutsch · All categories · School list · 1 available')).toBeVisible()
+  })
+
+  it('localizes section selection for the German website', async () => {
+    const user = userEvent.setup()
+    render(<I18nProvider language="de"><Practice words={[word]} wordLists={[list]} loading={false} onUpdated={vi.fn()} /></I18nProvider>)
+    const source = screen.getByRole('combobox', { name: 'Üben mit' })
+    expect(within(source).getAllByRole('option').map(option => option.textContent)).toEqual(['Alle meine Wörter', 'School list · 1 Wort', 'Animals · 1 Wort'])
+    await user.selectOptions(source, within(source).getByRole('option', { name: 'Animals · 1 Wort' }))
+    expect(source).toHaveDisplayValue('Animals · 1 Wort')
+  })
+
   it('hides the source picker without an added list containing available words', async () => {
     const { rerender } = render(<Practice words={[word]} loading={false} onUpdated={vi.fn()} />)
     await screen.findByRole('button', { name: 'Start 15 words' })
@@ -33,7 +130,7 @@ describe('whole-challenge dictation', () => {
     render(<Practice words={[word, difficult, unrelated]} wordLists={[{ ...list, wordIds: [word.id, difficult.id, 'deleted-word'] }]} loading={false} onUpdated={vi.fn()} />)
     const source = screen.getByRole('combobox', { name: 'Practice from' })
     expect(source).toHaveValue('')
-    expect(within(source).getAllByRole('option').map(option => option.textContent)).toEqual(['All my words', 'School list · 2 words'])
+    expect(within(source).getAllByRole('option').map(option => option.textContent)).toEqual(['All my words', 'School list · 2 words', 'Animals · 1 word'])
     expect(screen.getByText('Deutsch · All categories · 3 available')).toBeVisible()
     await user.selectOptions(source, list.resourceId)
     await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), category)
@@ -50,7 +147,7 @@ describe('whole-challenge dictation', () => {
   it('selects the list language and falls back to all words on language changes or disablement', async () => {
     const user = userEvent.setup()
     const english: Word = { ...word, id: 'english-word', text: 'book', language: 'en' }
-    const lists: AddedWordList[] = [list, { ...list, resourceId: 'english', title: 'English list', language: 'en', wordIds: [english.id] }, { ...list, resourceId: 'french', title: 'Disabled list', language: 'fr' }]
+    const lists: PracticeWordList[] = [list, { ...list, resourceId: 'english', title: 'English list', language: 'en', wordIds: [english.id] }, { ...list, resourceId: 'french', title: 'Disabled list', language: 'fr' }]
     const { rerender } = render(<Practice words={[word, english]} wordLists={lists} loading={false} onUpdated={vi.fn()} />)
     const source = screen.getByRole('combobox', { name: 'Practice from' })
     expect(within(source).queryByRole('option', { name: /Disabled list/ })).not.toBeInTheDocument()
@@ -69,7 +166,7 @@ describe('whole-challenge dictation', () => {
   it('translates the source picker and word counts for the German website', async () => {
     render(<I18nProvider language="de"><Practice words={[word]} wordLists={[list]} loading={false} onUpdated={vi.fn()} /></I18nProvider>)
     const source = screen.getByRole('combobox', { name: 'Üben mit' })
-    expect(within(source).getAllByRole('option').map(option => option.textContent)).toEqual(['Alle meine Wörter', 'School list · 1 Wort'])
+    expect(within(source).getAllByRole('option').map(option => option.textContent)).toEqual(['Alle meine Wörter', 'School list · 1 Wort', 'Animals · 1 Wort'])
     await act(async () => {})
   })
 

@@ -5,6 +5,7 @@ import App from './App'
 import { api } from './lib/api'
 import type { AuthState, Challenge, Word } from '../shared/model'
 import { initialLanguagePreferences } from '../shared/languages'
+import * as pwa from './lib/pwa'
 
 const anonymous = { authenticated: false, emailMigrationRequired: false, email: null }
 const account = { authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' }
@@ -21,10 +22,41 @@ beforeEach(() => {
   vi.spyOn(api, 'words').mockResolvedValue([])
   vi.spyOn(api, 'addedWordLists').mockResolvedValue([])
   vi.spyOn(api, 'languagePreferences').mockResolvedValue(initialLanguagePreferences())
+  vi.spyOn(api, 'reminderSettings').mockResolvedValue({ configured: false, publicKey: null, enabled: false, deviceEnabled: false, time: '17:00', timeZone: 'UTC' })
   vi.spyOn(api, 'challengeStatus').mockResolvedValue({ challenges: [], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
 })
 
 describe('public registration and private account state', () => {
+  it('removes this device from reminders before signing out without changing another device', async () => {
+    const user = userEvent.setup()
+    const unsubscribe = vi.fn(async () => true)
+    const endpoint = 'https://fcm.googleapis.com/test'
+    vi.spyOn(pwa, 'currentPushSubscription').mockResolvedValue({ endpoint, unsubscribe } as unknown as PushSubscription)
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    vi.spyOn(api, 'removeReminder').mockImplementation(async () => { expect(unsubscribe).not.toHaveBeenCalled() })
+    vi.spyOn(api, 'logout').mockImplementation(async () => { expect(unsubscribe).toHaveBeenCalledOnce() })
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Account menu' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(api.logout).toHaveBeenCalledOnce())
+    expect(api.removeReminder).toHaveBeenCalledWith(endpoint)
+  })
+
+  it('keeps sign-out retryable if device reminder removal fails', async () => {
+    const user = userEvent.setup()
+    const unsubscribe = vi.fn(async () => true)
+    vi.spyOn(pwa, 'currentPushSubscription').mockResolvedValue({ endpoint: 'https://fcm.googleapis.com/test', unsubscribe } as unknown as PushSubscription)
+    vi.spyOn(api, 'session').mockResolvedValue(account)
+    vi.spyOn(api, 'removeReminder').mockRejectedValue(new Error('Connection lost'))
+    vi.spyOn(api, 'logout').mockResolvedValue(undefined)
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Account menu' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sign out: Connection lost')
+    expect(api.logout).not.toHaveBeenCalled()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
   it('opens progress and complete challenge history in Progress without cluttering Home or Collection', async () => {
     const user = userEvent.setup()
     const timestamp = '2026-10-23T12:00:00Z'
@@ -39,7 +71,7 @@ describe('public registration and private account state', () => {
     vi.spyOn(api, 'words').mockResolvedValue(words)
     vi.spyOn(api, 'challengeStatus').mockResolvedValue({ challenges: [pending, checked], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
     render(<App />)
-    await screen.findByRole('heading', { name: 'Continue learning' })
+    await screen.findByRole('heading', { name: 'Ready to check' })
     expect(screen.queryByRole('button', { name: /sync|refresh/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Challenge progress' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'View results' })).not.toBeInTheDocument()
@@ -141,7 +173,7 @@ describe('public registration and private account state', () => {
     expect(screen.getByText('book, pencil')).toBeVisible()
     expect(screen.queryByText('I read a book.')).not.toBeInTheDocument()
     vi.mocked(api.words).mockResolvedValue([added, existing])
-    vi.mocked(api.addedWordLists).mockResolvedValue([{ resourceId: 'english', title: 'Everyday English', language: 'en', sectionIds: ['school'], wordIds: [existing.id, added.id] }])
+    vi.mocked(api.addedWordLists).mockResolvedValue([{ resourceId: 'english', title: 'Everyday English', language: 'en', sectionIds: ['school'], wordIds: [existing.id, added.id], sections: [{ id: 'school', title: 'At school', wordIds: [existing.id, added.id] }] }])
     await user.click(screen.getByRole('button', { name: 'Add selected words' }))
     expect(imported).toHaveBeenCalledWith('english', ['school'], false)
     expect(await screen.findByRole('status')).toHaveTextContent('1 added, 1 already in your collection.')
@@ -164,7 +196,7 @@ describe('public registration and private account state', () => {
       id: 'english', title: 'English list', language: 'en', sections: [{ id: 'school', title: 'At school', entries: [{ id: 'book', word: 'book', sentence: 'I read a book.', translations: [] }] }],
     }])
     const imported = vi.spyOn(api, 'importWordResource').mockImplementation(async () => {
-      vi.mocked(api.addedWordLists).mockResolvedValue([{ resourceId: 'english', title: 'English list', language: 'en', sectionIds: ['school'], wordIds: [existing.id] }])
+      vi.mocked(api.addedWordLists).mockResolvedValue([{ resourceId: 'english', title: 'English list', language: 'en', sectionIds: ['school'], wordIds: [existing.id], sections: [{ id: 'school', title: 'At school', wordIds: [existing.id] }] }])
       return { added: 0, existing: 1, language: 'en' }
     })
     render(<App />)

@@ -33,6 +33,10 @@ export type AddedWordList = {
   wordIds: string[]
 }
 
+export type PracticeWordList = AddedWordList & {
+  sections: { id: string; title: string; wordIds: string[] }[]
+}
+
 export type Word = {
   id: string
   text: string

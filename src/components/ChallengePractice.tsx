@@ -79,12 +79,11 @@ function ChallengeStatistics({ challenges }: { challenges: Challenge[] }) {
   </section>
 }
 
-export function ChallengePractice({ words, onUpdated, loading = false, filters, sourcePicker, selectionLabel, onActiveChange, view = 'practice' }: {
+export function ChallengePractice({ words, onUpdated, loading = false, filters, selectionLabel, onActiveChange, view = 'practice' }: {
   words: Word[]
   onUpdated: () => Promise<void>
   loading?: boolean
   filters?: ReactNode
-  sourcePicker?: ReactNode
   selectionLabel?: string
   onActiveChange?: (active: boolean) => void
   view?: 'practice' | 'statistics'
@@ -296,10 +295,9 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
       {!reporting && historySections[0]}
       {!reporting && <div className="photo-intro">
         <h2>{t('Start a challenge')}</h2>
-        {sourcePicker && <fieldset className="practice-source" disabled={busy || loading}>{sourcePicker}</fieldset>}
         <p className="selection-summary">{selectionLabel && <>{selectionLabel} · </>}{loading ? t('Loading…') : t('{count} available', { count: words.length })}</p>
         <div className="challenge-starts" role="group" aria-label={t('Start a challenge')}>
-          {challengeSizes.map(size => <button key={size} className={`button ${size === 15 ? 'primary' : 'secondary'}`} aria-label={t('Start {count} words', { count: size })} aria-describedby={shortChallenge ? 'challenge-size-note' : undefined} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => { setPreparedWords(selectPracticeWords(words, size)); onActiveChange?.(true) }}><strong>{size}</strong><span>{t('words')}</span></button>)}
+          {challengeSizes.map(size => <button key={size} className={`button ${size === 15 ? 'primary' : 'secondary'}`} aria-label={t('Start {count} words', { count: size })} aria-describedby={shortChallenge ? 'challenge-size-note' : undefined} disabled={busy || loading || !status || !words.length || !speech.supported} onClick={() => { setPreparedWords(selectPracticeWords(words, size, status?.challenges)); onActiveChange?.(true) }}><strong>{size}</strong><span>{t('words')}</span></button>)}
         </div>
         {shortChallenge && <p className="challenge-size-note" id="challenge-size-note">{t(words.length === 1 ? 'Uses up to {count} available word, without repeats.' : 'Uses up to {count} available words, without repeats.', { count: words.length })}</p>}
         {filters && <fieldset className="challenge-filters" aria-label={t('Filter words')} disabled={busy || loading}>{filters}</fieldset>}

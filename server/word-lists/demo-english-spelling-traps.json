@@ -1,0 +1,587 @@
+{
+  "id": "demo-english-spelling-traps",
+  "title": "Demo: English spelling traps (50 words)",
+  "language": "en",
+  "sections": [
+    {
+      "id": "double-letters",
+      "title": "Double letters",
+      "entries": [
+        {
+          "id": "accommodate",
+          "word": "accommodate",
+          "sentence": "The hall can accommodate our whole class.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "unterbringen"
+            }
+          ]
+        },
+        {
+          "id": "beginning",
+          "word": "beginning",
+          "sentence": "Read the beginning of the story.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Anfang"
+            }
+          ]
+        },
+        {
+          "id": "committee",
+          "word": "committee",
+          "sentence": "The committee meets on Friday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Ausschuss"
+            }
+          ]
+        },
+        {
+          "id": "embarrass",
+          "word": "embarrass",
+          "sentence": "I did not mean to embarrass my friend.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "blamieren"
+            }
+          ]
+        },
+        {
+          "id": "necessary",
+          "word": "necessary",
+          "sentence": "A warm coat is necessary in winter.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "notwendig"
+            }
+          ]
+        },
+        {
+          "id": "occasion",
+          "word": "occasion",
+          "sentence": "We baked a cake for the occasion.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Anlass"
+            }
+          ]
+        },
+        {
+          "id": "occurrence",
+          "word": "occurrence",
+          "sentence": "Snow in April is a rare occurrence here.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Vorkommen"
+            }
+          ]
+        },
+        {
+          "id": "recommend",
+          "word": "recommend",
+          "sentence": "Can you recommend a good book?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "empfehlen"
+            }
+          ]
+        },
+        {
+          "id": "tomorrow",
+          "word": "tomorrow",
+          "sentence": "We will visit the library tomorrow.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "morgen"
+            }
+          ]
+        },
+        {
+          "id": "successful",
+          "word": "successful",
+          "sentence": "Our first attempt was successful.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erfolgreich"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vowels-and-letter-order",
+      "title": "Vowels and letter order",
+      "entries": [
+        {
+          "id": "believe",
+          "word": "believe",
+          "sentence": "I believe you can solve this puzzle.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "glauben"
+            }
+          ]
+        },
+        {
+          "id": "receive",
+          "word": "receive",
+          "sentence": "We receive a letter every week.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erhalten"
+            }
+          ]
+        },
+        {
+          "id": "achieve",
+          "word": "achieve",
+          "sentence": "Daily practice helps us achieve our goals.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "erreichen"
+            }
+          ]
+        },
+        {
+          "id": "friend",
+          "word": "friend",
+          "sentence": "My friend walks to school with me.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Freund"
+            }
+          ]
+        },
+        {
+          "id": "piece",
+          "word": "piece",
+          "sentence": "Please give me a piece of paper.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Stück"
+            }
+          ]
+        },
+        {
+          "id": "weird",
+          "word": "weird",
+          "sentence": "We heard a weird noise outside.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "seltsam"
+            }
+          ]
+        },
+        {
+          "id": "ceiling",
+          "word": "ceiling",
+          "sentence": "The lamp hangs from the ceiling.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zimmerdecke"
+            }
+          ]
+        },
+        {
+          "id": "foreign",
+          "word": "foreign",
+          "sentence": "Learning a foreign language takes practice.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "fremd"
+            }
+          ]
+        },
+        {
+          "id": "separate",
+          "word": "separate",
+          "sentence": "Keep the clean clothes in a separate bag.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "getrennt"
+            }
+          ]
+        },
+        {
+          "id": "definite",
+          "word": "definite",
+          "sentence": "We need a definite answer today.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "eindeutig"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "silent-letters",
+      "title": "Silent letters",
+      "entries": [
+        {
+          "id": "answer",
+          "word": "answer",
+          "sentence": "Write your answer on the next line.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Antwort"
+            }
+          ]
+        },
+        {
+          "id": "business",
+          "word": "business",
+          "sentence": "My aunt runs a small business.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Geschäft"
+            }
+          ]
+        },
+        {
+          "id": "debt",
+          "word": "debt",
+          "sentence": "He paid his debt last month.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Schuld"
+            }
+          ]
+        },
+        {
+          "id": "doubt",
+          "word": "doubt",
+          "sentence": "I have no doubt that you will succeed.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Zweifel"
+            }
+          ]
+        },
+        {
+          "id": "february",
+          "word": "February",
+          "sentence": "February is the shortest month.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Februar"
+            }
+          ]
+        },
+        {
+          "id": "island",
+          "word": "island",
+          "sentence": "We took a boat to the island.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Insel"
+            }
+          ]
+        },
+        {
+          "id": "knowledge",
+          "word": "knowledge",
+          "sentence": "Reading helps us gain knowledge.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Wissen"
+            }
+          ]
+        },
+        {
+          "id": "receipt",
+          "word": "receipt",
+          "sentence": "Keep the receipt after you pay.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Quittung"
+            }
+          ]
+        },
+        {
+          "id": "wednesday",
+          "word": "Wednesday",
+          "sentence": "Our next lesson is on Wednesday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Mittwoch"
+            }
+          ]
+        },
+        {
+          "id": "government",
+          "word": "government",
+          "sentence": "The government announced a new plan.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Regierung"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "longer-words",
+      "title": "Longer words",
+      "entries": [
+        {
+          "id": "beautiful",
+          "word": "beautiful",
+          "sentence": "The garden is full of beautiful flowers.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "schön"
+            }
+          ]
+        },
+        {
+          "id": "calendar",
+          "word": "calendar",
+          "sentence": "Mark the date on your calendar.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Kalender"
+            }
+          ]
+        },
+        {
+          "id": "environment",
+          "word": "environment",
+          "sentence": "We can all help protect the environment.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Umwelt"
+            }
+          ]
+        },
+        {
+          "id": "excellent",
+          "word": "excellent",
+          "sentence": "You did an excellent job today.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "ausgezeichnet"
+            }
+          ]
+        },
+        {
+          "id": "experience",
+          "word": "experience",
+          "sentence": "The camping trip was a new experience.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Erfahrung"
+            }
+          ]
+        },
+        {
+          "id": "independent",
+          "word": "independent",
+          "sentence": "She is becoming more independent.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "selbstständig"
+            }
+          ]
+        },
+        {
+          "id": "interested",
+          "word": "interested",
+          "sentence": "I am interested in learning about space.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "interessiert"
+            }
+          ]
+        },
+        {
+          "id": "privilege",
+          "word": "privilege",
+          "sentence": "It is a privilege to play for the team.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Privileg"
+            }
+          ]
+        },
+        {
+          "id": "restaurant",
+          "word": "restaurant",
+          "sentence": "We had dinner at a small restaurant.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Restaurant"
+            }
+          ]
+        },
+        {
+          "id": "temperature",
+          "word": "temperature",
+          "sentence": "The temperature will rise this afternoon.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Temperatur"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "everyday-tricky-words",
+      "title": "Everyday tricky words",
+      "entries": [
+        {
+          "id": "because",
+          "word": "because",
+          "sentence": "We stayed inside because it was raining.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "weil"
+            }
+          ]
+        },
+        {
+          "id": "definitely",
+          "word": "definitely",
+          "sentence": "I will definitely come to your party.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "definitiv"
+            }
+          ]
+        },
+        {
+          "id": "different",
+          "word": "different",
+          "sentence": "Try solving the puzzle in a different way.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "anders"
+            }
+          ]
+        },
+        {
+          "id": "enough",
+          "word": "enough",
+          "sentence": "We have enough chairs for everyone.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "genug"
+            }
+          ]
+        },
+        {
+          "id": "exercise",
+          "word": "exercise",
+          "sentence": "Finish the exercise before the bell rings.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Übung"
+            }
+          ]
+        },
+        {
+          "id": "grammar",
+          "word": "grammar",
+          "sentence": "We learn grammar in our language lesson.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Grammatik"
+            }
+          ]
+        },
+        {
+          "id": "guarantee",
+          "word": "guarantee",
+          "sentence": "The shop offers a guarantee on the bicycle.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Garantie"
+            }
+          ]
+        },
+        {
+          "id": "language",
+          "word": "language",
+          "sentence": "Which language would you like to learn?",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Sprache"
+            }
+          ]
+        },
+        {
+          "id": "surprise",
+          "word": "surprise",
+          "sentence": "We planned a surprise for her birthday.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "Überraschung"
+            }
+          ]
+        },
+        {
+          "id": "until",
+          "word": "until",
+          "sentence": "Please wait here until I return.",
+          "translations": [
+            {
+              "language": "de",
+              "word": "bis"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

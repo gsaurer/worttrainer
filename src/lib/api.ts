@@ -1,5 +1,6 @@
 import type { AccountDataExport, AuthState, Language, LanguagePreferences, NavigationTiming, Challenge, ChallengeStatus, ChallengeCheckInput, WebsiteLanguage, Word } from '../../shared/model'
-import type { AddedWordList, ResourceImport, WordResource } from '../../shared/model'
+import type { PracticeWordList, ResourceImport, WordResource } from '../../shared/model'
+import type { DevicePushSubscription, ReminderSchedule, ReminderSettings } from '../../shared/reminders'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -34,8 +35,11 @@ export const api = {
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),
   words: () => request<Word[]>('/words', 'GET', undefined, true),
-  addedWordLists: () => request<AddedWordList[]>('/word-lists', 'GET', undefined, true),
+  addedWordLists: () => request<PracticeWordList[]>('/word-lists', 'GET', undefined, true),
   languagePreferences: () => request<LanguagePreferences>('/languages', 'GET', undefined, true),
+  reminderSettings: (device?: string) => request<ReminderSettings>(`/reminders${device ? `?device=${encodeURIComponent(device)}` : ''}`, 'GET', undefined, true),
+  saveReminder: (schedule: ReminderSchedule & { subscription: DevicePushSubscription }) => request<ReminderSettings>('/reminders', 'POST', schedule, true),
+  removeReminder: (endpoint: string) => request<void>('/reminders', 'DELETE', { endpoint }, true),
   saveLanguagePreferences: (preferences: LanguagePreferences) => request<LanguagePreferences>('/languages', 'POST', preferences, true),
   exportData: () => request<AccountDataExport>('/export', 'GET', undefined, true),
   addWord: (text: string, language: Language) => request<Word>('/words', 'POST', { text, language }, true),

@@ -1,4 +1,4 @@
-import type { Category, Word } from '../../shared/model'
+import type { Category, Challenge, Word } from '../../shared/model'
 export { validateWord } from '../../shared/model'
 export { languages } from '../../shared/languages'
 
@@ -17,10 +17,23 @@ export function shuffled(words: Word[]): Word[] {
   return result
 }
 
-export function selectPracticeWords(words: Word[], size: number): Word[] {
+export function selectPracticeWords(words: Word[], size: number, challenges: readonly Challenge[] = []): Word[] {
   const count = Math.min(Math.max(0, Math.floor(size)), words.length)
+  const lastActivity = new Map(words.map(word => [word.id, word.last_practiced_at === null ? -Infinity : Date.parse(word.last_practiced_at)]))
+  for (const challenge of challenges) {
+    const startedAt = Date.parse(challenge.startedAt)
+    for (const word of challenge.words) {
+      const previous = lastActivity.get(word.id)
+      if (previous !== undefined) lastActivity.set(word.id, Math.max(previous, startedAt))
+    }
+  }
+  const byLastActivity = (left: Word, right: Word) => {
+    const leftTime = lastActivity.get(left.id)!
+    const rightTime = lastActivity.get(right.id)!
+    return leftTime === rightTime ? 0 : leftTime < rightTime ? -1 : 1
+  }
   const groups: Record<Category, Word[]> = { new: [], minus: [], plus: [] }
-  for (const word of shuffled(words)) groups[word.category].push(word)
+  for (const word of shuffled(words).sort(byLastActivity)) groups[word.category].push(word)
   const defaultCount = Math.ceil(count / 2)
   const plusCount = Math.floor(count / 10)
   const selected = [
@@ -28,7 +41,7 @@ export function selectPracticeWords(words: Word[], size: number): Word[] {
     ...groups.minus.splice(0, count - defaultCount - plusCount),
     ...groups.plus.splice(0, plusCount),
   ]
-  const priority = shuffled([...groups.new, ...groups.minus])
+  const priority = shuffled([...groups.new, ...groups.minus]).sort(byLastActivity)
   selected.push(...priority.slice(0, count - selected.length))
   selected.push(...groups.plus.slice(0, count - selected.length))
   return shuffled(selected)

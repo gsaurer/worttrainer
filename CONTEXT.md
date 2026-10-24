@@ -37,6 +37,12 @@ Sentences and translations are retained centrally for future vocabulary training
 not used in current dictation. Enabling a disabled resource language requires
 explicit consent and does not change the account's default language.
 
+**Practice source**:
+The **Practice from** menu groups each added list's whole-list choice and named
+sections together. Selecting a section restricts the challenge to that section's
+owned words; the separate learning-category filter still applies. Selection does
+not add words or change their shared progress.
+
 **Enabled language**:
 A language a parent account has chosen for adding words and starting new challenges.
 Disabling it keeps its existing words, progress, and saved challenges.
@@ -79,3 +85,9 @@ A challenge that prioritizes Default and − words, with occasional + words for
 reinforcement, targeting 50% Default, 40% −, and 10% +. Missing groups are filled
 from available words without repeats; an explicit category filter restricts the
 challenge to that category.
+
+Within each category, words never used or checked come first, followed by those
+least recently used or checked. Selection uses the later of the last confirmed
+check and the most recent saved challenge start, including unchecked challenges.
+Equal-priority words and the final dictation order are randomized. This rotates
+through the available words without changing the category mix or word progress.
