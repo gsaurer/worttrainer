@@ -19,7 +19,7 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
   const [loadError, setLoadError] = useState('')
   const [language, setLanguage] = useState<Language | 'all'>('all')
   const [resourceId, setResourceId] = useState('')
-  const [sectionIds, setSectionIds] = useState<string[]>([])
+  const [selection, setSelection] = useState<{ resourceId: string; sectionIds: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -37,16 +37,17 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
 
   const available = resources.filter(resource => language === 'all' || resource.language === language)
   const resource = available.find(resource => resource.id === resourceId) ?? available.find(resource => resource.language === preferences.defaultLanguage) ?? available[0]
+  const addedList = wordLists.find(list => list.resourceId === resource?.id)
+  const sectionIds = selection && selection.resourceId === resource?.id ? selection.sectionIds : addedList?.sectionIds ?? []
   const selected = resource?.sections.filter(section => sectionIds.includes(section.id)) ?? []
   const spellings = new Set(selected.flatMap(section => section.entries.map(entry => entry.word.toLowerCase())))
   const existing = new Set(words.filter(word => word.language === resource?.language).map(word => word.text.toLowerCase()))
   const missing = [...spellings].filter(word => !existing.has(word)).length
-  const addedList = wordLists.find(list => list.resourceId === resource?.id)
   const unregisteredSections = selected.some(section => !addedList?.sectionIds.includes(section.id))
   const enabled = resource ? preferences.enabled.includes(resource.language) : false
   const allSelected = !!resource && selected.length === resource.sections.length
 
-  function resetSelection() { setSectionIds([]); setError(''); setNotice('') }
+  function resetSelection() { setSelection(null); setError(''); setNotice('') }
 
   async function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -56,8 +57,9 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
     setError('')
     setNotice('')
     try {
-      const result = await api.importWordResource(resource.id, sectionIds, !enabled)
+      const result = await api.importWordResource(resource.id, selected.map(section => section.id), !enabled)
       await onUpdated()
+      setSelection(null)
       setNotice(t('{added} added, {existing} already in your collection.', result))
     } catch (error) { setError(errorMessage(error)) }
     finally { importing.current = false; setSaving(false) }
@@ -82,10 +84,10 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
         <div className="resource-section-heading"><h2><BookOpen size={22} />{resource.title}</h2><span>{languages[resource.language].name}</span></div>
         <fieldset className="resource-sections" disabled={saving}>
           <legend className="visually-hidden">{t('Sections')}</legend>
-          <label className="resource-section-choice resource-select-all"><input type="checkbox" checked={allSelected} ref={input => { if (input) input.indeterminate = selected.length > 0 && !allSelected }} onChange={event => { setSectionIds(event.target.checked ? resource.sections.map(section => section.id) : []); setNotice(''); setError('') }} />{t('All sections')}</label>
+          <label className="resource-section-choice resource-select-all"><input type="checkbox" checked={allSelected} ref={input => { if (input) input.indeterminate = selected.length > 0 && !allSelected }} onChange={event => { setSelection({ resourceId: resource.id, sectionIds: event.target.checked ? resource.sections.map(section => section.id) : [] }); setNotice(''); setError('') }} />{t('All sections')}</label>
           {resource.sections.map(section => <div key={section.id} className="resource-section">
             <label className="resource-section-choice"><input type="checkbox" checked={sectionIds.includes(section.id)} onChange={event => {
-              setSectionIds(previous => event.target.checked ? [...previous, section.id] : previous.filter(id => id !== section.id))
+              setSelection({ resourceId: resource.id, sectionIds: event.target.checked ? [...sectionIds, section.id] : sectionIds.filter(id => id !== section.id) })
               setNotice(''); setError('')
             }} /><span dir="auto">{section.title}</span><span className="resource-count">{t('Words: {count}', { count: section.entries.length })}</span></label>
             <details><summary>{t('Preview words')}</summary><p lang={resource.language} dir="auto">{section.entries.map(entry => entry.word).join(', ')}</p></details>

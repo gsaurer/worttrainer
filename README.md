@@ -26,7 +26,7 @@ The file is ignored by Git and excluded from Docker builds. The example leaves
 deployment-specific overrides commented, so copying it preserves local defaults.
 Restart the API after editing `.env` to load the new values.
 
-Open **http://localhost:5182**. The API runs on `127.0.0.1:3002`; Vite proxies
+Open **[http://localhost:5182](http://localhost:5182)**. The API runs on `127.0.0.1:3002`; Vite proxies
 `/api` to it. Choose **Create account**, enter your parent email, and choose a
 password (12–128 characters). There is no setup token, invitation, default
 password, or mock login. Registration is public wherever the app is reachable.
@@ -42,7 +42,7 @@ The development server is loopback-only by default.
 
 ### Active development
 
-Keep one `npm run dev` instance running at **http://localhost:5182** and reuse
+Keep one `npm run dev` instance running at **[http://localhost:5182](http://localhost:5182)** and reuse
 the same account and data. Vite reloads frontend changes and the API watcher
 restarts on server changes; a production build or a new container is not needed
 for each iteration. Do not start another preview or reset the collection to try
@@ -114,13 +114,13 @@ stable because imported private collections refer to them. Sentences and
 translations remain in the server catalog; importing a section adds its words
 without resetting existing progress.
 
-[MORE! Book 3](server/word-lists/more-book-3.json) contains 524 entries from the
-supplied screenshots, grouped into Units 1–14. Continuation pages `8-1`/`8-2`
-and `10-1`/`10-2` are merged in page order into their respective units, not
+[MORE! Book 3](server/word-lists/more-book-3.json) contains 599 entries from 19
+supplied screenshots, grouped into Units 1–14. Continuation pages for Units 4,
+5, 6, 8, and 10 are merged in page order into their respective units, not
 separate sections. Vocabulary panels above the tables are included as well.
 English phrases, printed example sentences, and German translations are
 retained. Where no example was printed, the phrase itself fills the required
-sentence field. The 68 panel entries without printed translations use an empty
+sentence field. The 143 entries without printed translations use an empty
 `translations` array rather than invented translations. Select **Word lists >
 MORE! Book 3** in the app to add the desired units, then choose the book or a
 unit in **Practice from**. Re-adding units preserves existing word progress.
@@ -143,7 +143,7 @@ docker compose up --build -d
 docker compose logs worttrainer
 ```
 
-Open **http://localhost:3000**, choose **Create account**, and register.
+Open **[http://localhost:3000](http://localhost:3000)**, choose **Create account**, and register.
 Compose defaults bind to host loopback and allow HTTP cookies **only for
 this local preview**.
 
@@ -169,6 +169,49 @@ For an explicitly trusted LAN-only HTTP installation, use its exact
 `http://host:port` as `APP_ORIGIN`, set `COOKIE_SECURE=false`, and bind the port to
 the appropriate LAN interface. HTTP does not encrypt passwords or sessions;
 HTTPS is strongly recommended even on the LAN.
+
+### Before a wider release
+
+Run the release checks from a clean dependency install:
+
+```sh
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm audit --omit=dev
+docker build -t worttrainer:0.1.0 .
+```
+
+Review every dependency advisory rather than using `npm audit fix --force`.
+The current lockfile includes `body-parser` 2.3.0, affected by
+[GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828).
+Both JSON and photo parsers disable request decompression (`inflate: false`),
+the advisory's documented workaround. Compressed requests return HTTP 415;
+the app sends uncompressed requests. The audit still reports this dependency
+and Express. Upgrade to a patched compatible parser as soon as one is available
+from the configured registry; do not downgrade Express to silence the report.
+
+Before inviting users:
+
+- Confirm redistribution rights for every bundled word list. The MORE! Book 3
+  catalog was transcribed from supplied textbook screenshots; its presence here
+  does not establish permission to distribute it. Do not distribute that catalog
+  without confirming permission.
+- Publish an operator contact and privacy information covering account details,
+  practice history, retained handwriting photos, optional Azure processing, and
+  device reminder registrations. Establish a process for account/data deletion;
+  there is no self-service account deletion or email-based password recovery.
+- Use the exact HTTPS `APP_ORIGIN`, secure cookies, and a trusted reverse proxy
+  with the backend inaccessible directly. Registration is public and email
+  ownership is not verified.
+- Back up the entire data directory and verify recovery into an isolated volume.
+  Keep one backend process per volume; this first version is not designed for
+  multiple replicas or large public-service workloads.
+- Check sign-in, list import, dictation, manual review, and export on the target
+  desktop and phone browsers. Verify installed dictation voices and, if enabled,
+  physical camera capture, Azure reading, and real device notifications.
 
 ### Phone installation and daily reminders
 
@@ -449,6 +492,11 @@ the same language are skipped case-insensitively, keeping their progress and
 history. Repeated or concurrent imports do not create duplicates. Different
 accounts import independently; the catalog itself is not editable by users.
 
+Reopening a list restores that account's previously imported section selections.
+Unsaved checkbox changes do not remove words or saved memberships. A successful
+import adds to the saved selection; switching lists restores each list's own
+saved sections.
+
 On **Home**, **Practice from** defaults to **All my words**. Added lists appear
 with their available word counts; only imported sections and words still in your
 collection are included. Selecting a list selects its language and narrows the
@@ -461,9 +509,10 @@ words already exist, to register the list for practice. This adds no duplicates 
 does not reset progress. Repeated imports accumulate selected sections and share
 the same word records, including spellings already entered manually.
 
-The central catalog lives in `server/word-resources.ts`, initially with original
-English, German, and French starter lists. Maintain books/resources there and
-rebuild/restart the server to publish changes. Each resource has a stable `id`,
+The central catalog is loaded by `server/word-resources.ts` from the individual
+JSON files in `server/word-lists/`, including English, German, and French starter
+lists. Maintain books/resources in those JSON files and rebuild/restart the
+server to publish changes. Each resource has a stable `id`,
 `title`, `language`, and `sections`; each section has an `id`, `title`, and
 `entries`. An entry contains `id`, `word`, `sentence`, and a `translations` array
 of `{ language, word }` pairs (empty when no translation is available). Catalog

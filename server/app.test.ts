@@ -3,6 +3,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash, randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { brotliCompressSync, deflateSync, gzipSync } from 'node:zlib'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
@@ -90,6 +92,33 @@ describe('real self-hosted authentication and JSON persistence', () => {
     await post('/api/words', { text: 'word', language: 'xx' }).expect(400)
     await post('/api/words', { text: 'word', language: 'fr' }).expect(409)
     for (const text of ['', ' ', 'a\nb', 'a'.repeat(81)]) await post('/api/words', { text, language: 'en' }).expect(400)
+  })
+
+  it('rejects compressed JSON and photo bodies without changing data and keeps serving requests', async () => {
+    const before = store.words(accountId)
+    const body = Buffer.from(JSON.stringify({ text: 'compressed', language: 'en' }))
+    const server = createApp({ ...options(), ocr: { endpoint: 'https://test.cognitiveservices.azure.com', key: 'test-only-key', monthlyLimit: 450 } }).listen(0, '127.0.0.1')
+    try {
+      await once(server, 'listening')
+      const address = server.address()
+      if (!address || typeof address === 'string') throw new Error('Expected a temporary HTTP port.')
+      for (const [encoding, compressed] of [
+        ['gzip', gzipSync(body)], ['deflate', deflateSync(body)], ['br', brotliCompressSync(body)],
+      ] as const) {
+        for (const [path, contentType] of [['/api/words', 'application/json'], [`/api/challenges/${randomUUID()}/photo`, 'image/jpeg']]) {
+          const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
+            method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': contentType, 'Content-Encoding': encoding },
+            body: new Uint8Array(compressed),
+          })
+          expect(response.status).toBe(415)
+          expect(await response.json()).toEqual({ error: 'Compressed request bodies are not supported.' })
+          await request(server).get('/api/health').expect(200).expect({ ok: true })
+        }
+      }
+      expect(store.words(accountId)).toEqual(before)
+    } finally {
+      await new Promise<void>((resolve, reject) => { server.close(error => error ? reject(error) : resolve()) })
+    }
   })
 
   it('starts words in Default with no attempt, normalizes edges and prevents same-language duplicates', async () => {

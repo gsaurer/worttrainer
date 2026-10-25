@@ -181,9 +181,79 @@ describe('public registration and private account state', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }))
     await user.type(screen.getByRole('searchbox', { name: 'Search words' }), 'pencil')
     expect(screen.getByText('pencil')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Word lists' }))
+    expect(await screen.findByRole('checkbox', { name: /At school/ })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /At home/ })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'All sections' })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Add selected words' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Back to collection' }))
     await user.click(screen.getByRole('button', { name: 'Home' }))
     expect(await screen.findByRole('combobox', { name: 'Practice from' })).toHaveValue('')
     expect(screen.getByRole('option', { name: 'Everyday English · 2 words' })).toBeInTheDocument()
+  })
+
+  it('restores saved sections per list and account without overwriting pending changes', async () => {
+    const user = userEvent.setup()
+    const book: Word = { id: 'book', text: 'book', language: 'en', category: 'plus', consecutive_mistakes: 0, created_at: '2026-10-23T12:00:00Z', last_practiced_at: null }
+    const house: Word = { ...book, id: 'house', text: 'house', category: 'new' }
+    const maison: Word = { ...book, id: 'maison', text: 'maison', language: 'fr' }
+    const savedLists: Awaited<ReturnType<typeof api.addedWordLists>> = [
+      { resourceId: 'english', title: 'English list', language: 'en', sectionIds: ['school'], wordIds: [book.id], sections: [{ id: 'school', title: 'At school', wordIds: [book.id] }] },
+      { resourceId: 'french', title: 'French list', language: 'fr', sectionIds: ['home'], wordIds: [maison.id], sections: [{ id: 'home', title: 'At home', wordIds: [maison.id] }] },
+    ]
+    vi.mocked(api.session).mockResolvedValue(account)
+    vi.mocked(api.words).mockResolvedValue([book, maison])
+    vi.mocked(api.addedWordLists).mockResolvedValue(savedLists)
+    vi.mocked(api.languagePreferences).mockResolvedValue({ enabled: ['en', 'fr'], defaultLanguage: 'en' })
+    vi.spyOn(api, 'wordResources').mockResolvedValue([
+      { id: 'english', title: 'English list', language: 'en', sections: [
+        { id: 'school', title: 'At school', entries: [{ id: 'book', word: 'book', sentence: 'A book.', translations: [] }] },
+        { id: 'home', title: 'At home', entries: [{ id: 'house', word: 'house', sentence: 'A house.', translations: [] }] },
+      ] },
+      { id: 'french', title: 'French list', language: 'fr', sections: [
+        { id: 'school', title: 'At school', entries: [{ id: 'livre', word: 'livre', sentence: 'Un livre.', translations: [] }] },
+        { id: 'home', title: 'At home', entries: [{ id: 'maison', word: 'maison', sentence: 'Une maison.', translations: [] }] },
+      ] },
+    ])
+    const imported = vi.spyOn(api, 'importWordResource').mockImplementation(async () => {
+      vi.mocked(api.words).mockResolvedValue([book, maison, house])
+      vi.mocked(api.addedWordLists).mockResolvedValue([
+        { ...savedLists[0], sectionIds: ['school', 'home'], wordIds: [book.id, house.id], sections: [...savedLists[0].sections, { id: 'home', title: 'At home', wordIds: [house.id] }] },
+        savedLists[1],
+      ])
+      return { added: 1, existing: 0, language: 'en' }
+    })
+    render(<App />)
+    await openCollection(user)
+    await user.click(screen.getByRole('button', { name: 'Word lists' }))
+    expect(await screen.findByRole('checkbox', { name: /At school/ })).toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /At school/ }))
+    expect(screen.getByRole('button', { name: 'Add selected words' })).toBeDisabled()
+    const reads = vi.mocked(api.addedWordLists).mock.calls.length
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    await waitFor(() => expect(api.addedWordLists).toHaveBeenCalledTimes(reads + 1))
+    expect(screen.getByRole('checkbox', { name: /At school/ })).not.toBeChecked()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Word list' }), 'french')
+    expect(screen.getByRole('checkbox', { name: /At school/ })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /At home/ })).toBeChecked()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en')
+    expect(screen.getByRole('checkbox', { name: /At school/ })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /At home/ })).not.toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /At school/ }))
+    await user.click(screen.getByRole('checkbox', { name: /At home/ }))
+    await user.click(screen.getByRole('button', { name: 'Add selected words' }))
+    expect(imported).toHaveBeenCalledWith('english', ['home'], false)
+    expect(await screen.findByRole('status')).toHaveTextContent('1 added, 0 already in your collection.')
+    expect(screen.getByRole('checkbox', { name: 'All sections' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Add selected words' })).toBeDisabled()
+    vi.mocked(api.session).mockResolvedValue({ ...account, email: 'other@example.com' })
+    vi.mocked(api.words).mockResolvedValue([])
+    vi.mocked(api.addedWordLists).mockResolvedValue([])
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    await openCollection(user)
+    await user.click(screen.getByRole('button', { name: 'Word lists' }))
+    expect(await screen.findByRole('checkbox', { name: /At school/ })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /At home/ })).not.toBeChecked()
   })
 
   it('registers an older all-existing import for practice without duplicating its words', async () => {

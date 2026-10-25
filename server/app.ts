@@ -61,7 +61,7 @@ export function createApp(options: AppOptions) {
     }
     next()
   })
-  app.use(express.json({ limit: '16kb', strict: true }))
+  app.use(express.json({ limit: '16kb', strict: true, inflate: false }))
 
   const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Wait 15 minutes and try again.' } })
   let passwordWork = 0
@@ -227,7 +227,7 @@ export function createApp(options: AppOptions) {
   const photoAvailable: express.RequestHandler = (_req, _res, next) => {
     next(options.ocr ? undefined : new HttpError(503, 'Automatic photo reading needs an Azure Free/F0 endpoint and key. You can still review the sheet manually.'))
   }
-  app.post('/api/challenges/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb' }), async (req, res) => {
+  app.post('/api/challenges/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb', inflate: false }), async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
     const owner = accountId(req)
     const challenge = store.challenge(owner, id)
@@ -266,6 +266,7 @@ export function createApp(options: AppOptions) {
     if (error instanceof HttpError) { res.status(error.status).json({ error: error.message }); return }
     if (error instanceof SyntaxError && 'body' in error) { res.status(400).json({ error: 'Invalid JSON request.' }); return }
     if (error instanceof Error && 'type' in error && error.type === 'entity.too.large') { res.status(413).json({ error: 'Request is too large.' }); return }
+    if (error instanceof Error && 'type' in error && error.type === 'encoding.unsupported') { res.status(415).json({ error: 'Compressed request bodies are not supported.' }); return }
     console.error('Request failed', error)
     res.status(500).json({ error: 'The server could not save or load your data. Please retry; check the server logs if this continues.' })
   }

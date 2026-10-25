@@ -213,6 +213,45 @@ describe('centrally managed word resources', () => {
     expect(store.languagePreferences(second.id).enabled).not.toContain('fr')
   })
 
+  it('keeps concurrent overlapping list imports unique per account and language after restart', async () => {
+    const existing = await store.addWord(first.id, 'BOOK', 'en')
+    const otherLanguage = await store.addWord(first.id, 'BOOK', 'de')
+    await store.mark(first.id, existing.id, true, randomUUID())
+    const before = store.words(first.id).find(word => word.id === existing.id)
+    const resources = wordResources.filter(resource => resource.language === 'en')
+    const spellings = new Set(resources.flatMap(resource => resource.sections.flatMap(section => section.entries.map(entry => entry.word.toLowerCase()))))
+    const responses = await Promise.all(resources.flatMap(resource => {
+      const input = { resourceId: resource.id, sectionIds: resource.sections.map(section => section.id), enableLanguage: false }
+      return [post('/api/word-resources/import', input), post('/api/word-resources/import', input)]
+    }))
+    expect(responses.map(response => response.status)).toEqual(Array(resources.length * 2).fill(200))
+    expect(responses.reduce((total, response) => total + response.body.added, 0)).toBe(spellings.size - 1)
+    const words = store.words(first.id)
+    expect(words).toHaveLength(spellings.size + 1)
+    expect(new Set(words.map(word => `${word.language}:${word.text.toLowerCase()}`)).size).toBe(words.length)
+    expect(words.find(word => word.id === existing.id)).toEqual(before)
+    expect(words.find(word => word.id === otherLanguage.id)).toEqual(otherLanguage)
+    await post('/api/words', { text: 'book', language: 'en' }).expect(409)
+    const lists = (await get('/api/word-lists').expect(200)).body
+    expect(lists).toHaveLength(resources.length)
+    for (const resource of resources) {
+      const list = store.practiceWordLists(first.id).find(list => list.resourceId === resource.id)!
+      const unique = new Set(resource.sections.flatMap(section => section.entries.map(entry => entry.word.toLowerCase())))
+      expect(list.sectionIds).toEqual(resource.sections.map(section => section.id))
+      expect(list.wordIds).toHaveLength(unique.size)
+      expect(new Set(list.wordIds).size).toBe(unique.size)
+      expect(list.wordIds).not.toContain(otherLanguage.id)
+      const input = { resourceId: resource.id, sectionIds: list.sectionIds, enableLanguage: false }
+      await post('/api/word-resources/import', input).expect(200).expect({ added: 0, existing: unique.size, language: 'en' })
+    }
+    const reopened = await FileStore.open(file)
+    expect(reopened.words(first.id)).toEqual(words)
+    expect(reopened.practiceWordLists(first.id)).toEqual(lists)
+    expect(reopened.exportData(first.id).attempts).toHaveLength(1)
+    expect(reopened.words(second.id)).toEqual([])
+    expect(reopened.practiceWordLists(second.id)).toEqual([])
+  })
+
   it('rejects unauthenticated, forged, invalid, foreign-section and cross-origin imports without writes', async () => {
     const input = { resourceId: 'everyday-english', sectionIds: ['at-school'], enableLanguage: false }
     const accountFile = join(directory, 'store.accounts', `${first.id}.json`)
