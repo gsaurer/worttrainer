@@ -147,19 +147,31 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
       </div>}
     </div></header>
     <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' || tab === 'resources' || tab === 'document' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>
-    <main className={showPageTitle ? undefined : 'workspace-content'}>
+    <main className={tab === 'settings' ? 'settings-page' : showPageTitle ? undefined : 'workspace-content'}>
       {showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>}
       {authError && <p className="error" role="alert">{t('Could not sign out: {error}', { error: message(authError) })}</p>}
       {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>{t('Retry loading')}</button></div>}
       {tab === 'settings' ? <div className="settings-layout">
-        <div>{preferences ? <LanguageSettings preferences={preferences} onSave={saveLanguages} onSaved={() => setTab('home')} /> : !error && <p role="status">{t('Loading your languages…')}</p>}</div>
-        <div className="settings-secondary">
-          <InstallWebApp />
-          <ReminderSettings />
-          <WebsiteLanguageSettings onSaved={onWebsiteLanguageSaved} />
-          <ConnectedApps />
-          <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
-          <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
+        <nav className="settings-navigation" aria-label={t('Settings sections')}>
+          <a href="#settings-languages">{t('Language preferences')}</a>
+          <a href="#settings-device">{t('This device')}</a>
+          <a href="#settings-connections">{t('Connected apps')}</a>
+          <a href="#settings-account">{t('Account')}</a>
+        </nav>
+        <div className="settings-content">
+          <div id="settings-languages" className="settings-group" role="group" aria-label={t('Language preferences')}>
+            <WebsiteLanguageSettings onSaved={onWebsiteLanguageSaved} />
+            {preferences ? <LanguageSettings preferences={preferences} onSave={saveLanguages} /> : !error && <p role="status">{t('Loading your languages…')}</p>}
+          </div>
+          <div id="settings-device" className="settings-group" role="group" aria-label={t('This device')}>
+            <InstallWebApp />
+            <ReminderSettings />
+          </div>
+          <div id="settings-connections" className="settings-group"><ConnectedApps /></div>
+          <div id="settings-account" className="settings-group" role="group" aria-label={t('Account')}>
+            <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
+            <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
+          </div>
         </div>
       </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'resources' ? <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'document' ? <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'collection' ? <>{documentEnabled && <button className="text-button resource-command" onClick={() => setTab('document')}><FileCheck2 size={18} />{t('Check my document')}</button>}<Collection words={words} loading={loading} refresh={refresh} preferences={preferences} onOpenWordLists={() => setTab('resources')} /></> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} /> : <div className="home-actions">
         <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} />

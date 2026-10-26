@@ -118,7 +118,7 @@ export type AccountDataExport = {
   languagePreferences: LanguagePreferences
   websiteLanguage: WebsiteLanguage
   words: Word[]
-  attempts: { id: string; wordId: string; correct: boolean; createdAt: string }[]
+  attempts: { id: string; wordId: string; correct: boolean; createdAt: string; spelling?: string }[]
   challenges: Challenge[]
   wordLists: AddedWordList[]
   statistics: ReturnType<typeof challengeStatistics>

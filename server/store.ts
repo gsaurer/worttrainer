@@ -4,7 +4,7 @@ import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import { nextProgress, challengeStatistics, validateWord, type AccountDataExport, type Language, type LanguagePreferences, type WebsiteLanguage, type Word } from '../shared/model.js'
+import { nextProgress, challengeStatistics, validateWord, type AccountDataExport, type Category, type Language, type LanguagePreferences, type WebsiteLanguage, type Word } from '../shared/model.js'
 import { initialLanguagePreferences } from '../shared/languages.js'
 import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
 import { HttpError } from './errors.js'
@@ -43,7 +43,7 @@ const wordListsSchema = z.array(z.object({
 }).strict())
 const collectionShape = {
   words: z.array(wordSchema),
-  attempts: z.array(z.object({ id: z.uuid(), wordId: z.uuid(), correct: z.boolean(), createdAt: z.string().datetime() }).strict()),
+  attempts: z.array(z.object({ id: z.uuid(), wordId: z.uuid(), correct: z.boolean(), createdAt: z.string().datetime(), spelling: z.string().trim().min(1).max(1000).optional() }).strict()),
   challenges: z.array(challengeSchema).default([]),
   wordLists: wordListsSchema.default([]),
 }
@@ -578,17 +578,26 @@ export class FileStore {
     })
   }
 
-  mark(accountId: string, wordId: string, correct: boolean, attemptId: string) {
+  moveWord(accountId: string, wordId: string, category: Category) {
+    return this.accountTransaction(accountId, state => {
+      const word = state.words.find(word => word.id === wordId)
+      if (!word) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
+      if (word.category !== category) Object.assign(word, { category, consecutive_mistakes: 0 })
+      return { ...word }
+    })
+  }
+
+  mark(accountId: string, wordId: string, correct: boolean, attemptId: string, spelling?: string) {
     return this.accountTransaction(accountId, state => {
       const word = state.words.find(word => word.id === wordId)
       if (!word) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
       const existing = state.attempts.find(attempt => attempt.id === attemptId)
       if (existing) {
-        if (existing.wordId !== wordId || existing.correct !== correct) throw new HttpError(409, 'This attempt ID already belongs to another answer.')
+        if (existing.wordId !== wordId || existing.correct !== correct || existing.spelling !== spelling) throw new HttpError(409, 'This attempt ID already belongs to another answer.')
         return { ...word }
       }
       Object.assign(word, nextProgress(word, correct, state.attempts), { last_practiced_at: new Date().toISOString() })
-      state.attempts.push({ id: attemptId, wordId, correct, createdAt: word.last_practiced_at! })
+      state.attempts.push({ id: attemptId, wordId, correct, createdAt: word.last_practiced_at!, ...(spelling === undefined ? {} : { spelling }) })
       return { ...word }
     })
   }

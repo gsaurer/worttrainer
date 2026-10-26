@@ -85,6 +85,47 @@ function createWordServer(store: FileStore, accountId: string, scopes: string[],
       return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The word could not be saved. Please retry.' }] }
     }
   })
+  server.registerTool('worttrainer_move_word', {
+    title: 'Move a Worttrainer word',
+    description: 'Move an existing word in the authenticated account to new (Default), plus or minus. This explicitly overrides its category without recording a practice attempt or changing its last-practiced time. Changing category resets the consecutive-mistake counter; previous attempts and correct-result history are preserved. Moving to the current category does nothing. Use worttrainer_get_words to find the word ID.',
+    inputSchema: z.object({
+      wordId: z.uuid().describe('ID of an existing word in this account.'),
+      category: z.enum(['new', 'plus', 'minus']).describe('Target category: new means Default, plus means learned, minus means needs practice.'),
+    }).strict(),
+    outputSchema: z.object({ word: wordSchema }),
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
+  }, async ({ wordId, category }) => {
+    const denied = scopeError('words:write')
+    if (denied) return denied
+    try {
+      const output = { word: await store.moveWord(accountId, wordId, category) }
+      return { content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent: output }
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The word could not be moved. Please retry.' }] }
+    }
+  })
+  server.registerTool('worttrainer_record_mistake', {
+    title: 'Record a Worttrainer spelling mistake',
+    description: 'Record one confirmed incorrect practice result for an existing word in the authenticated account. Optionally include spelling with exactly what was written incorrectly; the correct word text is never replaced. Applies normal progress rules: plus returns to Default on a mistake and two consecutive mistakes lead to minus. Requires a fresh UUID attemptId for each real attempt; reuse that same ID and spelling on retries to avoid counting twice. Do not use for unconfirmed recognition or a category-only move. Use worttrainer_get_words to find the word ID.',
+    inputSchema: z.object({
+      wordId: z.uuid().describe('ID of the existing correct word in this account.'),
+      attemptId: z.uuid().describe('Unique UUID for this confirmed attempt. Reuse unchanged when retrying this same attempt.'),
+      spelling: z.string().trim().min(1).max(1000).optional().describe('Optional actual incorrect spelling, not a correction or explanation. Omit if unknown.'),
+    }).strict(),
+    outputSchema: z.object({ word: wordSchema, attemptId: z.uuid() }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
+  }, async ({ wordId, attemptId, spelling }) => {
+    const denied = scopeError('words:write')
+    if (denied) return denied
+    try {
+      const output = { word: await store.mark(accountId, wordId, false, attemptId, spelling), attemptId }
+      return { content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent: output }
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The mistake could not be saved. Retry with the same attempt ID and spelling.' }] }
+    }
+  })
   return server
 }
 

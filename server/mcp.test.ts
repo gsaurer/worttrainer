@@ -110,6 +110,8 @@ describe('web connector OAuth', () => {
   })
 
   it('allows a read-only grant without permitting writes', async () => {
+    const word = await store.addWord(firstId, 'butterfly', 'en')
+    const before = store.exportData(firstId)
     const flow = await startOAuth('words:read')
     const exchange = await consentOAuth(flow)
     const token = await request(app).post('/api/oauth/token').type('form').send(exchange).expect(200)
@@ -117,7 +119,16 @@ describe('web connector OAuth', () => {
     const denied = await call(token.body.access_token, 'worttrainer_add_word', { text: 'unauthorized', language: 'en' }).expect(200)
     expect(denied.body.result).toMatchObject({ isError: true })
     expect(denied.body.result._meta['mcp/www_authenticate'][0]).toContain('words:write')
-    expect(store.words(firstId)).toEqual([])
+    for (const [name, args] of [
+      ['worttrainer_move_word', { wordId: word.id, category: 'minus' }],
+      ['worttrainer_record_mistake', { wordId: word.id, attemptId: randomUUID(), spelling: 'buterfly' }],
+    ] as const) {
+      const response = await call(token.body.access_token, name, args).expect(200)
+      expect(response.body.result.isError).toBe(true)
+      expect(response.body.result._meta['mcp/www_authenticate'][0]).toContain('words:write')
+    }
+    expect(store.words(firstId)).toEqual(before.words)
+    expect(store.exportData(firstId).attempts).toEqual(before.attempts)
   })
 
   it('requires same-origin explicit consent and preserves state when the user declines', async () => {
@@ -269,9 +280,16 @@ describe('account-scoped Streamable HTTP MCP', () => {
     expect(initialized.body.result.serverInfo.name).toBe('worttrainer-mcp-server')
     expect(initialized.headers['mcp-session-id']).toBeUndefined()
     const response = await rpc(token, 'tools/list').expect(200)
-    expect(response.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word'])
+    expect(response.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word', 'worttrainer_move_word', 'worttrainer_record_mistake'])
     expect(response.body.result.tools[0]).toMatchObject({ inputSchema: { type: 'object' }, outputSchema: { type: 'object' }, annotations: { readOnlyHint: true } })
     expect(response.body.result.tools[1]).toMatchObject({ annotations: { readOnlyHint: false, destructiveHint: false } })
+    for (const tool of response.body.result.tools.slice(2)) {
+      expect(tool).toMatchObject({
+        inputSchema: { type: 'object', additionalProperties: false }, outputSchema: { type: 'object' },
+        annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
+      })
+    }
     await request(app).post('/api/mcp').set('Host', host).set('Authorization', `Bearer ${token}`)
       .set('Accept', 'application/json, text/event-stream')
       .send({ jsonrpc: '2.0', method: 'notifications/initialized' }).expect(202)
@@ -313,6 +331,105 @@ describe('account-scoped Streamable HTTP MCP', () => {
     const reopened = await FileStore.open(join(directory, 'store.json'))
     expect(reopened.words(firstId)).toContainEqual(response.body.result.structuredContent.word)
     expect(reopened.sessionAccount(digest(token))).toBe(firstId)
+  })
+
+  it('moves words between categories without fabricating attempts or changing practice time', async () => {
+    const word = await store.addWord(firstId, 'butterfly', 'en')
+    await store.mark(firstId, word.id, false, randomUUID())
+    await store.mark(firstId, word.id, false, randomUUID())
+    const before = store.exportData(firstId)
+    const token = await issue()
+    for (const category of ['plus', 'minus', 'new']) {
+      const response = await call(token, 'worttrainer_move_word', { wordId: word.id, category }).expect(200)
+      expect(response.body.result.isError).not.toBe(true)
+      expect(response.body.result.structuredContent.word).toEqual({ ...before.words[0], category, consecutive_mistakes: 0 })
+      expect(store.exportData(firstId).attempts).toEqual(before.attempts)
+    }
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.words(firstId)[0]).toEqual({ ...before.words[0], category: 'new', consecutive_mistakes: 0 })
+  })
+
+  it('records wrong spellings persistently with normal progress and retry-safe attempt IDs', async () => {
+    const word = await store.addWord(firstId, 'butterfly', 'en')
+    for (let index = 0; index < 3; index++) await store.mark(firstId, word.id, true, randomUUID())
+    const token = await issue()
+    const attemptId = randomUUID()
+    const args = { wordId: word.id, attemptId, spelling: 'buterfly' }
+    const first = await call(token, 'worttrainer_record_mistake', args).expect(200)
+    expect(first.body.result.isError).not.toBe(true)
+    expect(first.body.result.structuredContent.word).toMatchObject({ text: 'butterfly', category: 'new', consecutive_mistakes: 1 })
+    const beforeRetry = store.exportData(firstId)
+    const retries = await Promise.all([
+      call(token, 'worttrainer_record_mistake', args).expect(200),
+      call(token, 'worttrainer_record_mistake', args).expect(200),
+    ])
+    for (const retry of retries) expect(retry.body.result.structuredContent).toEqual(first.body.result.structuredContent)
+    expect(store.exportData(firstId).attempts).toEqual(beforeRetry.attempts)
+    expect(store.words(firstId)).toEqual(beforeRetry.words)
+    const conflict = await call(token, 'worttrainer_record_mistake', { ...args, spelling: 'butterfli' }).expect(200)
+    expect(conflict.body.result.isError).toBe(true)
+    const second = await call(token, 'worttrainer_record_mistake', { ...args, attemptId: randomUUID() }).expect(200)
+    expect(second.body.result.structuredContent.word).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.exportData(firstId).attempts.slice(-2)).toEqual([
+      { id: attemptId, wordId: word.id, correct: false, spelling: 'buterfly', createdAt: first.body.result.structuredContent.word.last_practiced_at },
+      { id: second.body.result.structuredContent.attemptId, wordId: word.id, correct: false, spelling: 'buterfly', createdAt: second.body.result.structuredContent.word.last_practiced_at },
+    ])
+    expect(reopened.words(firstId)[0]).toEqual(second.body.result.structuredContent.word)
+  })
+
+  it('preserves a current category on repeated moves and allows mistakes without a known spelling', async () => {
+    const word = await store.addWord(firstId, 'butterfly', 'en')
+    const token = await issue()
+    const attemptId = randomUUID()
+    const first = await call(token, 'worttrainer_record_mistake', { wordId: word.id, attemptId }).expect(200)
+    expect(first.body.result.structuredContent.word).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
+    const unchanged = await call(token, 'worttrainer_move_word', { wordId: word.id, category: 'new' }).expect(200)
+    expect(unchanged.body.result.structuredContent.word).toEqual(first.body.result.structuredContent.word)
+    const retry = await call(token, 'worttrainer_record_mistake', { wordId: word.id, attemptId }).expect(200)
+    expect(retry.body.result.structuredContent).toEqual(first.body.result.structuredContent)
+    const second = await call(token, 'worttrainer_record_mistake', { wordId: word.id, attemptId: randomUUID() }).expect(200)
+    expect(second.body.result.structuredContent.word).toMatchObject({ category: 'minus', consecutive_mistakes: 2 })
+    expect(store.exportData(firstId).attempts).toHaveLength(2)
+    expect(store.exportData(firstId).attempts[0]).not.toHaveProperty('spelling')
+  })
+
+  it('rejects foreign and missing words, invalid mutation inputs and reused attempt payloads without changes', async () => {
+    const word = await store.addWord(firstId, 'butterfly', 'en')
+    const other = await store.addWord(secondId, 'private word', 'en')
+    const existingAttempt = randomUUID()
+    await store.mark(firstId, word.id, true, existingAttempt)
+    const before = store.exportData(firstId)
+    const otherBefore = store.exportData(secondId)
+    const token = await issue()
+    const attemptId = randomUUID()
+    const move = { wordId: word.id, category: 'minus' }
+    const mistake = { wordId: word.id, attemptId, spelling: 'buterfly' }
+    for (const wordId of [other.id, randomUUID()]) {
+      const moved = await call(token, 'worttrainer_move_word', { ...move, wordId }).expect(200)
+      const recorded = await call(token, 'worttrainer_record_mistake', { ...mistake, wordId }).expect(200)
+      expect(moved.body.result).toMatchObject({ isError: true, content: [{ type: 'text', text: 'Word not found. Sync your collection and try again.' }] })
+      expect(recorded.body.result).toEqual(moved.body.result)
+    }
+    for (const args of [
+      { ...move, wordId: 'invalid' }, { ...move, category: 'default' }, { ...move, category: '' },
+      { ...move, accountId: secondId }, { wordId: word.id },
+    ]) {
+      const response = await call(token, 'worttrainer_move_word', args).expect(200)
+      expect(response.body.result.isError).toBe(true)
+    }
+    for (const args of [
+      { ...mistake, wordId: 'invalid' }, { ...mistake, attemptId: 'invalid' }, { wordId: word.id },
+      { ...mistake, spelling: '   ' }, { ...mistake, spelling: 'a'.repeat(1001) }, { ...mistake, spelling: null },
+      { ...mistake, accountId: secondId }, { ...mistake, correct: true }, { ...mistake, attemptId: existingAttempt },
+    ]) {
+      const response = await call(token, 'worttrainer_record_mistake', args).expect(200)
+      expect(response.body.result.isError).toBe(true)
+    }
+    expect(store.words(firstId)).toEqual(before.words)
+    expect(store.exportData(firstId).attempts).toEqual(before.attempts)
+    expect(store.words(secondId)).toEqual(otherBefore.words)
+    expect(store.exportData(secondId).attempts).toEqual(otherBefore.attempts)
   })
 
   it('rejects invalid words, disabled languages, duplicates and account overrides without writes', async () => {
@@ -393,12 +510,19 @@ describe('account-scoped Streamable HTTP MCP', () => {
       const url = new URL(`http://127.0.0.1:${address.port}/api/mcp`)
       await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }))
       const tools = await client.listTools()
-      expect(tools.tools.map(tool => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word'])
+      expect(tools.tools.map(tool => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word', 'worttrainer_move_word', 'worttrainer_record_mistake'])
       const added = await client.callTool({ name: 'worttrainer_add_word', arguments: { text: 'client word', language: 'en' } })
       expect(added.isError).not.toBe(true)
       expect(added.structuredContent).toMatchObject({ word: { text: 'client word', category: 'new' } })
       const listed = await client.callTool({ name: 'worttrainer_get_words', arguments: { language: 'en' } })
       expect(listed.structuredContent).toMatchObject({ total: 1, words: [{ text: 'client word' }], hasMore: false })
+      const wordId = store.words(firstId)[0].id
+      const moved = await client.callTool({ name: 'worttrainer_move_word', arguments: { wordId, category: 'plus' } })
+      expect(moved.structuredContent).toMatchObject({ word: { text: 'client word', category: 'plus' } })
+      const attemptId = randomUUID()
+      const mistaken = await client.callTool({ name: 'worttrainer_record_mistake', arguments: { wordId, attemptId, spelling: 'clint word' } })
+      expect(mistaken.structuredContent).toMatchObject({ attemptId, word: { text: 'client word', category: 'new', consecutive_mistakes: 1 } })
+      expect(store.exportData(firstId).attempts[0]).toMatchObject({ id: attemptId, spelling: 'clint word', correct: false })
       const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
       const malformed = await fetch(url, { method: 'POST', headers, body: '{broken' })
       expect(malformed.status).toBe(400)
@@ -412,7 +536,7 @@ describe('account-scoped Streamable HTTP MCP', () => {
       })
       expect(compressed.status).toBe(415)
       expect(await compressed.json()).toEqual({ error: 'Compressed request bodies are not supported.' })
-      expect((await client.listTools()).tools).toHaveLength(2)
+      expect((await client.listTools()).tools).toHaveLength(4)
     } finally {
       await client.close()
       await new Promise<void>((resolve, reject) => { server.close(error => error ? reject(error) : resolve()) })

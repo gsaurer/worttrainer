@@ -28,6 +28,28 @@ beforeEach(() => {
 })
 
 describe('public registration and private account state', () => {
+  it('groups settings by purpose and keeps language saves on the settings page', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.session).mockResolvedValue(account)
+    vi.spyOn(api, 'saveLanguagePreferences').mockResolvedValue(initialLanguagePreferences())
+    render(<App />)
+    await openSettings(user)
+    const navigation = screen.getByRole('navigation', { name: 'Settings sections' })
+    expect(within(navigation).getAllByRole('link').map(link => link.textContent)).toEqual(['Language preferences', 'This device', 'Connected apps', 'Account'])
+    const languages = screen.getByRole('group', { name: 'Language preferences' })
+    expect(within(languages).getByRole('region', { name: 'Website language' })).toBeVisible()
+    expect(within(languages).getByRole('region', { name: 'Languages' })).toBeVisible()
+    const device = screen.getByRole('group', { name: 'This device' })
+    expect(within(device).getByRole('heading', { name: 'Install Worttrainer' })).toBeVisible()
+    expect(within(device).getByRole('heading', { name: 'Daily reminder' })).toBeVisible()
+    const identity = screen.getByRole('group', { name: 'Account' })
+    expect(within(identity).getByText(account.email)).toBeVisible()
+    expect(within(identity).getByRole('button', { name: 'Export my data (JSON)' })).toBeVisible()
+    await user.click(within(languages).getByRole('button', { name: 'Save languages' }))
+    expect(await within(languages).findByRole('status')).toHaveTextContent('Languages saved.')
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
+  })
+
   it('shows OAuth consent after existing login without opening the private collection', async () => {
     window.history.replaceState(null, '', '/?oauth_request=test-request')
     vi.mocked(api.session).mockResolvedValue(account)
@@ -554,6 +576,9 @@ describe('public registration and private account state', () => {
     await user.selectOptions(screen.getByLabelText('Default language'), 'fr')
     await user.click(screen.getByRole('button', { name: 'Save languages' }))
     expect(save).toHaveBeenCalledWith({ enabled: ['de', 'en', 'fr'], defaultLanguage: 'fr' })
+    expect(await screen.findByText('Languages saved.')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Home' }))
     expect(screen.getByText('Français · All categories · 0 available')).toBeInTheDocument()
     await openCollection(user)
     const add = await screen.findByRole('region', { name: 'Add a word' })
