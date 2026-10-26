@@ -11,6 +11,7 @@ import { HttpError } from './errors.js'
 import { challengeSchema, recognitionSchema } from './challenge-schema.js'
 import { wordResources } from './word-resources.js'
 import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList, PracticeWordList } from '../shared/model.js'
+import { oauthStateSchema, type OAuthState } from './oauth.js'
 
 export const parentEmailSchema = z.string().trim().toLowerCase().email('Enter a valid parent email address.').max(254)
 const credentialsSchema = z.object({
@@ -83,12 +84,14 @@ function validateOwnership(data: { accounts: { id: string; account: Account }[];
 }
 const stateSchema = z.object({
   accounts: z.array(accountDataSchema), sessions: z.array(sessionSchema), ocrUsage: usageSchema,
+  oauth: oauthStateSchema.default({ clients: [], grants: [] }),
 }).strict().superRefine(validateOwnership)
 const oldStoreSchema = stateSchema.safeExtend({ version: z.literal(2) })
 const indexSchema = z.object({
   version: z.literal(3),
   accounts: z.array(z.object({ id: z.uuid(), account: accountSchema }).strict()),
   sessions: z.array(sessionSchema), ocrUsage: usageSchema,
+  oauth: oauthStateSchema.default({ clients: [], grants: [] }),
 }).strict().superRefine(validateOwnership)
 function migrateLegacyCollection(value: unknown) {
   if (typeof value !== 'object' || value === null || !('photoRounds' in value) || 'challenges' in value) return value
@@ -131,10 +134,11 @@ function privateData(data: AccountData): z.infer<typeof accountFileSchema> {
   }
 }
 
-function indexData(state: State): z.infer<typeof indexSchema> {
+function indexData(state: State): z.input<typeof indexSchema> {
   return {
     version: 3, accounts: state.accounts.map(({ id, account }) => ({ id, account })),
     sessions: state.sessions, ocrUsage: state.ocrUsage,
+    ...(state.oauth.clients.length || state.oauth.grants.length ? { oauth: state.oauth } : {}),
   }
 }
 
@@ -211,7 +215,7 @@ export class FileStore {
         try { entries = await readdir(accountDirectory(file)) }
         catch (error) { if (!missing(error)) throw error }
         if (entries.length) throw new Error(`Missing account index ${file}, but account data exists. Restore the index from a matching backup; no data has been reset.`)
-        const state: State = { accounts: [], sessions: [], ocrUsage: { month: null, used: 0 } }
+        const state: State = { accounts: [], sessions: [], ocrUsage: { month: null, used: 0 }, oauth: { clients: [], grants: [] } }
         await writeJson(file, indexData(state))
         return new FileStore(file, state)
       }
@@ -238,7 +242,7 @@ export class FileStore {
           ...raw,
           accounts: 'accounts' in raw && Array.isArray(raw.accounts) ? raw.accounts.map(migrateLegacyCollection) : undefined,
         })
-        const state: State = { accounts: old.accounts, sessions: old.sessions, ocrUsage: old.ocrUsage }
+        const state: State = { accounts: old.accounts, sessions: old.sessions, ocrUsage: old.ocrUsage, oauth: old.oauth }
         await preserveBackup(file, text, 2)
         for (const account of state.accounts) await ensureAccountFile(file, account)
         // Publish the index only after every complete account file is durable.
@@ -265,7 +269,7 @@ export class FileStore {
         }
         accounts.push({ ...identity, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists })
       }
-      return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage }))
+      return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage, oauth: index.oauth }))
     } catch (error) {
       throw new Error(`Cannot read data store ${file}. Restore a valid backup; no data has been reset. ${error instanceof Error ? error.message : 'Storage operation failed.'}`, { cause: error })
     }
@@ -425,6 +429,12 @@ export class FileStore {
 
   sessionAccount(tokenHash: string, now = Date.now()) {
     return this.state.sessions.find(session => session.tokenHash === tokenHash && session.expiresAt > now)?.accountId ?? null
+  }
+
+  oauthState(): OAuthState { return structuredClone(this.state.oauth) }
+
+  oauthTransaction<T>(change: (state: OAuthState) => T): Promise<T> {
+    return this.transaction(state => change(state.oauth))
   }
 
   private accountTransaction<T>(accountId: string, change: (account: AccountData) => T) {

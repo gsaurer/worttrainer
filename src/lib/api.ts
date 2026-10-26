@@ -1,6 +1,7 @@
 import type { AccountDataExport, AuthState, Language, LanguagePreferences, NavigationTiming, Challenge, ChallengeStatus, ChallengeCheckInput, WebsiteLanguage, Word } from '../../shared/model'
 import type { DocumentCheck, PracticeWordList, ResourceImport, WordResource } from '../../shared/model'
 import type { DevicePushSubscription, ReminderSchedule, ReminderSettings } from '../../shared/reminders'
+import type { ConnectedAppsState, ConnectionRequest } from '../../shared/oauth'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -34,6 +35,10 @@ export const api = {
   saveWebsiteLanguage: (websiteLanguage: WebsiteLanguage) => request<{ websiteLanguage: WebsiteLanguage }>('/website-language', 'POST', { websiteLanguage }, true),
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),
+  connectionRequest: (id: string) => request<ConnectionRequest>(`/oauth/request?id=${encodeURIComponent(id)}`, 'GET', undefined, true),
+  decideConnection: (id: string, approve: boolean) => request<{ redirect: string }>('/oauth/consent', 'POST', { id, approve }, true),
+  connectedApps: () => request<ConnectedAppsState>('/oauth/connections', 'GET', undefined, true),
+  disconnectApp: (id: string) => request<void>(`/oauth/connections/${encodeURIComponent(id)}`, 'DELETE', {}, true),
   words: () => request<Word[]>('/words', 'GET', undefined, true),
   addedWordLists: () => request<PracticeWordList[]>('/word-lists', 'GET', undefined, true),
   languagePreferences: () => request<LanguagePreferences>('/languages', 'GET', undefined, true),

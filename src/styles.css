@@ -184,6 +184,29 @@ form .button { margin-top: 24px; }
 .settings-secondary { display: grid; gap: 20px; min-width: 0; }
 .settings-panel { padding: 24px; }
 .settings-panel h2 { margin-bottom: 16px; }
+.connection-address { display: flex; gap: 8px; align-items: center; }
+.connection-address input { min-width: 0; width: 100%; margin: 0; }
+.connection-icon { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; justify-content: center; }
+.connection-links { display: flex; flex-wrap: wrap; gap: 20px; margin: 16px 0; }
+.connection-links a { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: .85rem; }
+.connected-apps-list, .connection-permissions { list-style: none; padding: 0; margin: 16px 0; }
+.connected-apps-list > li { padding: 16px 0; border-top: 1px solid var(--line); }
+.connection-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.connection-heading strong, .connection-origin, .connection-details dd { overflow-wrap: anywhere; min-width: 0; }
+.connection-origin { color: var(--muted); font-size: .8rem; margin: 4px 0 12px; }
+.connection-permissions { font-size: .85rem; }
+.connection-permissions li { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.connection-permissions svg { flex-shrink: 0; color: var(--green); }
+.oauth-consent { width: min(100%, 540px); margin: 32px auto; }
+.oauth-consent h1 { font-size: 1.8rem; margin-bottom: 28px; }
+.oauth-consent h2 { font-size: 1.3rem; overflow-wrap: anywhere; }
+.oauth-consent h3 { font-size: 1rem; margin-top: 28px; }
+.connection-details { margin: 20px 0 8px; }
+.connection-details dt { color: var(--muted); font-size: .8rem; margin-top: 14px; }
+.connection-details dd { margin: 4px 0 0; }
+.oauth-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.connection-confirm { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.connection-back { display: inline-block; margin-top: 24px; }
 .settings-panel .fine-print { margin: 12px 0 0; }
 .reminder-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .reminder-toggle input { width: 18px; height: 18px; flex: 0 0 auto; margin: 0; }

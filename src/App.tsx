@@ -17,6 +17,7 @@ import { DocumentChecker } from './components/DocumentChecker'
 import { LanguageSettings } from './components/LanguageSettings'
 import { WebsiteLanguageSettings } from './components/WebsiteLanguageSettings'
 import { InstallWebApp, ReminderSettings } from './components/WebAppSettings'
+import { ConnectedApps, OAuthConsent } from './components/ConnectedApps'
 import { currentPushSubscription, installedWebApp } from './lib/pwa'
 import { I18nProvider } from './i18n/I18n'
 import { useI18n } from './i18n/context'
@@ -32,6 +33,12 @@ function removeSetupFragment() {
   }
 }
 
+async function signOutAccount() {
+  const subscription = await currentPushSubscription()
+  if (subscription) { await api.removeReminder(subscription.endpoint); await subscription.unsubscribe() }
+  await api.logout()
+}
+
 export default function App() {
   return <I18nProvider><Application /></I18nProvider>
 }
@@ -41,6 +48,7 @@ function Application() {
   const [auth, setAuth] = useState<AuthState | null>(null)
   const [error, setError] = useState('')
   const requests = useRef(0)
+  const oauthRequest = new URLSearchParams(window.location.search).get('oauth_request')
 
   async function reconnect() {
     const generation = ++requests.current
@@ -73,10 +81,10 @@ function Application() {
   }, [])
 
   if (!auth) return <main className="loading-screen"><Brand />{error ? <><p className="error" role="alert">{t('Could not connect to the Worttrainer server: {error}', { error: message(error) })}</p><button className="button primary" onClick={() => void reconnect()}>{t('Retry connection')}</button></> : <p role="status">{t('Opening your little word collection…')}</p>}</main>
-  if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FeaturesProvider value={auth.features ?? noFeatures}><FamilyApp key={auth.email} onSignedOut={() => { requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onWebsiteLanguageSaved={language => {
+  if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FeaturesProvider value={auth.features ?? noFeatures}>{oauthRequest ? <OAuthConsent key={auth.email} requestId={oauthRequest} onComplete={redirect => window.location.assign(redirect)} onSwitchAccount={async () => { await signOutAccount(); requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} /> : <FamilyApp key={auth.email} onSignedOut={() => { requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onWebsiteLanguageSaved={language => {
     requests.current++
     setAuth(current => current?.email === auth.email ? { ...current, websiteLanguage: language } : current)
-  }} email={auth.email ?? ''} /></FeaturesProvider></I18nProvider>
+  }} email={auth.email ?? ''} />}</FeaturesProvider></I18nProvider>
   return <>{error && <div className="auth-error error" role="alert">{message(error)}<button className="text-button" onClick={() => setError('')}>{t('Dismiss')}</button></div>}<Auth emailMigrationRequired={auth.emailMigrationRequired} onAuthenticated={state => { requests.current++; setError(''); setAuth(state) }} /></>
 }
 
@@ -118,9 +126,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
     setSigningOut(true)
     setAuthError('')
     try {
-      const subscription = await currentPushSubscription()
-      if (subscription) { await api.removeReminder(subscription.endpoint); await subscription.unsubscribe() }
-      await api.logout()
+      await signOutAccount()
       onSignedOut()
     }
     catch (error) { setAuthError(errorMessage(error)) }
@@ -151,6 +157,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
           <InstallWebApp />
           <ReminderSettings />
           <WebsiteLanguageSettings onSaved={onWebsiteLanguageSaved} />
+          <ConnectedApps />
           <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
           <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
         </div>

@@ -15,6 +15,7 @@ import { pushSubscriptionSchema, reminderScheduleSchema, type ReminderService } 
 import type { FeatureFlags } from './feature-flags.js'
 import { mcpHandler, mcpTokenPrefix, mcpTokenSchema } from './mcp.js'
 import { wordInputSchema } from './words.js'
+import { createOAuth } from './oauth.js'
 
 export type AppOptions = {
   store: FileStore
@@ -55,7 +56,31 @@ export function createApp(options: AppOptions) {
     if (options.production) res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     next()
   })
-  app.all('/api/mcp', mcpHandler(store, options.origin))
+  const oauth = createOAuth(store, options.origin)
+  app.all('/api/mcp', mcpHandler(store, options.origin, oauth))
+  app.use('/api/oauth', oauth.protocol)
+  const resourceMetadata = {
+    resource: `${options.origin}/api/mcp`, authorization_servers: [options.origin],
+    scopes_supported: ['words:read', 'words:write'], bearer_methods_supported: ['header'],
+  }
+  app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/api/mcp'], (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json(resourceMetadata)
+  })
+  app.get('/.well-known/oauth-authorization-server', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({
+      issuer: options.origin,
+      authorization_endpoint: `${options.origin}/api/oauth/authorize`,
+      token_endpoint: `${options.origin}/api/oauth/token`,
+      registration_endpoint: `${options.origin}/api/oauth/register`,
+      revocation_endpoint: `${options.origin}/api/oauth/revoke`,
+      response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'],
+      token_endpoint_auth_methods_supported: ['none'], code_challenge_methods_supported: ['S256'],
+      authorization_response_iss_parameter_supported: true,
+      scopes_supported: resourceMetadata.scopes_supported,
+    })
+  })
   app.use('/api', (_req, _res, next) => { void (options.features?.refresh() ?? Promise.resolve()).then(() => next()) })
   app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store')
@@ -98,6 +123,17 @@ export function createApp(options: AppOptions) {
     const token = randomBytes(32).toString('base64url')
     return { token, stored: { tokenHash: digest(token), accountId, expiresAt: Date.now() + maxAgeSeconds * 1000 } }
   }
+  app.get('/api/oauth/request', requireAuth, (req, res) => { res.json(oauth.details(req.query.id, accountId(req))) })
+  app.post('/api/oauth/consent', requireAuth, async (req, res) => {
+    const input = parse(z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{43}$/), approve: z.boolean() }).strict(), req.body)
+    res.json(await oauth.decide(input.id, input.approve, accountId(req)))
+  })
+  app.get('/api/oauth/connections', requireAuth, (req, res) => { res.json(oauth.connections(accountId(req))) })
+  app.delete('/api/oauth/connections/:id', requireAuth, async (req, res) => {
+    const id = parse(z.uuid(), req.params.id)
+    await oauth.disconnect(accountId(req), id)
+    res.status(204).end()
+  })
   const featuresOf = (id: string) => options.features ? { features: options.features.forAccount(id) } : {}
   function authState(req: Request): AuthState {
     const signedIn = authenticated(req)

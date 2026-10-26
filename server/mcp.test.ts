@@ -61,7 +61,194 @@ beforeEach(async () => {
 
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
+async function startOAuth(scope = 'words:read words:write') {
+  const redirectUri = 'https://chatgpt.com/connector_platform_oauth_redirect'
+  const registered = await request(app).post('/api/oauth/register').send({ client_name: 'ChatGPT', redirect_uris: [redirectUri] }).expect(201)
+  const verifier = randomBytes(32).toString('base64url')
+  const query = {
+    client_id: registered.body.client_id as string, response_type: 'code', redirect_uri: redirectUri,
+    state: randomBytes(16).toString('base64url'), scope,
+    code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', resource: `${origin}/api/mcp`,
+  }
+  const started = await request(app).get('/api/oauth/authorize').query(query).expect(303)
+  const id = new URL(started.headers.location, origin).searchParams.get('oauth_request')!
+  return { query, id, verifier }
+}
+
+async function consentOAuth(flow: Awaited<ReturnType<typeof startOAuth>>, session = cookie) {
+  await request(app).get('/api/oauth/request').query({ id: flow.id }).set('Cookie', session).expect(200)
+  const consent = await request(app).post('/api/oauth/consent').set('Origin', origin).set('Cookie', session).send({ id: flow.id, approve: true }).expect(200)
+  const redirect = new URL(consent.body.redirect)
+  expect(redirect.origin + redirect.pathname).toBe(flow.query.redirect_uri)
+  expect(redirect.searchParams.get('state')).toBe(flow.query.state)
+  expect(redirect.searchParams.get('iss')).toBe(origin)
+  return { grant_type: 'authorization_code', client_id: flow.query.client_id, code: redirect.searchParams.get('code')!, code_verifier: flow.verifier, redirect_uri: flow.query.redirect_uri, resource: flow.query.resource }
+}
+
+describe('web connector OAuth', () => {
+  it('links the consenting account through PKCE, persists only hashes, and reads and adds its words', async () => {
+    const flow = await startOAuth()
+    await request(app).get('/api/oauth/request').query({ id: flow.id }).expect(401)
+    const details = await request(app).get('/api/oauth/request').query({ id: flow.id }).set('Cookie', cookie).expect(200)
+    expect(details.body).toEqual({ clientName: 'ChatGPT', clientOrigin: 'https://chatgpt.com', scopes: ['words:read', 'words:write'], accountEmail: 'first@example.test' })
+    await store.addWord(secondId, 'private other account', 'en')
+    const exchange = await consentOAuth(flow)
+    const token = await request(app).post('/api/oauth/token').type('form').send(exchange).expect(200)
+    expect(token.body).toMatchObject({ token_type: 'Bearer', scope: 'words:read words:write' })
+    expect(token.body.access_token).toMatch(/^wtr_access_[A-Za-z0-9_-]{43}$/)
+    expect(token.body.refresh_token).toMatch(/^wtr_refresh_[A-Za-z0-9_-]{43}$/)
+    await call(token.body.access_token, 'worttrainer_add_word', { text: 'butterfly', language: 'en' }).expect(200)
+    const words = await call(token.body.access_token, 'worttrainer_get_words', {}).expect(200)
+    expect(words.body.result.structuredContent.words.map((word: { text: string }) => word.text)).toEqual(['butterfly'])
+    const text = await readFile(join(directory, 'store.json'), 'utf8')
+    for (const value of [token.body.access_token, token.body.refresh_token, exchange.code]) expect(text).not.toContain(value)
+    store = await FileStore.open(join(directory, 'store.json'))
+    app = createApp({ store, origin, secureCookie: false })
+    await call(token.body.access_token, 'worttrainer_get_words', {}).expect(200)
+    await request(app).get('/api/words').set('Cookie', `worttrainer_session=${token.body.access_token}`).expect(401)
+    await request(app).post('/api/oauth/token').type('form').send(exchange).expect(400)
+  })
+
+  it('allows a read-only grant without permitting writes', async () => {
+    const flow = await startOAuth('words:read')
+    const exchange = await consentOAuth(flow)
+    const token = await request(app).post('/api/oauth/token').type('form').send(exchange).expect(200)
+    await call(token.body.access_token, 'worttrainer_get_words', {}).expect(200)
+    const denied = await call(token.body.access_token, 'worttrainer_add_word', { text: 'unauthorized', language: 'en' }).expect(200)
+    expect(denied.body.result).toMatchObject({ isError: true })
+    expect(denied.body.result._meta['mcp/www_authenticate'][0]).toContain('words:write')
+    expect(store.words(firstId)).toEqual([])
+  })
+
+  it('requires same-origin explicit consent and preserves state when the user declines', async () => {
+    const flow = await startOAuth()
+    await request(app).get('/api/oauth/request').query({ id: flow.id }).set('Cookie', cookie).expect(200)
+    await request(app).post('/api/oauth/consent').set('Origin', origin).send({ id: flow.id, approve: true }).expect(401)
+    await request(app).post('/api/oauth/consent').set('Cookie', cookie).send({ id: flow.id, approve: true }).expect(403)
+    await request(app).post('/api/oauth/consent').set('Origin', origin).set('Cookie', secondCookie).send({ id: flow.id, approve: true }).expect(403)
+    const denied = await request(app).post('/api/oauth/consent').set('Origin', origin).set('Cookie', cookie).send({ id: flow.id, approve: false }).expect(200)
+    const callback = new URL(denied.body.redirect)
+    expect(callback.searchParams.get('error')).toBe('access_denied')
+    expect(callback.searchParams.get('code')).toBeNull()
+    expect(callback.searchParams.get('state')).toBe(flow.query.state)
+    expect(callback.searchParams.get('iss')).toBe(origin)
+    expect(store.oauthState().grants).toEqual([])
+    await request(app).get('/api/oauth/request').query({ id: flow.id }).set('Cookie', cookie).expect(400)
+  })
+
+  it('rejects unsafe registration, unregistered redirects, invalid resources, plain PKCE and unsupported scopes', async () => {
+    for (const uri of ['http://evil.example/callback', 'javascript:alert(1)', 'https://evil.example/callback#fragment', 'https://user:password@evil.example/callback']) {
+      await request(app).post('/api/oauth/register').send({ redirect_uris: [uri] }).expect(400)
+    }
+    const flow = await startOAuth()
+    for (const change of [
+      { redirect_uri: 'https://evil.example/callback' }, { resource: 'https://other.example/api/mcp' },
+      { code_challenge_method: 'plain' }, { code_challenge: '' }, { scope: 'account:delete' }, { response_type: 'token' },
+    ]) await request(app).get('/api/oauth/authorize').query({ ...flow.query, ...change }).expect(400)
+    expect(store.oauthState().grants).toEqual([])
+    const exchange = await consentOAuth(flow)
+    await request(app).post('/api/oauth/token').type('form').send({ ...exchange, resource: 'https://other.example/api/mcp' }).expect(400)
+    await request(app).post('/api/oauth/token').type('form').send(exchange).expect(200)
+  })
+
+  it('rejects incorrect PKCE and callback proofs and consumes codes once even under concurrency', async () => {
+    const wrongProof = await consentOAuth(await startOAuth())
+    await request(app).post('/api/oauth/token').type('form').send({ ...wrongProof, code_verifier: randomBytes(32).toString('base64url') }).expect(400)
+    await request(app).post('/api/oauth/token').type('form').send(wrongProof).expect(400)
+    const wrongCallback = await consentOAuth(await startOAuth())
+    await request(app).post('/api/oauth/token').type('form').send({ ...wrongCallback, redirect_uri: 'https://evil.example/callback' }).expect(400)
+    const exchange = await consentOAuth(await startOAuth())
+    const results = await Promise.all([request(app).post('/api/oauth/token').type('form').send(exchange), request(app).post('/api/oauth/token').type('form').send(exchange)])
+    expect(results.map(result => result.status).sort()).toEqual([200, 400])
+  })
+
+  it('rotates refresh tokens, rejects scope escalation, and revokes the connection on reuse', async () => {
+    const flow = await startOAuth('words:read')
+    const issued = await request(app).post('/api/oauth/token').type('form').send(await consentOAuth(flow)).expect(200)
+    const refresh = { grant_type: 'refresh_token', client_id: flow.query.client_id, refresh_token: issued.body.refresh_token, resource: flow.query.resource }
+    await request(app).post('/api/oauth/token').type('form').send({ ...refresh, scope: 'words:read words:write' }).expect(400)
+    const rotated = await request(app).post('/api/oauth/token').type('form').send(refresh).expect(200)
+    expect(rotated.body.refresh_token).not.toBe(issued.body.refresh_token)
+    await rpc(issued.body.access_token, 'tools/list').expect(401)
+    await rpc(rotated.body.access_token, 'tools/list').expect(200)
+    await request(app).post('/api/oauth/token').type('form').send(refresh).expect(400)
+    await rpc(rotated.body.access_token, 'tools/list').expect(401)
+  })
+
+  it('rejects malformed token requests and binds token exchange and revocation to the registered client', async () => {
+    await request(app).post('/api/oauth/token').type('form').expect(400)
+    await request(app).post('/api/oauth/token').send({ grant_type: 'authorization_code' }).expect(415)
+    const flow = await startOAuth()
+    const otherFlow = await startOAuth()
+    const exchange = await consentOAuth(flow)
+    await request(app).post('/api/oauth/token').type('form').send({ ...exchange, client_id: otherFlow.query.client_id }).expect(400)
+    const issued = await request(app).post('/api/oauth/token').type('form').send(exchange).expect(200)
+    const refresh = { grant_type: 'refresh_token', client_id: flow.query.client_id, refresh_token: issued.body.refresh_token }
+    await request(app).post('/api/oauth/token').type('form').send({ ...refresh, client_id: otherFlow.query.client_id }).expect(400)
+    await request(app).post('/api/oauth/revoke').type('form').send({ token: issued.body.access_token, client_id: otherFlow.query.client_id }).expect(200)
+    await rpc(issued.body.access_token, 'tools/list').expect(200)
+    await request(app).post('/api/oauth/revoke').type('form').send({ token: issued.body.refresh_token, client_id: flow.query.client_id }).expect(200)
+    await rpc(issued.body.access_token, 'tools/list').expect(401)
+    await request(app).post('/api/oauth/token').type('form').send(refresh).expect(400)
+  })
+
+  it('lists and disconnects only owned connections, revokes both tokens, and preserves word progress', async () => {
+    const flow = await startOAuth()
+    const first = await request(app).post('/api/oauth/token').type('form').send(await consentOAuth(flow)).expect(200)
+    const secondFlow = await startOAuth()
+    const second = await request(app).post('/api/oauth/token').type('form').send(await consentOAuth(secondFlow, secondCookie)).expect(200)
+    const before = store.exportData(firstId)
+    await request(app).get('/api/oauth/connections').expect(401)
+    const listing = await request(app).get('/api/oauth/connections').set('Cookie', cookie).expect(200)
+    expect(listing.body.connections).toHaveLength(1)
+    expect(JSON.stringify(listing.body)).not.toContain('wtr_access_')
+    expect(JSON.stringify(listing.body)).not.toContain('wtr_refresh_')
+    const id = listing.body.connections[0].id
+    await request(app).delete(`/api/oauth/connections/${id}`).set('Cookie', cookie).send({}).expect(403)
+    await request(app).delete(`/api/oauth/connections/${id}`).set('Cookie', secondCookie).set('Origin', origin).send({}).expect(204)
+    await rpc(first.body.access_token, 'tools/list').expect(200)
+    await request(app).delete(`/api/oauth/connections/${id}`).set('Cookie', cookie).set('Origin', origin).send({}).expect(204)
+    await rpc(first.body.access_token, 'tools/list').expect(401)
+    await rpc(second.body.access_token, 'tools/list').expect(200)
+    await request(app).post('/api/oauth/token').type('form').send({ grant_type: 'refresh_token', client_id: flow.query.client_id, refresh_token: first.body.refresh_token }).expect(400)
+    expect(store.exportData(firstId).words).toEqual(before.words)
+    expect(store.exportData(firstId).attempts).toEqual(before.attempts)
+  })
+
+  it('rejects expired codes and tokens and invalidates OAuth connections after password recovery', async () => {
+    const expiredCode = await consentOAuth(await startOAuth())
+    await store.oauthTransaction(state => { state.grants[0].code!.expiresAt = Date.now() - 1000 })
+    await request(app).post('/api/oauth/token').type('form').send(expiredCode).expect(400)
+    const flow = await startOAuth()
+    const issued = await request(app).post('/api/oauth/token').type('form').send(await consentOAuth(flow)).expect(200)
+    const otherFlow = await startOAuth()
+    const other = await request(app).post('/api/oauth/token').type('form').send(await consentOAuth(otherFlow, secondCookie)).expect(200)
+    await store.oauthTransaction(state => { state.grants.find(grant => grant.accountId === firstId)!.access!.expiresAt = Date.now() - 1000 })
+    await rpc(issued.body.access_token, 'tools/list').expect(401)
+    const refreshed = await request(app).post('/api/oauth/token').type('form').send({ grant_type: 'refresh_token', client_id: flow.query.client_id, refresh_token: issued.body.refresh_token }).expect(200)
+    await store.recoverPassword(firstId, { salt: '11'.repeat(16), passwordHash: '11'.repeat(64) })
+    await rpc(refreshed.body.access_token, 'tools/list').expect(401)
+    await request(app).post('/api/oauth/token').type('form').send({ grant_type: 'refresh_token', client_id: flow.query.client_id, refresh_token: refreshed.body.refresh_token }).expect(400)
+    await rpc(other.body.access_token, 'tools/list').expect(200)
+  })
+})
+
 describe('account-scoped Streamable HTTP MCP', () => {
+  it('advertises OAuth discovery for web connectors without exposing account data', async () => {
+    const response = await request(app).post('/api/mcp').set('Host', host).send({}).expect(401)
+    expect(response.headers['www-authenticate']).toContain(`resource_metadata="${origin}/.well-known/oauth-protected-resource/api/mcp"`)
+    const resource = await request(app).get('/.well-known/oauth-protected-resource/api/mcp').expect(200)
+    expect(resource.body).toMatchObject({ resource: `${origin}/api/mcp`, authorization_servers: [origin], scopes_supported: ['words:read', 'words:write'] })
+    const authorization = await request(app).get('/.well-known/oauth-authorization-server').expect(200)
+    expect(authorization.body).toMatchObject({
+      issuer: origin,
+      authorization_endpoint: `${origin}/api/oauth/authorize`,
+      token_endpoint: `${origin}/api/oauth/token`,
+      registration_endpoint: `${origin}/api/oauth/register`,
+      code_challenge_methods_supported: ['S256'],
+    })
+  })
+
   it('protects token creation and keeps MCP credentials hashed, expiring and separate from browser sessions', async () => {
     await request(app).post('/api/mcp/token').set('Origin', origin).send({}).expect(401)
     await request(app).post('/api/mcp/token').set('Cookie', cookie).send({}).expect(403)

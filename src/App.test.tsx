@@ -23,10 +23,35 @@ beforeEach(() => {
   vi.spyOn(api, 'addedWordLists').mockResolvedValue([])
   vi.spyOn(api, 'languagePreferences').mockResolvedValue(initialLanguagePreferences())
   vi.spyOn(api, 'reminderSettings').mockResolvedValue({ configured: false, publicKey: null, enabled: false, deviceEnabled: false, time: '17:00', timeZone: 'UTC' })
+  vi.spyOn(api, 'connectedApps').mockResolvedValue({ endpoint: 'http://localhost:5182/api/mcp', connections: [] })
   vi.spyOn(api, 'challengeStatus').mockResolvedValue({ challenges: [], ocr: { enabled: false, month: '2026-10', used: 0, limit: 450 } })
 })
 
 describe('public registration and private account state', () => {
+  it('shows OAuth consent after existing login without opening the private collection', async () => {
+    window.history.replaceState(null, '', '/?oauth_request=test-request')
+    vi.mocked(api.session).mockResolvedValue(account)
+    vi.spyOn(api, 'connectionRequest').mockResolvedValue({ clientName: 'ChatGPT', clientOrigin: 'https://chatgpt.com', accountEmail: account.email, scopes: ['words:read', 'words:write'] })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'ChatGPT' })).toBeVisible()
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument()
+    expect(api.words).not.toHaveBeenCalled()
+    expect(api.connectionRequest).toHaveBeenCalledWith('test-request')
+  })
+
+  it('keeps an OAuth request through sign-in and then asks for consent', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?oauth_request=test-request')
+    vi.spyOn(api, 'login').mockResolvedValue(account)
+    vi.spyOn(api, 'connectionRequest').mockResolvedValue({ clientName: 'Claude', clientOrigin: 'https://claude.ai', accountEmail: account.email, scopes: ['words:read'] })
+    render(<App />)
+    await user.type(await screen.findByLabelText('Parent email'), account.email)
+    await user.type(screen.getByLabelText('Password'), 'test password only')
+    await user.click(screen.getByRole('button', { name: 'Open our word collection' }))
+    expect(await screen.findByRole('heading', { name: 'Claude' })).toBeVisible()
+    expect(screen.getByText(account.email)).toBeVisible()
+  })
+
   it('hides document checking by default and removes an open document tool when its flag is disabled', async () => {
     const user = userEvent.setup()
     vi.mocked(api.session).mockResolvedValue(account)
