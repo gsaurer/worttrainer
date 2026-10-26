@@ -7,10 +7,14 @@ import { validateWord, type AuthState } from '../shared/model.js'
 import { FileStore, parentEmailSchema } from './store.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { HttpError } from './errors.js'
-import { normalizePhoto, readAzurePhoto, type OcrOptions } from './ocr.js'
-import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from './languages.js'
+import { normalizePhoto, readAzureDocument, readAzurePhoto, type OcrOptions } from './ocr.js'
+import { checkSpelling } from './spelling.js'
+import { languagePreferencesSchema, websiteLanguageSchema } from './languages.js'
 import { wordResources } from './word-resources.js'
 import { pushSubscriptionSchema, reminderScheduleSchema, type ReminderService } from './reminders.js'
+import type { FeatureFlags } from './feature-flags.js'
+import { mcpHandler, mcpTokenPrefix, mcpTokenSchema } from './mcp.js'
+import { wordInputSchema } from './words.js'
 
 export type AppOptions = {
   store: FileStore
@@ -20,6 +24,7 @@ export type AppOptions = {
   trustProxy?: boolean
   ocr?: OcrOptions
   reminders?: ReminderService
+  features?: FeatureFlags
 }
 
 const cookieName = 'worttrainer_session'
@@ -50,11 +55,13 @@ export function createApp(options: AppOptions) {
     if (options.production) res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     next()
   })
+  app.all('/api/mcp', mcpHandler(store, options.origin))
+  app.use('/api', (_req, _res, next) => { void (options.features?.refresh() ?? Promise.resolve()).then(() => next()) })
   app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store')
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (req.headers.origin !== options.origin) return next(new HttpError(403, 'Request origin is not allowed. Open the app at its configured address.'))
-      const photoUpload = req.method === 'POST' && /^\/challenges\/[0-9a-f-]+\/photo$/.test(req.path)
+      const photoUpload = req.method === 'POST' && (/^\/challenges\/[0-9a-f-]+\/photo$/.test(req.path) || req.path === '/documents/photo')
       if (photoUpload ? !req.is(['image/jpeg', 'image/png']) : !req.is('application/json')) {
         return next(new HttpError(415, photoUpload ? 'Upload one JPEG or PNG photo.' : 'Send requests as application/json.'))
       }
@@ -91,6 +98,7 @@ export function createApp(options: AppOptions) {
     const token = randomBytes(32).toString('base64url')
     return { token, stored: { tokenHash: digest(token), accountId, expiresAt: Date.now() + maxAgeSeconds * 1000 } }
   }
+  const featuresOf = (id: string) => options.features ? { features: options.features.forAccount(id) } : {}
   function authState(req: Request): AuthState {
     const signedIn = authenticated(req)
     const account = signedIn ? store.account(signedIn) : null
@@ -98,7 +106,7 @@ export function createApp(options: AppOptions) {
       authenticated: !!signedIn,
       emailMigrationRequired: !!account && !('email' in account),
       email: signedIn && account && 'email' in account ? account.email : null,
-      ...(signedIn ? { websiteLanguage: store.websiteLanguage(signedIn) } : {}),
+      ...(signedIn ? { websiteLanguage: store.websiteLanguage(signedIn), ...featuresOf(signedIn) } : {}),
     }
   }
 
@@ -118,7 +126,7 @@ export function createApp(options: AppOptions) {
     const session = newSession()
     await store.register(account, session.stored, input.websiteLanguage)
     setCookie(res, session.token)
-    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email, websiteLanguage: input.websiteLanguage } satisfies AuthState)
+    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email, websiteLanguage: input.websiteLanguage, ...featuresOf(session.stored.accountId) } satisfies AuthState)
   })
   app.post('/api/login', authLimiter, async (req, res) => {
     const input = parse(z.object({ email: parentEmailSchema, password: z.string().min(1).max(128) }).strict(), req.body)
@@ -130,12 +138,26 @@ export function createApp(options: AppOptions) {
     if ('email' in record.account) await store.addSession(session.stored, record.account.passwordHash)
     else await store.migrateEmail(input.email, session.stored, record.account.passwordHash)
     setCookie(res, session.token)
-    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email, websiteLanguage: store.websiteLanguage(record.id) } satisfies AuthState)
+    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email, websiteLanguage: store.websiteLanguage(record.id), ...featuresOf(record.id) } satisfies AuthState)
   })
   app.post('/api/logout', async (req, res) => {
     const token = sessionToken(req)
     if (token && authenticated(req)) await store.removeSession(digest(token))
     setCookie(res, '', 0)
+    res.status(204).end()
+  })
+  app.post('/api/mcp/token', requireAuth, authLimiter, async (req, res) => {
+    parse(z.object({}).strict(), req.body)
+    const owner = accountId(req)
+    const token = mcpTokenPrefix + randomBytes(32).toString('base64url')
+    const expiresAt = Date.now() + maxAgeSeconds * 1000
+    await store.addSession({ tokenHash: digest(token), accountId: owner, expiresAt }, store.account(owner).passwordHash)
+    res.status(201).json({ token, tokenType: 'Bearer', expiresAt: new Date(expiresAt).toISOString(), endpoint: '/api/mcp' })
+  })
+  app.delete('/api/mcp/token', requireAuth, async (req, res) => {
+    const { token } = parse(z.object({ token: mcpTokenSchema }).strict(), req.body)
+    const hash = digest(token)
+    if (store.sessionAccount(hash) === accountId(req)) await store.removeSession(hash)
     res.status(204).end()
   })
   app.post('/api/password', requireAuth, authLimiter, async (req, res) => {
@@ -185,10 +207,7 @@ export function createApp(options: AppOptions) {
     res.json(await store.importWordResource(accountId(req), input.resourceId, input.sectionIds, input.enableLanguage))
   })
   app.post('/api/words', requireAuth, async (req, res) => {
-    const input = parse(z.object({
-      text: z.string().refine(value => validateWord(value) === null, 'Enter a word with 1–80 characters and no line breaks or control characters.').transform(value => value.trim()),
-      language: languageSchema,
-    }).strict(), req.body)
+    const input = parse(wordInputSchema, req.body)
     res.status(201).json(await store.addWord(accountId(req), input.text, input.language))
   })
   app.delete('/api/words/:id', requireAuth, async (req, res) => {
@@ -227,6 +246,29 @@ export function createApp(options: AppOptions) {
   const photoAvailable: express.RequestHandler = (_req, _res, next) => {
     next(options.ocr ? undefined : new HttpError(503, 'Automatic photo reading needs an Azure Free/F0 endpoint and key. You can still review the sheet manually.'))
   }
+  const documentAvailable: express.RequestHandler = (req, _res, next) => {
+    next(options.features?.enabled('document-check', accountId(req)) ? undefined : new HttpError(404, 'Document checking is not enabled for this account.'))
+  }
+  app.post('/api/documents/photo', requireAuth, documentAvailable, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb', inflate: false }), async (req, res) => {
+    const language = parse(z.enum(['en', 'de']), req.query.language)
+    if (!store.languagePreferences(accountId(req)).enabled.includes(language)) throw new HttpError(409, 'This language is disabled. Enable it in Languages before checking a document.')
+    if (photoReading) throw new HttpError(429, 'Another photo is being read. Please wait and try again.')
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Choose a JPEG or PNG photo first.')
+    photoReading = true
+    try {
+      const image = await normalizePhoto(req.body)
+      await store.reserveOcr(options.ocr!.monthlyLimit)
+      const text = await readAzureDocument(image, language, options.ocr!)
+      res.json(await checkSpelling(text, language))
+    } finally { photoReading = false }
+  })
+  app.post('/api/documents/words', requireAuth, documentAvailable, async (req, res) => {
+    const input = parse(z.object({
+      language: z.enum(['en', 'de']),
+      words: z.array(z.string().refine(value => validateWord(value) === null, 'Enter a word with 1–80 characters and no line breaks or control characters.').transform(value => value.trim().normalize('NFC'))).min(1).max(40),
+    }).strict(), req.body)
+    res.json(await store.importDocumentWords(accountId(req), input.words, input.language))
+  })
   app.post('/api/challenges/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb', inflate: false }), async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
     const owner = accountId(req)

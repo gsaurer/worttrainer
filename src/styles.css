@@ -141,7 +141,29 @@ form .button { margin-top: 24px; }
 .resource-add-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin: 24px 0; }
 .resource-add-actions .button { margin: 0; max-width: 100%; }
 .resource-import-result { padding: 16px 0; }
+.document-checker { max-width: 820px; min-width: 0; margin: 0 auto; letter-spacing: 0; }
+.document-toolbar { display: flex; align-items: end; flex-wrap: wrap; justify-content: space-between; gap: 16px; margin: 24px 0; }
+.document-toolbar label { width: 260px; max-width: 100%; margin: 0; }
+.document-toolbar .fine-print { margin: 0; }
+.document-photo { display: block; width: 100%; height: 320px; object-fit: contain; background: #e8ece5; border: 1px solid var(--line); border-radius: 4px; }
+.document-photo-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.document-photo-actions .challenge-icon-button { width: 48px; height: 48px; padding: 10px; gap: 0; }
+.document-checker .fine-print { margin-top: 12px; }
+.document-review { margin: 28px 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.document-review h2 { font-size: 1.65rem; letter-spacing: 0; margin-bottom: 12px; }
+.document-findings { min-width: 0; border: 0; padding: 0; margin: 20px 0; }
+.document-finding { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.document-finding .resource-section-choice { margin: 0; }
+.document-finding .resource-section-choice small { color: var(--muted); font-weight: 400; font-size: .75rem; }
+.document-correction { min-width: 0; }
+.document-correction label { overflow-wrap: anywhere; margin: 0; }
+.document-correction input { margin-top: 8px; }
+.document-correction .fine-print { display: block; }
+.document-text summary { padding: 12px 0; cursor: pointer; font-weight: 600; }
+.document-text p { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; padding: 16px; border-left: 2px solid var(--line); }
 @media (max-width: 600px) {
+  .document-finding { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .document-photo-actions .resource-command { flex: 1; min-width: 140px; }
   .resource-selectors { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .page-heading { flex-wrap: wrap; gap: 16px; }
   .resource-add-actions .button { width: 100%; }

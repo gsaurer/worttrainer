@@ -511,6 +511,20 @@ export class FileStore {
     })
   }
 
+  importDocumentWords(accountId: string, words: string[], language: Language) {
+    return this.accountTransaction(accountId, state => {
+      if (!state.languagePreferences.enabled.includes(language)) throw new HttpError(409, 'This language is disabled. Enable it in Languages before adding words.')
+      const unique = new Map(words.map(text => [text.toLowerCase(), text]))
+      const existing = new Set(state.words.filter(word => word.language === language).map(word => word.text.toLowerCase()))
+      const added = [...unique].filter(([key]) => !existing.has(key)).map(([, text]): Word => ({
+        id: randomUUID(), text, language, category: 'new', consecutive_mistakes: 0,
+        created_at: new Date().toISOString(), last_practiced_at: null,
+      }))
+      state.words.unshift(...added)
+      return { added: added.length, existing: unique.size - added.length, language }
+    })
+  }
+
   importWordResource(accountId: string, resourceId: string, sectionIds: string[], enableLanguage: boolean) {
     const resource = wordResources.find(item => item.id === resourceId)
     if (!resource) throw new HttpError(404, 'Word list not found.')

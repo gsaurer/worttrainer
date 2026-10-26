@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
-import { normalizePhoto, numberedAnswers, ocrConfiguration, readAzurePhoto } from './ocr.js'
+import { normalizePhoto, numberedAnswers, ocrConfiguration, readAzureDocument, readAzurePhoto } from './ocr.js'
 import { suggestedResult } from '../shared/model.js'
 
 afterEach(() => { vi.unstubAllGlobals() })
@@ -82,6 +82,16 @@ describe('safe handwriting answer recognition', () => {
     expect(transport.mock.calls[0][0]).toContain('pages=1')
     expect(transport.mock.calls[0][1]?.body).toBe(JSON.stringify({ base64Source: Buffer.from('test-image').toString('base64') }))
     expect(transport.mock.calls[2][1]?.method).toBe('DELETE')
+  })
+  it('reads full document text without changing spelling or requiring numbered answers', async () => {
+    const text = 'A beautifull day.\nWe walked through the garden.'
+    const transport = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 202, headers: { 'Operation-Location': operation } }))
+      .mockResolvedValueOnce(Response.json({ status: 'succeeded', analyzeResult: analysis(text) }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', transport)
+    expect(await readAzureDocument(Buffer.from('test-image'), 'en', config, async () => {})).toBe(text)
+    expect(transport.mock.calls.at(-1)?.[1]?.method).toBe('DELETE')
   })
   it('refuses unexpected operation hosts before sending credentials and reports quota errors', async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, { status: 202, headers: { 'Operation-Location': 'https://untrusted.example/result' } }))

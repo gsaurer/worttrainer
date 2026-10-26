@@ -1,5 +1,5 @@
 import type { AccountDataExport, AuthState, Language, LanguagePreferences, NavigationTiming, Challenge, ChallengeStatus, ChallengeCheckInput, WebsiteLanguage, Word } from '../../shared/model'
-import type { PracticeWordList, ResourceImport, WordResource } from '../../shared/model'
+import type { DocumentCheck, PracticeWordList, ResourceImport, WordResource } from '../../shared/model'
 import type { DevicePushSubscription, ReminderSchedule, ReminderSettings } from '../../shared/reminders'
 
 export class ApiError extends Error {
@@ -53,6 +53,10 @@ export const api = {
   readPhoto: async (id: string, photo: File) => readResponse<Challenge>(await fetch(`/api/challenges/${encodeURIComponent(id)}/photo`, {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': photo.type }, body: photo,
   }), true),
+  checkDocument: async (language: DocumentCheck['language'], photo: File) => readResponse<DocumentCheck>(await fetch(`/api/documents/photo?language=${language}`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': photo.type }, body: photo,
+  }), true),
+  addDocumentWords: (language: DocumentCheck['language'], words: string[]) => request<ResourceImport>('/documents/words', 'POST', { language, words }, true),
   reviewChallenge: (id: string, results: boolean[], check: ChallengeCheckInput) => request<Challenge>(`/challenges/${encodeURIComponent(id)}/review`, 'POST', { results, check }, true),
   deleteChallenge: (id: string) => request<void>(`/challenges/${encodeURIComponent(id)}`, 'DELETE', {}, true),
 }

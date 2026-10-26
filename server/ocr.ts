@@ -91,6 +91,14 @@ export async function normalizePhoto(input: Buffer) {
 }
 
 export async function readAzurePhoto(image: Buffer, language: Language, count: number, config: OcrOptions, pause = (ms: number) => delay(ms)): Promise<PhotoRecognition> {
+  return numberedAnswers(await readAzureAnalysis(image, language, config, pause), count)
+}
+
+export async function readAzureDocument(image: Buffer, language: Language, config: OcrOptions, pause = (ms: number) => delay(ms)): Promise<string> {
+  return (await readAzureAnalysis(image, language, config, pause)).content
+}
+
+async function readAzureAnalysis(image: Buffer, language: Language, config: OcrOptions, pause: (ms: number) => Promise<unknown>): Promise<Analysis> {
   const headers = { 'Ocp-Apim-Subscription-Key': config.key }
   const signal = AbortSignal.timeout(75_000)
   let operation: URL | undefined
@@ -119,7 +127,7 @@ export async function readAzurePhoto(image: Buffer, language: Language, count: n
       if (result.data.status === 'failed') throw new HttpError(422, 'Azure could not recognize this sheet. Retake the photo or review manually.')
       if (result.data.status === 'succeeded') {
         if (!result.data.analyzeResult) throw new HttpError(502, 'Azure returned no recognized text.')
-        return numberedAnswers(result.data.analyzeResult, count)
+        return result.data.analyzeResult
       }
     }
     throw new HttpError(504, 'Photo reading took too long. Review manually or try again later; no results were saved.')

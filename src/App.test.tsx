@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { api } from './lib/api'
-import type { AuthState, Challenge, Word } from '../shared/model'
+import type { AuthState, Challenge, DocumentCheck, Word } from '../shared/model'
 import { initialLanguagePreferences } from '../shared/languages'
 import * as pwa from './lib/pwa'
 
@@ -27,6 +27,46 @@ beforeEach(() => {
 })
 
 describe('public registration and private account state', () => {
+  it('hides document checking by default and removes an open document tool when its flag is disabled', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.session).mockResolvedValue(account)
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Start a challenge' })
+    expect(screen.queryByRole('button', { name: 'Check my document' })).not.toBeInTheDocument()
+    await openCollection(user)
+    expect(screen.queryByRole('button', { name: 'Check my document' })).not.toBeInTheDocument()
+    vi.mocked(api.session).mockResolvedValue({ ...account, features: ['document-check'] })
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    await user.click(await screen.findByRole('button', { name: 'Check my document' }))
+    expect(await screen.findByRole('region', { name: 'Check my document' })).toBeVisible()
+    vi.mocked(api.session).mockResolvedValue({ ...account, features: [] })
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Check my document' })).not.toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Add a word' })).toBeVisible()
+  })
+
+  it('discards a delayed document result after another account signs in', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.session).mockResolvedValue({ ...account, features: ['document-check'] })
+    vi.mocked(api.challengeStatus).mockResolvedValue({ challenges: [], ocr: { enabled: true, month: '2026-10', used: 0, limit: 450 } })
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:document'), revokeObjectURL: vi.fn() }))
+    let finish!: (result: DocumentCheck) => void
+    vi.spyOn(api, 'checkDocument').mockReturnValue(new Promise(resolve => { finish = resolve }))
+    const add = vi.spyOn(api, 'addDocumentWords')
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Check my document' }))
+    fireEvent.change(screen.getByLabelText('Document photo (JPEG or PNG, up to 4 MB)'), { target: { files: [new File(['photo'], 'document.jpg', { type: 'image/jpeg' })] } })
+    await user.click(screen.getByRole('button', { name: 'Check document' }))
+    await waitFor(() => expect(api.checkDocument).toHaveBeenCalledOnce())
+    vi.mocked(api.session).mockResolvedValue({ ...account, email: 'another@example.test' })
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Check my document' })).not.toBeInTheDocument())
+    await act(async () => { finish({ language: 'de', text: 'Private first-account text', wordCount: 3, limited: false, possibleMistakes: [{ word: 'Privattt', occurrences: 1, suggestions: ['Privat'] }] }) })
+    expect(screen.queryByText('Privattt')).not.toBeInTheDocument()
+    expect(screen.queryByText('Private first-account text')).not.toBeInTheDocument()
+    expect(add).not.toHaveBeenCalled()
+  })
+
   it('removes this device from reminders before signing out without changing another device', async () => {
     const user = userEvent.setup()
     const unsubscribe = vi.fn(async () => true)

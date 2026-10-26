@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleUserRound, Download, LogOut, Settings } from 'lucide-react'
+import { ChevronDown, CircleUserRound, Download, FileCheck2, LogOut, Settings } from 'lucide-react'
 import type { AuthState, WebsiteLanguage } from '../shared/model'
 import { api } from './lib/api'
+import { FeaturesProvider, noFeatures, useFeature } from './lib/features'
 import { errorMessage } from './lib/words'
 import { useWords } from './hooks/useWords'
 import { Auth } from './components/Auth'
@@ -12,6 +13,7 @@ import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
 import { DataExport } from './components/DataExport'
 import { WordResources } from './components/WordResources'
+import { DocumentChecker } from './components/DocumentChecker'
 import { LanguageSettings } from './components/LanguageSettings'
 import { WebsiteLanguageSettings } from './components/WebsiteLanguageSettings'
 import { InstallWebApp, ReminderSettings } from './components/WebAppSettings'
@@ -71,16 +73,18 @@ function Application() {
   }, [])
 
   if (!auth) return <main className="loading-screen"><Brand />{error ? <><p className="error" role="alert">{t('Could not connect to the Worttrainer server: {error}', { error: message(error) })}</p><button className="button primary" onClick={() => void reconnect()}>{t('Retry connection')}</button></> : <p role="status">{t('Opening your little word collection…')}</p>}</main>
-  if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FamilyApp key={auth.email} onSignedOut={() => { requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onWebsiteLanguageSaved={language => {
+  if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FeaturesProvider value={auth.features ?? noFeatures}><FamilyApp key={auth.email} onSignedOut={() => { requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onWebsiteLanguageSaved={language => {
     requests.current++
     setAuth(current => current?.email === auth.email ? { ...current, websiteLanguage: language } : current)
-  }} email={auth.email ?? ''} /></I18nProvider>
+  }} email={auth.email ?? ''} /></FeaturesProvider></I18nProvider>
   return <>{error && <div className="auth-error error" role="alert">{message(error)}<button className="text-button" onClick={() => setError('')}>{t('Dismiss')}</button></div>}<Auth emailMigrationRequired={auth.emailMigrationRequired} onAuthenticated={state => { requests.current++; setError(''); setAuth(state) }} /></>
 }
 
 function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: string; onSignedOut: () => void; onWebsiteLanguageSaved: (language: WebsiteLanguage) => void }) {
   const { t, message } = useI18n()
-  const [tab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings' | 'resources'>('home')
+  const [selectedTab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings' | 'resources' | 'document'>('home')
+  const documentEnabled = useFeature('document-check')
+  const tab = selectedTab === 'document' && !documentEnabled ? 'collection' : selectedTab
   const { words, wordLists, preferences, loading, error, refresh, saveLanguages } = useWords(tab)
   const [signingOut, setSigningOut] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -123,8 +127,8 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
     finally { setSigningOut(false) }
   }
 
-  const pageTitle = t(tab === 'home' ? 'Home' : tab === 'collection' ? 'Collection' : tab === 'statistics' ? 'Progress' : tab === 'resources' ? 'Word lists' : 'Settings')
-  const showPageTitle = tab === 'settings' || tab === 'resources'
+  const pageTitle = t(tab === 'home' ? 'Home' : tab === 'collection' ? 'Collection' : tab === 'statistics' ? 'Progress' : tab === 'resources' ? 'Word lists' : tab === 'document' ? 'Check my document' : 'Settings')
+  const showPageTitle = tab === 'settings' || tab === 'resources' || tab === 'document'
 
   return <div className="app-shell">
     <header className="site-header"><Brand /><div className="account" ref={accountMenu} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setAccountOpen(false) }}>
@@ -136,7 +140,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
         <button disabled={signingOut} onClick={() => void signOut()}><LogOut size={18} />{t(signingOut ? 'Signing out…' : 'Sign out')}</button>
       </div>}
     </div></header>
-    <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' || tab === 'resources' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>
+    <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' || tab === 'resources' || tab === 'document' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>
     <main className={showPageTitle ? undefined : 'workspace-content'}>
       {showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>}
       {authError && <p className="error" role="alert">{t('Could not sign out: {error}', { error: message(authError) })}</p>}
@@ -150,8 +154,9 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
           <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
           <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
         </div>
-      </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'resources' ? <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'collection' ? <Collection words={words} loading={loading} refresh={refresh} preferences={preferences} onOpenWordLists={() => setTab('resources')} /> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} /> : <div className="home-actions">
+      </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'resources' ? <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'document' ? <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'collection' ? <>{documentEnabled && <button className="text-button resource-command" onClick={() => setTab('document')}><FileCheck2 size={18} />{t('Check my document')}</button>}<Collection words={words} loading={loading} refresh={refresh} preferences={preferences} onOpenWordLists={() => setTab('resources')} /></> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} /> : <div className="home-actions">
         <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} />
+        {documentEnabled && <button className="text-button resource-command" onClick={() => setTab('document')}><FileCheck2 size={18} />{t('Check my document')}</button>}
       </div>}
     </main>
     <footer><span>{t('Little by little is a lot.')}</span><span>{t('Private spelling practice')}</span></footer>

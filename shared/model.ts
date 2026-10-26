@@ -52,11 +52,20 @@ export type AuthState = {
   emailMigrationRequired: boolean
   email: string | null
   websiteLanguage?: WebsiteLanguage
+  features?: string[]
 }
 
 export type PhotoRecognition = {
   answers: { number: number; text: string | null; confidence: number | null }[]
   warnings: string[]
+}
+
+export type DocumentCheck = {
+  language: 'en' | 'de'
+  text: string
+  wordCount: number
+  possibleMistakes: { word: string; occurrences: number; suggestions: string[] }[]
+  limited: boolean
 }
 
 export type ChallengeTiming = {

@@ -3,6 +3,7 @@ import { createApp } from './app.js'
 import { FileStore } from './store.js'
 import { ocrConfiguration } from './ocr.js'
 import { pushConfiguration, ReminderService } from './reminders.js'
+import { FeatureFlags } from './feature-flags.js'
 
 const production = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT ?? (production ? 3000 : 3002))
@@ -16,11 +17,13 @@ if (secureCookie && !origin.startsWith('https://')) throw new Error('Secure cook
 const dataFile = resolve(process.env.DATA_FILE ?? 'data/store.json')
 const store = await FileStore.open(dataFile)
 const reminders = await ReminderService.open(dataFile, store, pushConfiguration(process.env))
+const features = await FeatureFlags.open(dataFile, store)
 const app = createApp({
   store, origin, production, secureCookie,
   trustProxy: process.env.TRUST_PROXY === '1',
   ocr: ocrConfiguration(process.env),
   reminders,
+  features,
 })
 const host = process.env.HOST ?? (production ? '0.0.0.0' : '127.0.0.1')
 let stopReminders: (() => Promise<void>) | undefined
