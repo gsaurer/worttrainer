@@ -225,19 +225,19 @@ export function ChallengePractice({ words, initialWords, onUpdated, loading = fa
       <div><strong>{languages[item.words[0].language].name} · {item.words.length} {t(item.words.length === 1 ? 'word' : 'words')}</strong>{reporting && <small><span className="challenge-id" title={item.id}>{t('Challenge')} #{item.id.slice(0, 8)}</span> · {t('Started')} {date(item.startedAt)}<br />{item.reviewedAt ? t('Reviewed {date} · {correct} correct · {incorrect} incorrect · {accuracy}%', { date: date(item.reviewedAt), correct: stats.correct, incorrect: stats.incorrect, accuracy: stats.accuracy ?? '—' }) : item.writtenAt ? t('Written · awaiting parent review · no results recorded yet') : t('{position} of {count} written · in progress', { position: item.nextIndex, count: item.words.length })}</small>}</div>
       <div className="history-check-actions">
         {item.writtenAt && !item.reviewedAt ? <>{autoCheckEnabled && <button className="button secondary challenge-icon-button" title={t('Auto check')} aria-label={t('Auto check')} disabled={busy} onClick={() => openChallenge(item, 'photo')}><Camera size={18} aria-hidden="true" /></button>}<button className="button secondary challenge-icon-button" title={t('Manual check')} aria-label={t('Manual check')} disabled={busy} onClick={() => openChallenge(item, 'manual')}><Check size={18} aria-hidden="true" /></button></> : <button className={`button secondary${item.reviewedAt ? '' : ' challenge-icon-button'}`} title={t(item.reviewedAt ? 'View results' : 'Continue challenge')} aria-label={t(item.reviewedAt ? 'View results' : 'Continue challenge')} disabled={busy} onClick={() => openChallenge(item)}>{item.reviewedAt ? t('View results') : <Play size={18} aria-hidden="true" />}</button>}
-        <button className="button secondary challenge-icon-button" title={t('Remove challenge')} aria-label={t('Remove challenge')} aria-expanded={deleteId === item.id} aria-controls={`remove-challenge-${item.id}`} disabled={busy} onClick={() => { setDeleteId(item.id); setRemovePractice(false) }}><Trash2 size={18} aria-hidden="true" /></button>
+        <button className="button secondary challenge-delete-trigger" title={t('Delete challenge')} aria-expanded={deleteId === item.id} aria-controls={`remove-challenge-${item.id}`} disabled={busy} onClick={() => { setDeleteId(item.id); setRemovePractice(false) }}><Trash2 size={18} aria-hidden="true" />{t('Delete challenge')}</button>
       </div>
       {deleteId === item.id && <div className="challenge-delete-confirmation" id={`remove-challenge-${item.id}`}>
-        <span>{t('Remove this challenge?')}</span>
+        <strong>{t('Delete this challenge?')}</strong>
         {item.reviewedAt && <label className="challenge-delete-option"><input type="checkbox" checked={removePractice} disabled={busy} onChange={event => setRemovePractice(event.target.checked)} /><span>{t('Also remove its practice results')}</span></label>}
         <p className="fine-print">{t(removePractice ? 'Word ratings will be recalculated from the remaining practice results.' : 'Word progress stays.')}</p>
-        <button className="text-button danger" disabled={busy} onClick={() => void run(async () => {
+        <div className="challenge-delete-actions"><button className="button danger" disabled={busy} onClick={() => void run(async () => {
           await api.deleteChallenge(item.id, removePractice)
           setStatus(current => current ? { ...current, challenges: current.challenges.filter(challenge => challenge.id !== item.id) } : current)
           setDeleteId(null)
           if (removePractice) await onUpdated()
           setStatus(await api.challengeStatus())
-        })}>{t('Confirm removal')}</button><button className="text-button" disabled={busy} onClick={() => setDeleteId(null)}>{t('Cancel')}</button>
+        })}><Trash2 size={18} aria-hidden="true" />{t('Yes, delete')}</button><button className="button secondary" disabled={busy} onClick={() => setDeleteId(null)}><X size={18} aria-hidden="true" />{t('Keep challenge')}</button></div>
       </div>}
     </div>})}
   </section>) : []

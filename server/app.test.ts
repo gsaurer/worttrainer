@@ -50,7 +50,7 @@ beforeEach(() => { app = createApp(options()) })
 describe('real self-hosted authentication and JSON persistence', () => {
   it('serves public uncached status and both build identities without accessing account features', async () => {
     const build = { version: '0.1.0', buildId: 'b'.repeat(64), commit: 'a'.repeat(40), dirty: false, builtAt: '2026-10-27T10:00:00.000Z' }
-    const features = await FeatureFlags.open(join(directory, 'store.json'), store)
+    const features = await FeatureFlags.open(join(directory, 'store.json'))
     const refresh = vi.spyOn(features, 'refresh')
     const server = createApp({ ...options(), build, features })
     const response = await request(server).get('/api/status').expect(200).expect('Content-Type', /json/).expect('Cache-Control', 'no-store')
@@ -114,7 +114,7 @@ describe('real self-hosted authentication and JSON persistence', () => {
   it('rejects compressed JSON and photo bodies without changing data and keeps serving requests', async () => {
     const before = store.words(accountId)
     const body = Buffer.from(JSON.stringify({ text: 'compressed', language: 'en' }))
-    const features = await FeatureFlags.open(join(directory, 'store.json'), store)
+    const features = await FeatureFlags.open(join(directory, 'store.json'))
     vi.spyOn(features, 'enabled').mockImplementation(flag => flag === 'challenge-auto-check')
     const server = createApp({ ...options(), features, ocr: { endpoint: 'https://test.cognitiveservices.azure.com', key: 'test-only-key', monthlyLimit: 450 } }).listen(0, '127.0.0.1')
     try {

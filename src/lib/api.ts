@@ -33,6 +33,8 @@ export const api = {
   status: async (signal?: AbortSignal) => serviceStatusSchema.parse(await readResponse<ServiceStatus>(await fetch('/api/status', { signal, cache: 'no-store', credentials: 'omit' }), false)),
   session: () => request<AuthState>('/session'),
   login: (email: string, password: string) => request<AuthState>('/login', 'POST', { email, password }),
+  requestPasswordReset: (email: string) => request<{ message: string }>('/password-reset/request', 'POST', { email }),
+  resetPassword: (token: string, newPassword: string) => request<void>('/password-reset/complete', 'POST', { token, newPassword }),
   signup: (email: string, password: string, websiteLanguage: WebsiteLanguage = 'en') => request<AuthState>('/signup', 'POST', { email, password, websiteLanguage }),
   completeFirstRun: (input: FirstRunInput) => request<Word[]>('/onboarding', 'POST', input, true),
   saveWebsiteLanguage: (websiteLanguage: WebsiteLanguage) => request<{ websiteLanguage: WebsiteLanguage }>('/website-language', 'POST', { websiteLanguage }, true),

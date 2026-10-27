@@ -82,7 +82,7 @@ export function FirstRun({ onComplete }: { onComplete: (words: Word[]) => Promis
       {error && <p className="error" role="alert">{message(error)}</p>}
       <div className="first-run-actions">
         {step === 'words' && <button type="button" className="button secondary" disabled={busy} onClick={() => { setStep('language'); setError('') }}><ArrowLeft size={18} aria-hidden="true" />{t('Back')}</button>}
-        <button type="submit" className="button primary" disabled={busy || (step === 'words' && !ready)}>{t(step === 'language' ? 'Continue' : busy ? 'Saving...' : 'Save and practice')}<ArrowRight size={18} aria-hidden="true" /></button>
+        <button type="submit" className="button primary" disabled={busy || (step === 'words' && !ready)}>{t(step === 'language' ? 'Continue' : busy ? 'Saving...' : 'Add words')}<ArrowRight size={18} aria-hidden="true" /></button>
       </div>
     </form>
   </section>

@@ -125,7 +125,7 @@ form .button { margin-top: 24px; }
 .collection-additions > section { max-width: none; margin: 0; padding: 24px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
 .collection-layout > .word-panel, .statistics-layout > .statistics-progress { background: transparent; border: 0; border-radius: 0; }
 .collection-list-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 27px; border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
-.collection-layout .word-row:has(.delete-confirm) { flex-wrap: wrap; }
+.collection-layout .word-row { flex-wrap: wrap; }
 .collection-layout .delete-confirm { flex-basis: 100%; max-width: none; }
 .statistics-layout { max-width: 900px; margin: 0 auto; min-width: 0; }
 .statistics-progress { border-bottom: 1px solid var(--line); }
@@ -240,7 +240,7 @@ form .button { margin-top: 24px; }
 .connection-links a { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: .85rem; }
 .connected-apps-list, .connection-permissions { list-style: none; padding: 0; margin: 16px 0; }
 .connected-apps-list > li { padding: 16px 0; border-top: 1px solid var(--line); }
-.connection-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.connection-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .connection-heading strong, .connection-origin, .connection-details dd { overflow-wrap: anywhere; min-width: 0; }
 .connection-origin { color: var(--muted); font-size: .8rem; margin: 4px 0 12px; }
 .connection-permissions { font-size: .85rem; }
@@ -255,6 +255,8 @@ form .button { margin-top: 24px; }
 .connection-details dd { margin: 4px 0 0; }
 .oauth-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
 .connection-confirm { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.connection-confirm > strong { display: block; font-size: 1rem; }
+.connection-confirm > p { margin: 8px 0 0; font-size: .9rem; }
 .connection-back { display: inline-block; margin-top: 24px; }
 .settings-panel .fine-print { margin: 12px 0 0; }
 .reminder-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
@@ -289,11 +291,10 @@ form .button { margin-top: 24px; }
 .word-meta { font-size: .65rem; color: var(--muted); line-height: 1.5; }
 .word-meta > span { margin: 0 5px; }
 .badge { display: inline-flex; justify-content: center; align-items: center; min-width: 34px; min-height: 28px; font-size: .8rem; font-weight: 600; border-radius: 6px; padding: 4px 9px; vertical-align: middle; }
-.delete-button { border: 0; background: transparent; font-size: 1.4rem; color: #76796c; min-width: 40px; min-height: 44px; }
-.delete-button:hover { color: #9e4630; }
-.delete-confirm { display: flex; flex-wrap: wrap; gap: 8px; font-size: .64rem; max-width: 145px; }
-.delete-confirm > span { width: 100%; }
-.delete-confirm .text-button { font-size: .7rem; padding: 6px; }
+.word-row .delete-trigger { margin-left: auto; }
+.delete-confirm { border-top: 1px solid var(--line); padding-top: 16px; font-size: .9rem; }
+.delete-confirm > strong { display: block; font-size: 1rem; }
+.delete-confirm > p { margin: 8px 0 0; }
 .danger { color: #9e4630; }
 .panel-footnote { border-top: 1px solid var(--line); padding: 16px 25px; font-size: .65rem; color: var(--muted); background: #faf9f2; }
 .add-card { position: relative; background: #eaf0e3; border: 1px solid #d7dfca; border-radius: 12px; padding: 27px; }
@@ -449,8 +450,15 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .photo-history-row > div:last-child { font-size: .8rem; }
 .photo-history-row .text-button { margin-right: 12px; }
 .photo-history-row .challenge-icon-button { width: 44px; height: 44px; flex-shrink: 0; padding: 10px; }
-.challenge-delete-confirmation { flex-basis: 100%; }
-.challenge-delete-confirmation > span { display: block; margin-bottom: 8px; }
+.delete-trigger, .challenge-delete-trigger { gap: 8px; max-width: 100%; font-size: .95rem; }
+.delete-trigger svg, .destructive-actions svg { flex-shrink: 0; }
+.challenge-delete-confirmation { flex-basis: 100%; border-top: 1px solid var(--line); padding-top: 20px; }
+.challenge-delete-confirmation > strong { display: block; font-size: 1rem; margin-bottom: 8px; }
+.challenge-delete-confirmation .fine-print { margin: 8px 0 0; font-size: .9rem; }
+.destructive-actions, .challenge-delete-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.destructive-actions .button, .challenge-delete-actions .button { min-height: 48px; max-width: 100%; gap: 8px; font-size: 1rem; }
+.destructive-actions .danger, .challenge-delete-actions .danger { background: #9e342b; border-color: #9e342b; color: #fff; }
+.destructive-actions .danger:not(:disabled):hover, .challenge-delete-actions .danger:not(:disabled):hover { background: #7f271f; border-color: #7f271f; }
 .challenge-delete-option { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .challenge-delete-option input { flex-shrink: 0; width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; }
 .challenge-delete-option span { min-width: 0; }
@@ -594,7 +602,6 @@ main { animation: arrive .4s ease-out; }
   .word-row { padding: 18px; gap: 10px; }
   .word-text { font-size: 1.2rem; }
   .word-meta { font-size: .6rem; }
-  .delete-confirm { max-width: 120px; }
   .panel-footnote { font-size: .61rem; padding: 14px 18px; }
   .welcome-story h1 { font-size: 3rem; }
   .auth-card { padding: 27px 22px; }

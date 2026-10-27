@@ -51,21 +51,31 @@ describe('OAuth consent and connected apps', () => {
     expect(complete).not.toHaveBeenCalled()
   })
 
-  it('requires confirmation to disconnect and leaves a failed connection visible for retry', async () => {
+  it.each([
+    { language: 'en' as const, trigger: 'Disconnect Claude', label: 'Disconnect', confirm: 'Yes, disconnect', keep: 'Keep connected' },
+    { language: 'de' as const, trigger: 'Claude trennen', label: 'Trennen', confirm: 'Ja, trennen', keep: 'Verbunden lassen' },
+  ])('offers clear disconnect and keep actions in $language and retains failed connections for retry', async ({ language, trigger, label, confirm, keep }) => {
     const user = userEvent.setup()
     vi.spyOn(api, 'connectedApps').mockResolvedValue({ endpoint: 'https://words.example.test/api/mcp', connections: [connection] })
     const disconnect = vi.spyOn(api, 'disconnectApp').mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValue(undefined)
-    render(<I18nProvider language="en"><ConnectedApps /></I18nProvider>)
-    await user.click(await screen.findByRole('button', { name: 'Disconnect Claude' }))
+    render(<I18nProvider language={language}><ConnectedApps /></I18nProvider>)
+    const button = await screen.findByRole('button', { name: trigger })
+    expect(button).toHaveTextContent(label)
+    await user.click(button)
+    expect(screen.getByRole('button', { name: confirm })).toHaveClass('button', 'danger')
+    expect(screen.getByRole('button', { name: keep })).toHaveClass('button', 'secondary')
     expect(disconnect).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: keep }))
+    expect(screen.queryByRole('button', { name: confirm })).not.toBeInTheDocument()
     expect(disconnect).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Disconnect Claude' }))
-    await user.click(screen.getByRole('button', { name: 'Disconnect' }))
+    await user.click(screen.getByRole('button', { name: trigger }))
+    await user.click(screen.getByRole('button', { name: confirm }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost')
     expect(screen.getByText('Claude', { selector: 'strong' })).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Disconnect' }))
-    expect(await screen.findByText('No apps connected.')).toBeVisible()
+    expect(screen.getByRole('button', { name: confirm })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: confirm }))
+    await waitFor(() => expect(screen.queryByText('Claude', { selector: 'strong' })).not.toBeInTheDocument())
+    expect(disconnect).toHaveBeenCalledTimes(2)
     expect(disconnect).toHaveBeenLastCalledWith(connection.id)
   })
 

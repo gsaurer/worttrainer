@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, CircleUserRound, Download, List, LogOut, Plus, Settings } from 'lucide-react'
-import type { AuthState, WebsiteLanguage, Word } from '../shared/model'
+import type { AuthState, WebsiteLanguage } from '../shared/model'
 import { api } from './lib/api'
 import { FeaturesProvider, noFeatures, useFeature } from './lib/features'
 import { errorMessage } from './lib/words'
@@ -25,11 +25,11 @@ import { currentPushSubscription, installedWebApp } from './lib/pwa'
 import { I18nProvider } from './i18n/I18n'
 import { useI18n } from './i18n/context'
 
-function removeSetupFragment() {
+function removeAuthFragments() {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
-  const code = fragment.get('setup')
-  if (code !== null) {
+  if (fragment.has('setup') || fragment.has('reset')) {
     fragment.delete('setup')
+    fragment.delete('reset')
     const url = new URL(window.location.href)
     url.hash = fragment.toString()
     window.history.replaceState(null, '', url)
@@ -49,6 +49,7 @@ export default function App() {
 function Application() {
   const { t, message } = useI18n()
   const [auth, setAuth] = useState<AuthState | null>(null)
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('reset'))
   const [error, setError] = useState('')
   const requests = useRef(0)
   const oauthRequest = new URLSearchParams(window.location.search).get('oauth_request')
@@ -62,7 +63,12 @@ function Application() {
 
   useEffect(() => {
     let active = true
-    removeSetupFragment()
+    removeAuthFragments()
+    const hashChanged = () => {
+      const token = new URLSearchParams(window.location.hash.slice(1)).get('reset')
+      if (token !== null) setResetToken(token)
+      removeAuthFragments()
+    }
     const expired = () => {
       requests.current++
       setAuth({ authenticated: false, emailMigrationRequired: false, email: null })
@@ -79,10 +85,11 @@ function Application() {
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
     const timer = window.setInterval(refresh, 30_000)
-    window.addEventListener('hashchange', removeSetupFragment)
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener('auth-expired', expired); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('hashchange', removeSetupFragment) }
+    window.addEventListener('hashchange', hashChanged)
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('auth-expired', expired); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('hashchange', hashChanged) }
   }, [])
 
+  if (resetToken !== null) return <Auth key={resetToken} resetToken={resetToken} onRecoveryExit={() => { requests.current++; setError(''); setResetToken(null); setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onAuthenticated={state => { requests.current++; setError(''); setResetToken(null); setAuth(state) }} />
   if (!auth) return <main className="loading-screen"><Brand />{error ? <><p className="error" role="alert">{t('Could not connect to the Worttrainer server: {error}', { error: message(error) })}</p><button className="button primary" onClick={() => void reconnect()}>{t('Retry connection')}</button></> : <p role="status">{t('Opening your little word collection…')}</p>}</main>
   if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FeaturesProvider value={auth.features ?? noFeatures}>{oauthRequest ? <OAuthConsent key={auth.email} requestId={oauthRequest} onComplete={redirect => window.location.assign(redirect)} onSwitchAccount={async () => { await signOutAccount(); requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} /> : <FamilyApp key={auth.email} onboardingRequired={auth.onboardingRequired === true} onFirstRunComplete={() => {
     requests.current++
@@ -99,7 +106,6 @@ function FamilyApp({ email, onboardingRequired, onFirstRunComplete, onSignedOut,
   const [tab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings'>('home')
   const [collectionView, setCollectionView] = useState<'words' | 'add'>('add')
   const [practiceActive, setPracticeActive] = useState(false)
-  const [firstPractice, setFirstPractice] = useState<Word[] | null>(null)
   const documentEnabled = useFeature('document-check')
   const { words, wordLists, preferences, loading, error, refresh, saveLanguages } = useWords(tab)
   const [signingOut, setSigningOut] = useState(false)
@@ -159,11 +165,9 @@ function FamilyApp({ email, onboardingRequired, onFirstRunComplete, onSignedOut,
       {!onboardingRequired && (showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>)}
       {authError && <p className="error" role="alert">{t('Could not sign out: {error}', { error: message(authError) })}</p>}
       {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>{t('Retry loading')}</button></div>}
-      {onboardingRequired ? <FirstRun onComplete={async words => {
+      {onboardingRequired ? <FirstRun onComplete={async () => {
         await refresh()
-        setFirstPractice(words)
         setTab('home')
-        setPracticeActive(true)
         onFirstRunComplete()
       }} /> : tab === 'settings' ? <div className="settings-layout">
         <nav className="settings-navigation" aria-label={t('Settings sections')}>
@@ -201,7 +205,7 @@ function FamilyApp({ email, onboardingRequired, onFirstRunComplete, onSignedOut,
           <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} />
         </div>
       </div> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} onActiveChange={setPracticeActive} /> : <div className="home-actions">
-        <Practice words={words} wordLists={wordLists} initialWords={firstPractice ?? undefined} loading={loading} onUpdated={refresh} preferences={preferences} onActiveChange={active => { setPracticeActive(active); if (!active) setFirstPractice(null) }} />
+        <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} onActiveChange={setPracticeActive} />
         {!practiceActive && documentEnabled && <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} />}
       </div>}
     </main>

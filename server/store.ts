@@ -37,6 +37,7 @@ const wordSchema = z.object({
 }).strict().refine(word => word.consecutive_mistakes < 2 || word.category === 'minus')
 const oldSessionSchema = z.object({ tokenHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.number().int().positive() }).strict()
 const sessionSchema = oldSessionSchema.extend({ accountId: z.uuid() }).strict()
+const passwordResetsSchema = z.array(sessionSchema.extend({ issuedAt: z.number().int().positive(), passwordHash: credentialsSchema.shape.passwordHash }).strict()).default([])
 const wordListsSchema = z.array(z.object({
   resourceId: z.string().min(1).max(120),
   title: z.string().min(1).max(200),
@@ -75,12 +76,15 @@ const legacyStoreSchema = z.object({
   }
 })
 const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, onboardingRequired: z.boolean().optional(), websiteLanguage: websiteLanguageSchema.default('en'), languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
-function validateOwnership(data: { accounts: { id: string; account: Account }[]; sessions: StoredSession[] }, context: z.RefinementCtx) {
+function validateOwnership(data: { accounts: { id: string; account: Account }[]; sessions: StoredSession[]; passwordResets?: { accountId: string; tokenHash: string }[] }, context: z.RefinementCtx) {
   const ids = new Set(data.accounts.map(account => account.id))
   const emails = data.accounts.flatMap(item => 'email' in item.account ? [item.account.email] : [])
   if (ids.size !== data.accounts.length || new Set(emails).size !== emails.length ||
       data.accounts.filter(item => 'username' in item.account).length > 1 ||
       data.sessions.some(session => !ids.has(session.accountId)) ||
+      data.passwordResets?.some(reset => !ids.has(reset.accountId)) ||
+      new Set(data.passwordResets?.map(reset => reset.accountId)).size !== (data.passwordResets?.length ?? 0) ||
+      new Set(data.passwordResets?.map(reset => reset.tokenHash)).size !== (data.passwordResets?.length ?? 0) ||
       new Set(data.sessions.map(session => session.tokenHash)).size !== data.sessions.length) {
     context.addIssue({ code: 'custom', message: 'Inconsistent account ownership.' })
   }
@@ -88,6 +92,7 @@ function validateOwnership(data: { accounts: { id: string; account: Account }[];
 const stateSchema = z.object({
   accounts: z.array(accountDataSchema), sessions: z.array(sessionSchema), ocrUsage: usageSchema,
   oauth: oauthStateSchema.default({ clients: [], grants: [] }),
+  passwordResets: passwordResetsSchema,
 }).strict().superRefine(validateOwnership)
 const oldStoreSchema = stateSchema.safeExtend({ version: z.literal(2) })
 const indexSchema = z.object({
@@ -95,6 +100,7 @@ const indexSchema = z.object({
   accounts: z.array(z.object({ id: z.uuid(), account: accountSchema }).strict()),
   sessions: z.array(sessionSchema), ocrUsage: usageSchema,
   oauth: oauthStateSchema.default({ clients: [], grants: [] }),
+  passwordResets: passwordResetsSchema,
 }).strict().superRefine(validateOwnership)
 function migrateLegacyCollection(value: unknown) {
   if (typeof value !== 'object' || value === null || !('photoRounds' in value) || 'challenges' in value) return value
@@ -144,6 +150,7 @@ function indexData(state: State): z.input<typeof indexSchema> {
     version: 3, accounts: state.accounts.map(({ id, account }) => ({ id, account })),
     sessions: state.sessions, ocrUsage: state.ocrUsage,
     ...(state.oauth.clients.length || state.oauth.grants.length ? { oauth: state.oauth } : {}),
+    ...(state.passwordResets.length ? { passwordResets: state.passwordResets } : {}),
   }
 }
 
@@ -242,7 +249,7 @@ export class FileStore {
         try { entries = await readdir(accountDirectory(file)) }
         catch (error) { if (!missing(error)) throw error }
         if (entries.length) throw new Error(`Missing account index ${file}, but account data exists. Restore the index from a matching backup; no data has been reset.`)
-        const state: State = { accounts: [], sessions: [], ocrUsage: { month: null, used: 0 }, oauth: { clients: [], grants: [] } }
+        const state: State = { accounts: [], sessions: [], ocrUsage: { month: null, used: 0 }, oauth: { clients: [], grants: [] }, passwordResets: [] }
         await writeJson(file, indexData(state))
         return new FileStore(file, state)
       }
@@ -269,7 +276,7 @@ export class FileStore {
           ...raw,
           accounts: 'accounts' in raw && Array.isArray(raw.accounts) ? raw.accounts.map(migrateLegacyCollection) : undefined,
         })
-        const state: State = { accounts: old.accounts, sessions: old.sessions, ocrUsage: old.ocrUsage, oauth: old.oauth }
+        const state: State = { accounts: old.accounts, sessions: old.sessions, ocrUsage: old.ocrUsage, oauth: old.oauth, passwordResets: old.passwordResets }
         await preserveBackup(file, text, 2)
         for (const account of state.accounts) await ensureAccountFile(file, account)
         // Publish the index only after every complete account file is durable.
@@ -296,7 +303,7 @@ export class FileStore {
         }
         accounts.push({ ...identity, onboardingRequired: data.onboardingRequired, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists })
       }
-      return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage, oauth: index.oauth }))
+      return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage, oauth: index.oauth, passwordResets: index.passwordResets }))
     } catch (error) {
       throw new Error(`Cannot read data store ${file}. Restore a valid backup; no data has been reset. ${error instanceof Error ? error.message : 'Storage operation failed.'}`, { cause: error })
     }
@@ -571,6 +578,36 @@ export class FileStore {
       const data = owned(state, accountId)
       data.account = { ...data.account, ...credentials }
       state.sessions = state.sessions.filter(item => item.accountId !== accountId)
+    })
+  }
+
+  createPasswordReset(accountId: string, tokenHash: string, passwordHash: string, now = Date.now()) {
+    return this.transaction(state => {
+      if (owned(state, accountId).account.passwordHash !== passwordHash) return false
+      const active = state.passwordResets.filter(reset => reset.expiresAt > now && owned(state, reset.accountId).account.passwordHash === reset.passwordHash)
+      if (active.some(reset => reset.accountId === accountId && reset.issuedAt > now - 60_000)) return false
+      state.passwordResets = [...active.filter(reset => reset.accountId !== accountId), { accountId, tokenHash, passwordHash, issuedAt: now, expiresAt: now + 30 * 60_000 }]
+      return true
+    })
+  }
+
+  cancelPasswordReset(tokenHash: string) {
+    return this.transaction(state => { state.passwordResets = state.passwordResets.filter(reset => reset.tokenHash !== tokenHash) })
+  }
+
+  passwordResetAccount(tokenHash: string, now = Date.now()) {
+    const reset = this.state.passwordResets.find(reset => reset.tokenHash === tokenHash && reset.expiresAt > now)
+    return reset && owned(this.state, reset.accountId).account.passwordHash === reset.passwordHash ? reset.accountId : null
+  }
+
+  completePasswordReset(tokenHash: string, credentials: { salt: string; passwordHash: string }) {
+    return this.transaction(state => {
+      const reset = state.passwordResets.find(reset => reset.tokenHash === tokenHash && reset.expiresAt > Date.now())
+      if (!reset || owned(state, reset.accountId).account.passwordHash !== reset.passwordHash) throw new HttpError(400, 'This reset link is invalid or has expired. Request a new link.')
+      const data = owned(state, reset.accountId)
+      data.account = { ...data.account, ...credentials }
+      state.sessions = state.sessions.filter(session => session.accountId !== data.id)
+      state.passwordResets = state.passwordResets.filter(entry => entry.accountId !== data.id)
     })
   }
 

@@ -1,10 +1,9 @@
 import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join } from 'node:path'
 import { z } from 'zod'
-import { parentEmailSchema, type FileStore } from './store.js'
 
 const nameSchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, 'Use lowercase letters, digits and hyphens, starting with a letter.')
-const accountSchema = z.union([z.uuid().transform(value => value.toLowerCase()), parentEmailSchema])
+const accountSchema = z.uuid().transform(value => value.toLowerCase())
 const flagSchema = z.object({
   all: z.boolean().default(false),
   accounts: z.array(accountSchema).max(1000).default([]),
@@ -35,12 +34,12 @@ export class FeatureFlags {
   private pending: Promise<void> | null = null
   private failed: string | null = null
 
-  private constructor(private file: string, private store: FileStore, private flags: Flags, private version: string) {}
+  private constructor(private file: string, private flags: Flags, private version: string) {}
 
-  static async open(dataFile: string, store: FileStore) {
+  static async open(dataFile: string) {
     const file = join(dirname(dataFile), `${basename(dataFile, extname(dataFile))}.feature-flags.json`)
     const loaded = await readFlags(file)
-    return new FeatureFlags(file, store, loaded!.flags, loaded!.version)
+    return new FeatureFlags(file, loaded!.flags, loaded!.version)
   }
 
   /** Reloads when the file changed, at most once a second; an invalid edit keeps the last valid flags. */
@@ -66,9 +65,7 @@ export class FeatureFlags {
   enabled(name: string, accountId: string): boolean {
     const flag = this.flags[name]
     if (!flag) return false
-    if (flag.all) return true
-    const account = this.store.account(accountId)
-    return flag.accounts.includes(accountId) || ('email' in account && flag.accounts.includes(account.email))
+    return flag.all || flag.accounts.includes(accountId)
   }
 
   forAccount(accountId: string): string[] {

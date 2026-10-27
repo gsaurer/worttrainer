@@ -4,9 +4,10 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { hashPassword } from './passwords.js'
+import { createOAuth } from './oauth.js'
 import { FileStore } from './store.js'
 import type { Challenge, Word } from '../shared/model.js'
 
@@ -36,6 +37,10 @@ function cookieFrom(response: request.Response) {
   if (!Array.isArray(cookies) || typeof cookies[0] !== 'string') throw new Error('Expected a session cookie.')
   return cookies[0].split(';')[0]
 }
+function resetCredential() {
+  const token = randomBytes(32).toString('base64url')
+  return { token, tokenHash: createHash('sha256').update(token).digest('hex') }
+}
 const post = (path: string, body: object, cookie = second.cookie) =>
   request(app).post(path).set('Origin', origin).set('Cookie', cookie).send(body)
 const remove = (path: string) =>
@@ -58,6 +63,127 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
 describe('independent private accounts', () => {
+  it('resets a parent password with a private single-use email link without changing learning data', async () => {
+    const delivered: { to: string; url: string; language: 'de' | 'en' }[] = []
+    app = createApp({ store, origin, secureCookie: false, sendPasswordReset: async message => { delivered.push(message) } })
+    const original = store.exportData(first.id)
+    const unknown = await post('/api/password-reset/request', { email: 'unknown@example.com' }, '').expect(202)
+    const requested = await post('/api/password-reset/request', { email: ' FIRST@EXAMPLE.COM ' }, '').expect(202)
+    expect(requested.body).toEqual(unknown.body)
+    await vi.waitFor(() => expect(delivered).toHaveLength(1))
+    expect(delivered[0]).toMatchObject({ to: first.email, language: 'en' })
+    const link = new URL(delivered[0].url)
+    expect(link.origin).toBe(origin)
+    const token = new URLSearchParams(link.hash.slice(1)).get('reset')
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(requested.text).not.toContain(token)
+    expect(await readFile(join(directory, 'store.json'), 'utf8')).not.toContain(token)
+    await words(first.cookie).expect(200)
+    const newPassword = 'a recovered parent account passphrase'
+    await post('/api/password-reset/complete', { token, newPassword }, '').expect(204)
+    await post('/api/password-reset/complete', { token, newPassword }, '').expect(400)
+    await words(first.cookie).expect(401)
+    await words(second.cookie).expect(200)
+    expect(store.exportData(first.id)).toMatchObject({ words: original.words, attempts: original.attempts, challenges: original.challenges })
+    await post('/api/login', { email: first.email, password }, '').expect(401)
+    await post('/api/login', { email: first.email, password: newPassword }, '').expect(200)
+  }, 15_000)
+
+  it('persists password reset expiry and replaces older links only after the cooldown', async () => {
+    const older = resetCredential()
+    const newer = resetCredential()
+    const now = Date.now()
+    expect(await store.createPasswordReset(first.id, older.tokenHash, credentials.passwordHash, now - 60_001)).toBe(true)
+    expect(await store.createPasswordReset(first.id, newer.tokenHash, credentials.passwordHash, now)).toBe(true)
+    expect(await store.createPasswordReset(first.id, older.tokenHash, credentials.passwordHash, now + 1)).toBe(false)
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.passwordResetAccount(older.tokenHash)).toBeNull()
+    expect(reopened.passwordResetAccount(newer.tokenHash)).toBe(first.id)
+    expect(reopened.passwordResetAccount(newer.tokenHash, now + 30 * 60_000 - 1)).toBe(first.id)
+    expect(reopened.passwordResetAccount(newer.tokenHash, now + 30 * 60_000)).toBeNull()
+    const expired = resetCredential()
+    await reopened.createPasswordReset(second.id, expired.tokenHash, credentials.passwordHash, now - 31 * 60_000)
+    await expect(reopened.completePasswordReset(expired.tokenHash, credentials)).rejects.toThrow('invalid or has expired')
+    expect(reopened.sessionAccount(second.stored.tokenHash)).toBe(second.id)
+    expect(JSON.stringify(reopened.exportData(first.id))).not.toContain(newer.tokenHash)
+  })
+
+  it('consumes a password reset atomically and invalidates browser, MCP and OAuth credentials only for its owner', async () => {
+    const reset = resetCredential()
+    const replacement = { salt: '11'.repeat(16), passwordHash: '22'.repeat(64) }
+    const mcp = await post('/api/mcp/token', {}, first.cookie).expect(201)
+    const mcpHash = createHash('sha256').update(mcp.body.token).digest('hex')
+    const clientId = randomUUID()
+    const access = resetCredential()
+    const refresh = resetCredential()
+    const now = Date.now()
+    await store.oauthTransaction(state => {
+      state.clients.push({ id: clientId, name: 'Test app', redirectUris: ['https://client.example.test/callback'] })
+      state.grants.push({ id: randomUUID(), clientId, accountId: first.id, credentialHash: createHash('sha256').update(credentials.passwordHash).digest('hex'), resource: `${origin}/api/mcp`, scopes: ['words:read'], createdAt: now, usedRefreshHashes: [], access: { hash: access.tokenHash, expiresAt: now + 60_000 }, refresh: { hash: refresh.tokenHash, expiresAt: now + 60_000 } })
+    })
+    const oauth = createOAuth(store, origin)
+    expect(oauth.access(access.token)?.accountId).toBe(first.id)
+    await store.createPasswordReset(first.id, reset.tokenHash, credentials.passwordHash)
+    const outcomes = await Promise.allSettled([store.completePasswordReset(reset.tokenHash, replacement), store.completePasswordReset(reset.tokenHash, replacement)])
+    expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(outcomes.filter(result => result.status === 'rejected')).toHaveLength(1)
+    expect(store.sessionAccount(first.stored.tokenHash)).toBeNull()
+    expect(store.sessionAccount(mcpHash)).toBeNull()
+    expect(store.sessionAccount(second.stored.tokenHash)).toBe(second.id)
+    expect(oauth.access(access.token)).toBeNull()
+    await request(app).post('/api/oauth/token').type('form').send({ grant_type: 'refresh_token', refresh_token: refresh.token, client_id: clientId }).expect(400)
+    expect(store.words(first.id)).toHaveLength(1)
+    expect(store.challenges(first.id)).toHaveLength(1)
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.passwordResetAccount(reset.tokenHash)).toBeNull()
+    expect(reopened.account(first.id)).toMatchObject(replacement)
+  })
+
+  it('invalidates an outstanding password reset after a separate password change', async () => {
+    const reset = resetCredential()
+    await store.createPasswordReset(first.id, reset.tokenHash, credentials.passwordHash)
+    await store.recoverPassword(first.id, { salt: '11'.repeat(16), passwordHash: '22'.repeat(64) })
+    expect(store.passwordResetAccount(reset.tokenHash)).toBeNull()
+    await expect(store.completePasswordReset(reset.tokenHash, credentials)).rejects.toThrow('invalid or has expired')
+    expect(await store.createPasswordReset(first.id, reset.tokenHash, credentials.passwordHash)).toBe(false)
+  })
+
+  it('cancels a password reset after mail failure without logging secrets or changing the password', async () => {
+    const delivered: string[] = []
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      app = createApp({ store, origin, secureCookie: false, sendPasswordReset: async ({ url }) => { delivered.push(url); throw new Error('test-only SMTP credential') } })
+      await post('/api/password-reset/request', { email: first.email }, '').expect(202)
+      await vi.waitFor(() => expect(log).toHaveBeenCalledOnce())
+      expect(log).toHaveBeenCalledWith('Password reset email could not be sent.')
+      const token = new URLSearchParams(new URL(delivered[0]).hash.slice(1)).get('reset')!
+      expect(store.passwordResetAccount(createHash('sha256').update(token).digest('hex'))).toBeNull()
+      await words(first.cookie).expect(200)
+      expect(store.account(first.id)).toMatchObject(credentials)
+      await post('/api/login', { email: first.email, password }, '').expect(200)
+    } finally { log.mockRestore() }
+  }, 15_000)
+
+  it('protects password reset endpoints with origin, validation and independent abuse limits', async () => {
+    const send = vi.fn(async () => {})
+    app = createApp({ store, origin, secureCookie: false, sendPasswordReset: send })
+    await request(app).post('/api/password-reset/request').set('Origin', 'https://foreign.example.test').send({ email: first.email }).expect(403)
+    await post('/api/password-reset/request', { email: first.email, accountId: second.id }, '').expect(400)
+    await post('/api/password-reset/request', { email: 'invalid' }, '').expect(400)
+    for (let count = 0; count < 3; count++) await post('/api/password-reset/request', { email: 'unknown@example.com' }, '').expect(202)
+    await post('/api/password-reset/request', { email: 'unknown@example.com' }, '').expect(429)
+    const token = resetCredential().token
+    await post('/api/password-reset/complete', { token, newPassword: 'short' }, '').expect(400)
+    await post('/api/password-reset/complete', { token, newPassword: password, accountId: first.id }, '').expect(400)
+    for (let count = 0; count < 8; count++) await post('/api/password-reset/complete', { token, newPassword: password }, '').expect(400)
+    await post('/api/password-reset/complete', { token, newPassword: password }, '').expect(429)
+    expect(send).not.toHaveBeenCalled()
+    await post('/api/login', { email: first.email, password }, '').expect(200)
+    app = createApp({ store, origin, secureCookie: false })
+    await post('/api/password-reset/request', { email: first.email }, '').expect(503)
+    await post('/api/password-reset/request', { email: 'unknown@example.com' }, '').expect(503)
+  }, 15_000)
+
   it('exports one coherent complete account snapshot without credentials or another account’s data', async () => {
     await request(app).get('/api/export').expect(401)
     await store.reviewChallenge(first.id, challenge.id, [true], { method: 'photo', spellings: ['Strasse'] })

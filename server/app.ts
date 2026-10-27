@@ -29,6 +29,7 @@ export type AppOptions = {
   reminders?: ReminderService
   features?: FeatureFlags
   build?: BuildInfo
+  sendPasswordReset?: (message: { to: string; url: string; language: 'de' | 'en' }) => Promise<void>
 }
 
 const cookieName = 'worttrainer_session'
@@ -106,6 +107,8 @@ export function createApp(options: AppOptions) {
   app.use(express.json({ limit: '16kb', strict: true, inflate: false }))
 
   const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Wait 15 minutes and try again.' } })
+  const resetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many reset requests. Wait 15 minutes and try again.' } })
+  const resetCompletionLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many reset attempts. Wait 15 minutes and try again.' } })
   let passwordWork = 0
   async function withPasswordWork<T>(operation: () => Promise<T>): Promise<T> {
     if (passwordWork >= 2) throw new HttpError(429, 'Sign-in is busy. Try again in a moment.')
@@ -189,6 +192,35 @@ export function createApp(options: AppOptions) {
   app.post('/api/logout', async (req, res) => {
     const token = sessionToken(req)
     if (token && authenticated(req)) await store.removeSession(digest(token))
+    setCookie(res, '', 0)
+    res.status(204).end()
+  })
+  app.post('/api/password-reset/request', resetLimiter, async (req, res) => {
+    const input = parse(z.object({ email: parentEmailSchema }).strict(), req.body)
+    if (!options.sendPasswordReset) throw new HttpError(503, 'Password reset emails are not configured. Contact the server operator.')
+    res.status(202).json({ message: 'If an account exists for that email, a password reset link will be sent.' })
+    const deliver = async () => {
+      const record = store.findAccount(input.email)
+      if (!record || !('email' in record.account)) return
+      const token = randomBytes(32).toString('base64url')
+      const tokenHash = digest(token)
+      if (!await store.createPasswordReset(record.id, tokenHash, record.account.passwordHash)) return
+      const url = new URL('/', options.origin)
+      url.hash = new URLSearchParams({ reset: token }).toString()
+      try { await options.sendPasswordReset!({ to: record.account.email, url: url.toString(), language: store.websiteLanguage(record.id) }) }
+      catch {
+        await store.cancelPasswordReset(tokenHash)
+        console.error('Password reset email could not be sent.')
+      }
+    }
+    void deliver().catch(() => { console.error('Password reset request could not be completed.') })
+  })
+  app.post('/api/password-reset/complete', resetCompletionLimiter, async (req, res) => {
+    const input = parse(z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/), newPassword: password }).strict(), req.body)
+    const tokenHash = digest(input.token)
+    if (!store.passwordResetAccount(tokenHash)) throw new HttpError(400, 'This reset link is invalid or has expired. Request a new link.')
+    const credentials = await withPasswordWork(() => hashPassword(input.newPassword))
+    await store.completePasswordReset(tokenHash, credentials)
     setCookie(res, '', 0)
     res.status(204).end()
   })

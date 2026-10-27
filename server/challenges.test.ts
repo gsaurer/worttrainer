@@ -42,7 +42,7 @@ beforeEach(async () => {
   await store.register({ email: 'parent@example.com', salt: '00'.repeat(16), passwordHash: 'aa'.repeat(64) }, { accountId, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 60_000 })
   ids = [ (await store.addWord(accountId, 'Straße', 'de')).id, (await store.addWord(accountId, 'Schmetterling', 'de')).id ]
   await writeFile(join(directory, 'store.feature-flags.json'), JSON.stringify({ flags: { 'challenge-auto-check': { all: true } } }))
-  features = await FeatureFlags.open(join(directory, 'store.json'), store)
+  features = await FeatureFlags.open(join(directory, 'store.json'))
   app = createApp(options())
   photo = await sharp({ create: { width: 30, height: 40, channels: 3, background: '#ffffff' } }).png().toBuffer()
 })

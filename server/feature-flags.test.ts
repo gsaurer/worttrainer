@@ -41,30 +41,30 @@ afterEach(async () => { vi.restoreAllMocks(); await rm(directory, { recursive: t
 
 describe('feature flags', () => {
   it('has no flags without a file and never creates one', async () => {
-    const flags = await FeatureFlags.open(dataFile, store)
+    const flags = await FeatureFlags.open(dataFile)
     expect(flags.forAccount(first.id)).toEqual([])
     expect(flags.enabled('anything', first.id)).toBe(false)
     await expect(import('node:fs/promises').then(fs => fs.stat(flagsFile))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('enables a flag for everyone or only for listed account emails and IDs', async () => {
+  it('enables a flag for everyone or only for listed account IDs', async () => {
     await write({
       'for-everyone': { all: true },
-      'by-email': { accounts: [' First@Example.test '] },
+      'by-first-id': { accounts: [first.id] },
       'by-id': { accounts: [second.id.toUpperCase()] },
       'off': { all: false },
       'unlisted': {},
     })
-    const flags = await FeatureFlags.open(dataFile, store)
-    expect(flags.forAccount(first.id)).toEqual(['by-email', 'for-everyone'])
+    const flags = await FeatureFlags.open(dataFile)
+    expect(flags.forAccount(first.id)).toEqual(['by-first-id', 'for-everyone'])
     expect(flags.forAccount(second.id)).toEqual(['by-id', 'for-everyone'])
     expect(flags.enabled('off', first.id)).toBe(false)
     expect(flags.enabled('unknown', first.id)).toBe(false)
   })
 
   it('applies edits without a restart and keeps the last valid flags after a bad edit', async () => {
-    await write({ beta: { accounts: ['first@example.test'] } })
-    const flags = await FeatureFlags.open(dataFile, store)
+    await write({ beta: { accounts: [first.id] } })
+    const flags = await FeatureFlags.open(dataFile)
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(flags.enabled('beta', first.id)).toBe(true)
     await write({ beta: { all: true }, extra: { all: true } })
@@ -88,22 +88,35 @@ describe('feature flags', () => {
     ['unknown flag key', { flags: { beta: { everyone: true } } }],
     ['non-boolean all', { flags: { beta: { all: 'yes' } } }],
     ['invalid account', { flags: { beta: { accounts: ['not an account'] } } }],
+    ['email address', { flags: { beta: { accounts: ['first@example.test'] } } }],
+    ['mixed account IDs and email addresses', { flags: { beta: { accounts: [randomUUID(), 'first@example.test'] } } }],
   ])('refuses to start with an invalid file: %s', async (_name, content) => {
     await writeFile(flagsFile, JSON.stringify(content))
-    await expect(FeatureFlags.open(dataFile, store)).rejects.toThrow(flagsFile)
+    await expect(FeatureFlags.open(dataFile)).rejects.toThrow(flagsFile)
+  })
+
+  it('keeps ID-based access unchanged when an email-based edit is rejected', async () => {
+    await write({ beta: { accounts: [first.id] } })
+    const flags = await FeatureFlags.open(dataFile)
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await write({ beta: { accounts: ['second@example.test'] } })
+    await flags.refresh(Date.now() + 2000)
+    expect(flags.enabled('beta', first.id)).toBe(true)
+    expect(flags.enabled('beta', second.id)).toBe(false)
+    expect(log).toHaveBeenCalledOnce()
   })
 
   it('includes only the signed-in account’s flags in its session', async () => {
-    await write({ shared: { all: true }, private: { accounts: ['first@example.test'] } })
-    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile, store) })
+    await write({ shared: { all: true }, private: { accounts: [first.id] } })
+    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile) })
     expect((await request(app).get('/api/session').set('Cookie', first.cookie).expect(200)).body.features).toEqual(['private', 'shared'])
     expect((await request(app).get('/api/session').set('Cookie', second.cookie).expect(200)).body.features).toEqual(['shared'])
     expect((await request(app).get('/api/session').expect(200)).body).not.toHaveProperty('features')
   })
 
   it('gates document endpoints on the server, including per-account activation', async () => {
-    await write({ 'document-check': { accounts: ['first@example.test'] } })
-    const flags = await FeatureFlags.open(dataFile, store)
+    await write({ 'document-check': { accounts: [first.id] } })
+    const flags = await FeatureFlags.open(dataFile)
     const app = createApp({ store, origin, secureCookie: false, features: flags })
     for (const cookie of [undefined, second.cookie]) {
       const send = (path: string) => {
@@ -121,8 +134,8 @@ describe('feature flags', () => {
   })
 
   it('gates challenge auto checking independently and before OCR for each account', async () => {
-    await write({ 'document-check': { all: true }, 'challenge-auto-check': { accounts: ['first@example.test'] } })
-    const flags = await FeatureFlags.open(dataFile, store)
+    await write({ 'document-check': { all: true }, 'challenge-auto-check': { accounts: [first.id] } })
+    const flags = await FeatureFlags.open(dataFile)
     const normalize = vi.spyOn(ocr, 'normalizePhoto').mockResolvedValue(Buffer.from('normalized'))
     const read = vi.spyOn(ocr, 'readAzurePhoto').mockResolvedValue({ answers: [{ number: 1, text: 'beautiful', confidence: 0.9 }], warnings: [] })
     const options = { store, origin, secureCookie: false, ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 5 } }
@@ -161,7 +174,7 @@ describe('feature flags', () => {
 
   it('adds reviewed words atomically without duplicates, changed progress or account leakage', async () => {
     await write({ 'document-check': { all: true } })
-    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile, store) })
+    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile) })
     const existing = await store.addWord(first.id, 'beautiful', 'en')
     await store.mark(first.id, existing.id, false, randomUUID())
     const before = store.exportData(first.id)
@@ -184,7 +197,7 @@ describe('feature flags', () => {
     await write({ 'document-check': { all: true } })
     const normalize = vi.spyOn(ocr, 'normalizePhoto').mockResolvedValue(Buffer.from('normalized'))
     const read = vi.spyOn(ocr, 'readAzureDocument').mockResolvedValue('A beautifull flower.')
-    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile, store), ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 1 } })
+    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile), ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 1 } })
     const upload = (language = 'en') => request(app).post(`/api/documents/photo?language=${language}`).set('Origin', origin).set('Cookie', first.cookie).set('Content-Type', 'image/jpeg').send(Buffer.from('photo'))
     await upload('fr').expect(400)
     expect(normalize).not.toHaveBeenCalled()
@@ -200,7 +213,7 @@ describe('feature flags', () => {
     await write({ 'document-check': { all: true } })
     await store.setLanguagePreferences(first.id, { enabled: ['en'], defaultLanguage: 'en' })
     const read = vi.spyOn(ocr, 'readAzureDocument')
-    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile, store), ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 5 } })
+    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile), ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 5 } })
     const upload = (language: string) => request(app).post(`/api/documents/photo?language=${language}`).set('Origin', origin).set('Cookie', first.cookie).set('Content-Type', 'image/jpeg')
     await upload('de').send(Buffer.from('photo')).expect(409)
     await upload('en').set('Content-Encoding', 'gzip').send(gzipSync(Buffer.from('photo'))).expect(415)
@@ -218,7 +231,7 @@ describe('feature flags', () => {
     const reading = new Promise<string>((_resolve, reject) => { fail = reject })
     const began = new Promise<void>(resolve => { started = resolve })
     vi.spyOn(ocr, 'readAzureDocument').mockImplementationOnce(() => { started(); return reading }).mockResolvedValue('A beautiful flower.')
-    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile, store), ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 5 } })
+    const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile), ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 5 } })
     const upload = () => request(app).post('/api/documents/photo?language=en').set('Origin', origin).set('Cookie', first.cookie).set('Content-Type', 'image/jpeg').send(Buffer.from('photo'))
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     const firstUpload = upload().then(response => response)

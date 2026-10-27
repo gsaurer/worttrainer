@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Word } from '../../shared/model'
+import { I18nProvider } from '../i18n/I18n'
+import { api } from '../lib/api'
 import { Collection } from './Collection'
 
 const words: Word[] = [
@@ -10,6 +12,8 @@ const words: Word[] = [
 ]
 
 describe('word collection', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('keeps the existing words separate from word entry and imports', () => {
     render(<Collection words={words} loading={false} refresh={vi.fn()} />)
     expect(screen.getByRole('searchbox', { name: 'Search words' })).toBeVisible()
@@ -69,15 +73,49 @@ describe('word collection', () => {
     expect(screen.getByRole('combobox', { name: 'Category' })).toHaveValue('plus')
   })
 
-  it('requires an explicit delete confirmation and lets the parent keep the word', async () => {
+  it.each([
+    { language: 'en' as const, trigger: 'Delete word: Straße', label: 'Delete word', question: 'Delete word & history?', confirm: 'Yes, delete', keep: 'Keep word' },
+    { language: 'de' as const, trigger: 'Wort löschen: Straße', label: 'Wort löschen', question: 'Wort und Verlauf löschen?', confirm: 'Ja, löschen', keep: 'Wort behalten' },
+  ])('offers clear deletion and cancellation buttons in $language without deleting on cancel', async ({ language, trigger, label, question, confirm, keep }) => {
     const user = userEvent.setup()
-    render(<Collection words={words} loading={false} refresh={vi.fn()} />)
-    await user.type(screen.getByLabelText('Search words'), 'Straße')
-    await user.click(screen.getByRole('button', { name: 'Delete Straße' }))
-    expect(screen.getByText('Delete word & history?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Keep' }))
-    expect(screen.queryByText('Delete word & history?')).not.toBeInTheDocument()
+    const remove = vi.spyOn(api, 'deleteWord').mockResolvedValue(undefined)
+    render(<I18nProvider language={language}><Collection words={words} loading={false} refresh={vi.fn()} /></I18nProvider>)
+    const button = screen.getByRole('button', { name: trigger })
+    expect(button).toHaveTextContent(label)
+    await user.click(button)
+    expect(screen.getByText(question)).toBeVisible()
+    expect(screen.getByRole('button', { name: confirm })).toHaveClass('button', 'danger')
+    expect(screen.getByRole('button', { name: keep })).toHaveClass('button', 'secondary')
+    expect(remove).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: keep }))
+    expect(screen.queryByText(question)).not.toBeInTheDocument()
     expect(screen.getByText('Straße')).toBeInTheDocument()
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('deletes only the confirmed word and refreshes the collection', async () => {
+    const user = userEvent.setup()
+    const remove = vi.spyOn(api, 'deleteWord').mockResolvedValue(undefined)
+    const refresh = vi.fn().mockResolvedValue(undefined)
+    render(<Collection words={words} loading={false} refresh={refresh} />)
+    await user.click(screen.getByRole('button', { name: 'Delete word: Straße' }))
+    expect(screen.getByText('Saved challenges containing this word and their results are also removed. Other words’ progress stays.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Word and its practice history deleted.')
+    expect(remove).toHaveBeenCalledExactlyOnceWith('1')
+    expect(refresh).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the confirmation available after a failed deletion', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'deleteWord').mockRejectedValue(new Error('Connection lost'))
+    render(<Collection words={words} loading={false} refresh={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: 'Delete word: Straße' }))
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost')
+    expect(screen.getByRole('button', { name: 'Yes, delete' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Keep word' })).toBeEnabled()
+    expect(screen.getByText('Straße')).toBeVisible()
   })
 
   it('shows more words and restores the defined list when a search is cleared', async () => {
