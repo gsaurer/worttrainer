@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleUserRound, Download, FileCheck2, LogOut, Settings } from 'lucide-react'
+import { ChevronDown, CircleUserRound, Download, List, LogOut, Plus, Settings } from 'lucide-react'
 import type { AuthState, WebsiteLanguage } from '../shared/model'
 import { api } from './lib/api'
 import { FeaturesProvider, noFeatures, useFeature } from './lib/features'
@@ -8,6 +8,7 @@ import { useWords } from './hooks/useWords'
 import { Auth } from './components/Auth'
 import { Brand } from './components/Icons'
 import { Collection } from './components/Collection'
+import { AddWord } from './components/AddWord'
 import { Statistics } from './components/Statistics'
 import { Practice } from './components/Practice'
 import { PasswordSettings } from './components/PasswordSettings'
@@ -90,9 +91,10 @@ function Application() {
 
 function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: string; onSignedOut: () => void; onWebsiteLanguageSaved: (language: WebsiteLanguage) => void }) {
   const { t, message } = useI18n()
-  const [selectedTab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings' | 'resources' | 'document'>('home')
+  const [tab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings'>('home')
+  const [collectionView, setCollectionView] = useState<'words' | 'add'>('add')
+  const [practiceActive, setPracticeActive] = useState(false)
   const documentEnabled = useFeature('document-check')
-  const tab = selectedTab === 'document' && !documentEnabled ? 'collection' : selectedTab
   const { words, wordLists, preferences, loading, error, refresh, saveLanguages } = useWords(tab)
   const [signingOut, setSigningOut] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -133,11 +135,11 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
     finally { setSigningOut(false) }
   }
 
-  const pageTitle = t(tab === 'home' ? 'Home' : tab === 'collection' ? 'Collection' : tab === 'statistics' ? 'Progress' : tab === 'resources' ? 'Word lists' : tab === 'document' ? 'Check my document' : 'Settings')
-  const showPageTitle = tab === 'settings' || tab === 'resources' || tab === 'document'
+  const pageTitle = t(tab === 'home' ? 'Home' : tab === 'collection' ? 'Collection' : tab === 'statistics' ? 'Progress' : 'Settings')
+  const showPageTitle = tab === 'settings'
 
   return <div className="app-shell">
-    <header className="site-header"><Brand /><div className="account" ref={accountMenu} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setAccountOpen(false) }}>
+    {!practiceActive && <header className="site-header"><Brand /><div className="account" ref={accountMenu} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setAccountOpen(false) }}>
       <button ref={accountToggle} className="account-toggle" aria-label={t('Account menu')} title={email} aria-expanded={accountOpen} aria-controls="account-actions" onClick={() => setAccountOpen(previous => !previous)}><CircleUserRound /><ChevronDown size={16} /></button>
       {accountOpen && <div id="account-actions" className="account-panel" role="group" aria-label={t('Account')}>
         <p className="account-identity">{email}</p>
@@ -145,8 +147,8 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
         {!installedWebApp() && <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Download size={18} />{t('Install app')}</button>}
         <button disabled={signingOut} onClick={() => void signOut()}><LogOut size={18} />{t(signingOut ? 'Signing out…' : 'Sign out')}</button>
       </div>}
-    </div></header>
-    <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' || tab === 'resources' || tab === 'document' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>
+    </div></header>}
+    {!practiceActive && <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>}
     <main className={tab === 'settings' ? 'settings-page' : showPageTitle ? undefined : 'workspace-content'}>
       {showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>}
       {authError && <p className="error" role="alert">{t('Could not sign out: {error}', { error: message(authError) })}</p>}
@@ -173,11 +175,22 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
             <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
           </div>
         </div>
-      </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'resources' ? <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'document' ? <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} onBack={() => setTab('collection')} /> : tab === 'collection' ? <>{documentEnabled && <button className="text-button resource-command" onClick={() => setTab('document')}><FileCheck2 size={18} />{t('Check my document')}</button>}<Collection words={words} loading={loading} refresh={refresh} preferences={preferences} onOpenWordLists={() => setTab('resources')} /></> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} /> : <div className="home-actions">
-        <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} />
-        {documentEnabled && <button className="text-button resource-command" onClick={() => setTab('document')}><FileCheck2 size={18} />{t('Check my document')}</button>}
+      </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'collection' ? <div className="collection-workspace">
+        <nav className="main-nav collection-navigation" aria-label={t('Collection sections')}>
+          <button aria-current={collectionView === 'add' ? 'page' : undefined} onClick={() => setCollectionView('add')}><Plus size={18} aria-hidden="true" />{t('Add words')}</button>
+          <button aria-current={collectionView === 'words' ? 'page' : undefined} onClick={() => setCollectionView('words')}><List size={18} aria-hidden="true" />{t('Your words')}</button>
+        </nav>
+        <div hidden={collectionView !== 'words'}><Collection words={words} loading={loading} refresh={refresh} preferences={preferences} /></div>
+        <div className="collection-additions" hidden={collectionView !== 'add'}>
+          <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} />
+          {collectionView === 'add' && documentEnabled && <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} />}
+          <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} />
+        </div>
+      </div> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} onActiveChange={setPracticeActive} /> : <div className="home-actions">
+        <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} onActiveChange={setPracticeActive} />
+        {!practiceActive && documentEnabled && <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} />}
       </div>}
     </main>
-    <footer><span>{t('Little by little is a lot.')}</span><span>{t('Private spelling practice')}</span></footer>
+    {!practiceActive && <footer><span>{t('Little by little is a lot.')}</span><span>{t('Private spelling practice')}</span></footer>}
   </div>
 }

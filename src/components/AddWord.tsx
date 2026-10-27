@@ -53,8 +53,8 @@ export function AddWord({ words, loading, refresh, preferences = initialLanguage
   return <section className="add-card" aria-labelledby="add-title">
     <div className="add-heading"><h2 id="add-title">{t('Add a word')}</h2>{onOpenWordLists && <button className="text-button resource-command" onClick={onOpenWordLists}><BookOpen size={18} />{t('Word lists')}</button>}</div>
     <form className="quick-add" onSubmit={add}>
-      <div><label htmlFor="new-word">{t('Word')}</label><input ref={input} id="new-word" dir="auto" autoComplete="off" enterKeyHint="done" spellCheck={false} value={text} onChange={event => { setText(event.target.value); setError(''); setNotice('') }} placeholder={t('Correct spelling')} disabled={saving} required aria-invalid={!!existing || !!error} aria-describedby={error ? 'add-error' : existing ? 'word-duplicate' : undefined} /></div>
       <div><label htmlFor="new-language">{t('Language')}</label><select id="new-language" value={language} onChange={event => { setLanguage(event.target.value as Language); setError(''); setNotice('') }} disabled={saving}>{preferences.enabled.map(value => <option key={value} value={value}>{languages[value].name}</option>)}</select></div>
+      <div><label htmlFor="new-word">{t('Word')}</label><input ref={input} id="new-word" dir="auto" autoComplete="off" enterKeyHint="done" spellCheck={false} value={text} onChange={event => { setText(event.target.value); setError(''); setNotice('') }} placeholder={t('Correct spelling')} disabled={saving} required aria-invalid={!!existing || !!error} aria-describedby={error ? 'add-error' : existing ? 'word-duplicate' : undefined} /></div>
       <button className="button primary" disabled={saving || loading || !!existing || !text.trim()}>{t(saving ? 'Adding…' : 'Add word')}</button>
     </form>
     {existing && !error && <p id="word-duplicate" role="status" className="add-status">{duplicateMessage}</p>}

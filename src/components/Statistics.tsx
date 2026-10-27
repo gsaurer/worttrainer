@@ -4,11 +4,12 @@ import { languages } from '../lib/words'
 import { useI18n } from '../i18n/context'
 import { ChallengePractice } from './ChallengePractice'
 
-export function Statistics({ words, preferences, loading, refresh }: {
+export function Statistics({ words, preferences, loading, refresh, onActiveChange }: {
   words: Word[]
   preferences: LanguagePreferences
   loading: boolean
   refresh: () => Promise<void>
+  onActiveChange?: (active: boolean) => void
 }) {
   const { t } = useI18n()
   const [active, setActive] = useState(false)
@@ -26,6 +27,6 @@ export function Statistics({ words, preferences, loading, refresh }: {
         })}</tbody></table></div>
       </>}
     </section>}
-    <ChallengePractice view="statistics" words={words} loading={loading} onUpdated={refresh} onActiveChange={setActive} />
+    <ChallengePractice view="statistics" words={words} loading={loading} onUpdated={refresh} onActiveChange={active => { setActive(active); onActiveChange?.(active) }} />
   </div>
 }

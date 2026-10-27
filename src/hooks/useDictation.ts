@@ -10,8 +10,11 @@ export function useDictation() {
   const [speaking, setSpeaking] = useState(false)
   const [error, setError] = useState<{ key: Message; values?: Values } | null>(null)
   const current = useRef<SpeechSynthesisUtterance | null>(null)
+  const startTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const stop = useCallback(() => {
+    clearTimeout(startTimer.current)
+    startTimer.current = undefined
     current.current = null
     if (supported) window.speechSynthesis.cancel()
     setSpeaking(false)
@@ -24,6 +27,7 @@ export function useDictation() {
     const cancelWhenHidden = () => { if (document.hidden) stop() }
     document.addEventListener('visibilitychange', cancelWhenHidden)
     return () => {
+      clearTimeout(startTimer.current)
       current.current = null
       window.speechSynthesis.cancel()
       document.removeEventListener('visibilitychange', cancelWhenHidden)
@@ -51,17 +55,28 @@ export function useDictation() {
       utterance.lang = voice.lang || languages[language].speech
       utterance.rate = 0.8
       current.current = utterance
-      utterance.onstart = () => { if (current.current === utterance) setSpeaking(true) }
-      utterance.onend = () => { if (current.current === utterance) { current.current = null; setSpeaking(false); onFinished?.(true) } }
+      utterance.onstart = () => { if (current.current === utterance) { clearTimeout(startTimer.current); setSpeaking(true) } }
+      utterance.onend = () => { if (current.current === utterance) { clearTimeout(startTimer.current); current.current = null; setSpeaking(false); onFinished?.(true) } }
       utterance.onerror = event => {
         if (current.current !== utterance) return
+        clearTimeout(startTimer.current)
         current.current = null
         setSpeaking(false)
         setError({ key: 'Dictation could not play ({error}). Check your device audio and try Listen again.', values: { error: event.error } })
         onFinished?.(false)
       }
+      startTimer.current = setTimeout(() => {
+        if (current.current !== utterance) return
+        current.current = null
+        window.speechSynthesis.cancel()
+        setSpeaking(false)
+        setError({ key: 'Dictation could not play ({error}). Check your device audio and try Listen again.', values: { error: 'audio-start-timeout' } })
+        onFinished?.(false)
+      }, 5000)
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume()
       window.speechSynthesis.speak(utterance)
     } catch (error) {
+      clearTimeout(startTimer.current)
       current.current = null
       setSpeaking(false)
       setError(error instanceof Error ? { key: 'Dictation could not start: {error}', values: { error: error.message } } : { key: 'Dictation could not start: Please try again.' })

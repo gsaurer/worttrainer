@@ -173,7 +173,7 @@ describe('whole-challenge dictation', () => {
   it('automatically speaks words, waits the configured interval after speech, and stops without advancing', async () => {
     vi.useFakeTimers()
     const spoken: { text: string; onend: () => void }[] = []
-    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'de-DE', localService: true }], cancel: vi.fn(), speak: (utterance: { text: string; onend: () => void }) => spoken.push(utterance) })
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'de-DE', localService: true }], cancel: vi.fn(), speak: (utterance: { text: string; onstart: () => void; onend: () => void }) => { spoken.push(utterance); utterance.onstart() } })
     const saved = { ...challenge, words: [...challenge.words, { ...challenge.words[0], id: 'second-word', text: 'Straße' }] }
     vi.spyOn(api, 'createChallenge').mockResolvedValue(saved)
     const advance = vi.spyOn(api, 'advanceChallenge').mockImplementation(async (_id, nextIndex) => ({ ...saved, nextIndex }))
@@ -202,6 +202,23 @@ describe('whole-challenge dictation', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Previous word' })) })
     expect(advance).toHaveBeenLastCalledWith(challenge.id, 0, expect.objectContaining({ automatic: false, action: 'previous' }))
     expect(screen.getByRole('heading', { name: 'Listen and write the word.' })).toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent(word.text)
+  })
+
+  it('stops silent automatic playback without advancing when speech never starts', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'de-DE', localService: true }], cancel: vi.fn(), speak: vi.fn() })
+    vi.spyOn(api, 'createChallenge').mockResolvedValue(challenge)
+    const advance = vi.spyOn(api, 'advanceChallenge').mockResolvedValue(challenge)
+    render(<Practice words={[word]} loading={false} onUpdated={vi.fn()} />)
+    await act(async () => {})
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Start 10 words' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Start' })) })
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeVisible()
+    await act(async () => { vi.advanceTimersByTime(5000) })
+    expect(screen.getByRole('button', { name: 'Play automatically' })).toBeVisible()
+    expect(screen.getByRole('alert')).toHaveTextContent('audio-start-timeout')
+    expect(advance).not.toHaveBeenCalled()
     expect(document.body).not.toHaveTextContent(word.text)
   })
 

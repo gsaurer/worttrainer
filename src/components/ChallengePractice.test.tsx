@@ -42,7 +42,7 @@ describe('persisted whole-challenge practice', () => {
     expect(create).not.toHaveBeenCalled()
     expect(window.speechSynthesis.speak).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Challenges' })).getAllByRole('button')).toHaveLength(1)
+    expect(within(screen.getByRole('region', { name: 'Challenges' })).getAllByRole('button').map(button => button.textContent)).toEqual(['Back to challenges', 'Start'])
     await user.click(screen.getByRole('button', { name: 'Start' }))
     expect(create).toHaveBeenCalledWith([word.id])
     expect(screen.getByRole('heading', { name: 'Listen and write the word.' })).toBeVisible()
@@ -214,7 +214,7 @@ describe('persisted whole-challenge practice', () => {
     await user.click(await screen.findByRole('button', { name: 'Auto check' }))
     expect(screen.getByRole('button', { name: 'Take a photo' })).toBeVisible()
     expect(screen.getByLabelText(/one photo of your answers/i)).not.toBeVisible()
-    expect(screen.getByLabelText(/one photo of your answers/i)).toHaveAttribute('capture', 'environment')
+    expect(screen.getByLabelText(/one photo of your answers/i)).not.toHaveAttribute('capture')
     const file = new File(['test-photo'], 'answers.png', { type: 'image/png' })
     await user.upload(screen.getByLabelText(/one photo of your answers/i), file)
     expect(read).not.toHaveBeenCalled()
@@ -234,7 +234,7 @@ describe('persisted whole-challenge practice', () => {
     expect(review.mock.calls).toEqual([[challenge.id, [false], details], [challenge.id, [false], details]])
   })
 
-  it('captures a rear-camera JPEG, previews it before upload, and releases the camera for retakes and manual review', async () => {
+  it('captures a rear-camera JPEG, previews it before upload, and releases the camera for retakes and cancellation', async () => {
     const user = userEvent.setup()
     const stop = vi.fn()
     const stream = { getTracks: () => [{ stop }] }
@@ -253,6 +253,10 @@ describe('persisted whole-challenge practice', () => {
     await waitFor(() => expect(video).toHaveProperty('srcObject', stream))
     expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } } })
     expect(screen.getByRole('button', { name: 'Take a photo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel' }).parentElement).toBe(screen.getByRole('button', { name: 'Take a photo' }).parentElement)
+    expect(screen.queryByRole('button', { name: 'Send photo to Azure for reading' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Manual check' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Challenge details', { selector: 'summary' })).not.toBeInTheDocument()
     Object.defineProperties(video, { videoWidth: { value: 1200 }, videoHeight: { value: 1600 } })
     fireEvent.loadedData(video)
     await user.click(screen.getByRole('button', { name: 'Take a photo' }))
@@ -275,8 +279,10 @@ describe('persisted whole-challenge practice', () => {
     expect(stop).toHaveBeenCalledTimes(2)
     await user.click(screen.getByRole('button', { name: 'Retake photo' }))
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(3))
-    await user.click(screen.getByRole('button', { name: 'Manual check' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(stop).toHaveBeenCalledTimes(3)
+    expect(screen.getByRole('button', { name: 'Auto check' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Manual check' })).toBeVisible()
   })
 
   it('stops a late camera permission response after leaving photo checking', async () => {
@@ -290,13 +296,13 @@ describe('persisted whole-challenge practice', () => {
     render(<ChallengePractice words={[]} onUpdated={vi.fn()} />)
     await user.click(await screen.findByRole('button', { name: 'Auto check' }))
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1))
-    await user.click(screen.getByRole('button', { name: 'Manual check' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await act(async () => { complete?.(stream) })
     expect(stop).toHaveBeenCalledTimes(1)
     expect(screen.queryByLabelText('Camera preview')).not.toBeInTheDocument()
   })
 
-  it('allows camera retry and an explicit upload fallback after permission denial', async () => {
+  it('allows camera retry and gallery upload without forcing camera capture after permission denial', async () => {
     const user = userEvent.setup()
     const stop = vi.fn()
     const getUserMedia = vi.fn().mockRejectedValueOnce(new DOMException('Denied', 'NotAllowedError')).mockResolvedValue({ getTracks: () => [{ stop }] })
@@ -305,13 +311,16 @@ describe('persisted whole-challenge practice', () => {
     render(<ChallengePractice words={[]} onUpdated={vi.fn()} />)
     await user.click(await screen.findByRole('button', { name: 'Auto check' }))
     expect(await screen.findByText('Camera unavailable. Allow camera access or upload a photo.')).toBeVisible()
-    const chooser = vi.spyOn(screen.getByLabelText(/one photo of your answers/i), 'click').mockImplementation(() => {})
+    const input = screen.getByLabelText(/one photo of your answers/i)
+    expect(input).not.toHaveAttribute('capture')
+    expect(input).toHaveAttribute('accept', 'image/jpeg,image/png')
+    const chooser = vi.spyOn(input, 'click').mockImplementation(() => {})
     await user.click(screen.getByRole('button', { name: 'Try camera again' }))
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2))
     expect(chooser).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Upload a photo' }))
     expect(chooser).toHaveBeenCalledTimes(1)
-    await user.click(screen.getByRole('button', { name: 'Manual check' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(stop).toHaveBeenCalledTimes(1)
   })
 
@@ -330,7 +339,7 @@ describe('persisted whole-challenge practice', () => {
     fireEvent.loadedData(video)
     await user.click(screen.getByRole('button', { name: 'Take a photo' }))
     expect(screen.getByRole('button', { name: 'Take a photo' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Manual check' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await act(async () => { complete?.(new Blob(['late-photo'], { type: 'image/jpeg' })) })
     expect(stop).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('img', { name: 'Selected answer sheet for parent checking' })).not.toBeInTheDocument()

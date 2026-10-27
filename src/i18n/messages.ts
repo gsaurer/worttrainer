@@ -3,6 +3,9 @@ import type { WebsiteLanguage } from '../../shared/model'
 export const german = {
   'Home': 'Start',
   'Collection': 'Wortsammlung',
+  'Collection sections': 'Bereiche der Wortsammlung',
+  'Add words': 'Wörter hinzufügen',
+  'Import word list': 'Wortliste importieren',
   'Check my document': 'Meinen Text prüfen',
   'Document language': 'Sprache des Textes',
   'Document photo (JPEG or PNG, up to 4 MB)': 'Foto des Textes (JPEG oder PNG, bis 4 MB)',

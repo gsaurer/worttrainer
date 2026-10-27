@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Camera, FileCheck2, Plus, RotateCcw, Upload } from 'lucide-react'
+import { Camera, FileCheck2, Plus, RotateCcw, Upload, X } from 'lucide-react'
 import { validateWord, type ChallengeStatus, type DocumentCheck, type LanguagePreferences } from '../../shared/model'
 import { api } from '../lib/api'
 import { errorMessage, languages } from '../lib/words'
@@ -8,10 +8,9 @@ import { AnswerCamera } from './AnswerCamera'
 
 type Correction = { word: string; selected: boolean; saved: boolean }
 
-export function DocumentChecker({ preferences, onUpdated, onBack }: {
+export function DocumentChecker({ preferences, onUpdated }: {
   preferences: LanguagePreferences
   onUpdated: () => Promise<void>
-  onBack: () => void
 }) {
   const { t, message } = useI18n()
   const available = preferences.enabled.filter((language): language is DocumentCheck['language'] => language === 'en' || language === 'de')
@@ -41,6 +40,7 @@ export function DocumentChecker({ preferences, onUpdated, onBack }: {
   useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl) }, [photoUrl])
 
   function reset() { setResult(null); setCorrections([]); setNotice(''); setError('') }
+  function clearPhoto() { reset(); setPhoto(null); setPhotoUrl(''); setCameraOpen(false) }
   function selectPhoto(file?: File) {
     if (!file || working.current) return
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 4 * 1024 * 1024 || file.size === 0) {
@@ -84,29 +84,34 @@ export function DocumentChecker({ preferences, onUpdated, onBack }: {
     finally { working.current = false; if (active.current) setBusy(null) }
   }
 
-  return <section className="document-checker" aria-label={t('Check my document')}>
-    <button className="text-button resource-command" disabled={!!busy} onClick={onBack}><ArrowLeft size={18} />{t('Back to collection')}</button>
+  return <section className="document-checker photo-intro" aria-labelledby="document-check-title">
+    <h2 id="document-check-title">{t('Check my document')}</h2>
     {!language ? <p className="notice">{t('Enable English or German in Languages to check a document.')}</p> : <>
-      <div className="document-toolbar">
+      {!cameraOpen && <div className="document-toolbar">
         <label>{t('Document language')}<select value={language} disabled={!!busy} onChange={event => {
           if (event.target.value === 'en' || event.target.value === 'de') setChosen(event.target.value)
           reset()
         }}>{available.map(value => <option key={value} value={value}>{languages[value].name}</option>)}</select></label>
-        {ocr && <span className="fine-print">{t('Photo budget: {used} / {limit}', { used: ocr.used, limit: ocr.limit })}</span>}
-      </div>
+        {!photo && !result && <div className="document-photo-actions">
+          <button className="button secondary challenge-icon-button" disabled={!!busy} title={t('Take a photo')} aria-label={t('Take a photo')} onClick={() => { reset(); setCameraOpen(true) }}><Camera size={20} aria-hidden="true" /></button>
+          <button className="button secondary challenge-icon-button" disabled={!!busy} title={t('Upload a photo')} aria-label={t('Upload a photo')} onClick={() => input.current?.click()}><Upload size={20} aria-hidden="true" /></button>
+        </div>}
+      </div>}
       <label className="visually-hidden" htmlFor="document-photo">{t('Document photo (JPEG or PNG, up to 4 MB)')}</label>
-      <input ref={input} id="document-photo" type="file" hidden accept="image/jpeg,image/png" capture="environment" disabled={!!busy} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = '' }} />
-      {cameraOpen ? <AnswerCamera disabled={!!busy} onCapture={selectPhoto} onUpload={() => input.current?.click()} /> : photoUrl ? <img className="document-photo" src={photoUrl} alt={t('Selected document')} /> : null}
-      <div className="document-photo-actions">
-        <button className="button secondary challenge-icon-button" disabled={!!busy} title={t(photo ? 'Retake photo' : 'Take a photo')} aria-label={t(photo ? 'Retake photo' : 'Take a photo')} onClick={() => { reset(); setPhoto(null); setPhotoUrl(''); setCameraOpen(true) }}><Camera size={20} /></button>
-        <button className="button secondary challenge-icon-button" disabled={!!busy} title={t('Upload a photo')} aria-label={t('Upload a photo')} onClick={() => input.current?.click()}><Upload size={20} /></button>
-        {!result && <button className="button primary resource-command" disabled={!!busy || !photo || !ocr?.enabled || ocr.used >= ocr.limit} onClick={() => void check()}><FileCheck2 size={18} />{t(busy === 'checking' ? 'Checking document...' : 'Check document')}</button>}
-        {result && <button className="text-button resource-command" disabled={!!busy} onClick={() => { reset(); setPhoto(null); setPhotoUrl(''); setCameraOpen(false) }}><RotateCcw size={18} />{t('Check another document')}</button>}
-      </div>
-      {!ocr && <button className="text-button" disabled={!!busy} onClick={() => setRetry(previous => previous + 1)}>{t('Retry loading')}</button>}
-      {ocr && !ocr.enabled && <p className="notice">{t('Automatic reading needs an Azure Free/F0 endpoint and key. Review the paper manually until these are configured.')}</p>}
-      {ocr?.enabled && ocr.used >= ocr.limit && <p className="notice">{t('The monthly photo budget is exhausted. Use manual review; there is no paid fallback.')}</p>}
-      {!result && <p className="fine-print">{t('Only send a document you are allowed to share. The photo is sent to Microsoft Azure for reading; spelling is checked locally. The app does not save this document. Azure may retain input/results for up to 24 hours; early deletion is requested. Crop out names and faces.')}</p>}
+      <input ref={input} id="document-photo" type="file" hidden accept="image/jpeg,image/png" disabled={!!busy} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = '' }} />
+      {cameraOpen ? <AnswerCamera disabled={!!busy} onCapture={selectPhoto} onUpload={() => input.current?.click()} onCancel={clearPhoto} /> : photoUrl ? <img className="document-photo" src={photoUrl} alt={t('Selected document')} /> : null}
+      {!cameraOpen && (photo || result) && <div className={photo && !result ? 'document-photo-actions camera-actions' : 'document-photo-actions'}>
+        {!result && <>
+          <button className="button secondary challenge-icon-button" disabled={!!busy} title={t('Retake photo')} aria-label={t('Retake photo')} onClick={() => { reset(); setPhoto(null); setPhotoUrl(''); setCameraOpen(true) }}><Camera size={20} aria-hidden="true" /></button>
+          <button className="button primary resource-command" disabled={!!busy || !ocr?.enabled || ocr.used >= ocr.limit} onClick={() => void check()}><FileCheck2 size={18} />{t(busy === 'checking' ? 'Checking document...' : 'Check document')}</button>
+          <button className="button secondary challenge-icon-button" disabled={!!busy} title={t('Cancel')} aria-label={t('Cancel')} onClick={clearPhoto}><X size={20} aria-hidden="true" /></button>
+        </>}
+        {result && <button className="text-button resource-command" disabled={!!busy} onClick={clearPhoto}><RotateCcw size={18} />{t('Check another document')}</button>}
+      </div>}
+      {!cameraOpen && !ocr && <button className="text-button" disabled={!!busy} onClick={() => setRetry(previous => previous + 1)}>{t('Retry loading')}</button>}
+      {!cameraOpen && ocr && !ocr.enabled && <p className="notice">{t('Automatic reading needs an Azure Free/F0 endpoint and key. Review the paper manually until these are configured.')}</p>}
+      {!cameraOpen && ocr?.enabled && ocr.used >= ocr.limit && <p className="notice">{t('The monthly photo budget is exhausted. Use manual review; there is no paid fallback.')}</p>}
+      {!cameraOpen && photo && !result && <p className="fine-print">{t('Only send a document you are allowed to share. The photo is sent to Microsoft Azure for reading; spelling is checked locally. The app does not save this document. Azure may retain input/results for up to 24 hours; early deletion is requested. Crop out names and faces.')}</p>}
       {result && <div className="document-review">
         <h2>{t('Possible spelling mistakes')}</h2>
         <p className="fine-print">{t('{count} words checked. Names, specialist words and photo recognition can cause false alarms. Review each correction.', { count: result.wordCount })}</p>

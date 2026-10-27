@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Upload } from 'lucide-react'
+import { Camera, Upload, X } from 'lucide-react'
 import { useI18n } from '../i18n/context'
 
-export function AnswerCamera({ disabled, onCapture, onUpload }: { disabled: boolean; onCapture: (photo: File) => void; onUpload: () => void }) {
+export function AnswerCamera({ disabled, onCapture, onUpload, onCancel }: { disabled: boolean; onCapture: (photo: File) => void; onUpload: () => void; onCancel: () => void }) {
   const { t } = useI18n()
   const video = useRef<HTMLVideoElement>(null)
   const generation = useRef(0)
@@ -55,6 +55,7 @@ export function AnswerCamera({ disabled, onCapture, onUpload }: { disabled: bool
         else capture()
       }}><Camera size={22} aria-hidden="true" /></button>
       <button className="button secondary challenge-icon-button" title={t('Upload a photo')} aria-label={t('Upload a photo')} disabled={disabled || capturing} onClick={onUpload}><Upload size={18} aria-hidden="true" /></button>
+      <button className="button secondary challenge-icon-button" title={t('Cancel')} aria-label={t('Cancel')} disabled={disabled} onClick={onCancel}><X size={20} aria-hidden="true" /></button>
     </div>
   </div>
 }

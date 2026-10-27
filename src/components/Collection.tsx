@@ -5,14 +5,12 @@ import { initialLanguagePreferences } from '../../shared/languages'
 import { categories, errorMessage, languages } from '../lib/words'
 import { api } from '../lib/api'
 import { useI18n } from '../i18n/context'
-import { AddWord } from './AddWord'
 
-export function Collection({ words, loading, refresh, preferences = initialLanguagePreferences(), onOpenWordLists }: {
+export function Collection({ words, loading, refresh, preferences = initialLanguagePreferences() }: {
   words: Word[]
   loading: boolean
   refresh: () => Promise<void>
   preferences?: LanguagePreferences
-  onOpenWordLists?: () => void
 }) {
   const { t, message, date, categoryLabel } = useI18n()
   const [language, setLanguage] = useState<Language | 'all'>('all')
@@ -44,7 +42,6 @@ export function Collection({ words, loading, refresh, preferences = initialLangu
   }
 
   return <div className="collection-layout">
-    <AddWord words={words} loading={loading} refresh={refresh} preferences={preferences} onOpenWordLists={onOpenWordLists} />
     <section className="word-panel" aria-labelledby="collection-title">
       <div className="panel-heading"><h2 id="collection-title">{t('Your words')}</h2></div>
       <div className="collection-search"><label htmlFor="word-search">{t('Search words')}</label><input id="word-search" type="search" dir="auto" value={query} onChange={event => { setQuery(event.target.value); setConfirmDelete(null); setVisibleCount(20) }} placeholder={t('Type a spelling')} /></div>

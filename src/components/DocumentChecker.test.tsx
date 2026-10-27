@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialLanguagePreferences } from '../../shared/languages'
 import type { DocumentCheck } from '../../shared/model'
 import { api } from '../lib/api'
@@ -11,7 +11,7 @@ const checked: DocumentCheck = { language: 'en', text: 'A beautifull flower. Xyz
   { word: 'Xyzzname', occurrences: 1, suggestions: [] },
 ] }
 const onUpdated = vi.fn(async () => {})
-function open() { return render(<DocumentChecker preferences={{ ...initialLanguagePreferences(), defaultLanguage: 'en' }} onUpdated={onUpdated} onBack={() => {}} />) }
+function open() { return render(<DocumentChecker preferences={{ ...initialLanguagePreferences(), defaultLanguage: 'en' }} onUpdated={onUpdated} />) }
 async function upload() {
   await waitFor(() => expect(api.challengeStatus).toHaveBeenCalled())
   fireEvent.change(screen.getByLabelText('Document photo (JPEG or PNG, up to 4 MB)'), { target: { files: [new File(['photo'], 'text.jpg', { type: 'image/jpeg' })] } })
@@ -25,8 +25,99 @@ beforeEach(() => {
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:test-photo'), revokeObjectURL: vi.fn() }))
   onUpdated.mockClear()
 })
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('document correction review', () => {
+  it('keeps camera and upload beside the document language without a budget counter', async () => {
+    open()
+    await waitFor(() => expect(api.challengeStatus).toHaveBeenCalled())
+    const toolbar = screen.getByRole('combobox', { name: 'Document language' }).closest('.document-toolbar')
+    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Take a photo' }))
+    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Upload a photo' }))
+    expect(screen.queryByText(/^Photo budget:/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Check document' })).not.toBeInTheDocument()
+  })
+
+  it('captures and previews a camera photo inline before checking, and stops the camera on capture and cancel', async () => {
+    const user = userEvent.setup()
+    const stop = vi.fn()
+    const stream = { getTracks: () => [{ stop }] }
+    const getUserMedia = vi.fn().mockResolvedValue(stream)
+    vi.stubGlobal('navigator', { language: 'en-US', mediaDevices: { getUserMedia } })
+    const drawImage = vi.fn()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(vi.fn().mockReturnValue({ drawImage }))
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => callback(new Blob(['camera-photo'], { type: 'image/jpeg' })))
+    open()
+    expect(getUserMedia).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Check document' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Take a photo' }))
+    const video = screen.getByLabelText('Camera preview')
+    await waitFor(() => expect(video).toHaveProperty('srcObject', stream))
+    expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } } })
+    expect(screen.getAllByRole('button', { name: 'Take a photo' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Cancel' }).parentElement).toBe(screen.getByRole('button', { name: 'Take a photo' }).parentElement)
+    expect(screen.getByRole('button', { name: 'Upload a photo' }).parentElement).toBe(screen.getByRole('button', { name: 'Cancel' }).parentElement)
+    expect(screen.queryByRole('button', { name: 'Check document' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Document language' })).not.toBeInTheDocument()
+    Object.defineProperties(video, { videoWidth: { value: 1200 }, videoHeight: { value: 1600 } })
+    fireEvent.loadedData(video)
+    await user.click(screen.getByRole('button', { name: 'Take a photo' }))
+    expect(drawImage).toHaveBeenCalledWith(video, 0, 0, 1200, 1600)
+    expect(screen.getByRole('img', { name: 'Selected document' })).toHaveAttribute('src', 'blob:test-photo')
+    expect(stop).toHaveBeenCalledOnce()
+    expect(api.checkDocument).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Upload a photo' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' }).parentElement).toBe(screen.getByRole('button', { name: 'Check document' }).parentElement)
+    await user.click(screen.getByRole('button', { name: 'Check document' }))
+    expect(await screen.findByRole('heading', { name: 'Possible spelling mistakes' })).toBeVisible()
+    expect(api.checkDocument).toHaveBeenCalledWith('en', expect.objectContaining({ name: 'answers.jpg', type: 'image/jpeg' }))
+    expect(screen.queryByRole('button', { name: 'Retake photo' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Check another document' }))
+    expect(screen.queryByRole('heading', { name: 'Possible spelling mistakes' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Take a photo' }))
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(stop).toHaveBeenCalledTimes(2)
+    expect(screen.queryByLabelText('Camera preview')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Take a photo' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Check document' })).not.toBeInTheDocument()
+  })
+
+  it('opens the gallery upload without forcing camera capture when permission is denied', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('navigator', { language: 'en-US', mediaDevices: { getUserMedia: vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError')) } })
+    open()
+    await user.click(screen.getByRole('button', { name: 'Take a photo' }))
+    expect(await screen.findByText('Camera unavailable. Allow camera access or upload a photo.')).toBeVisible()
+    const input = screen.getByLabelText('Document photo (JPEG or PNG, up to 4 MB)')
+    expect(input).not.toHaveAttribute('capture')
+    expect(input).toHaveAttribute('accept', 'image/jpeg,image/png')
+    const chooser = vi.spyOn(input, 'click').mockImplementation(() => {})
+    await user.click(screen.getByRole('button', { name: 'Upload a photo' }))
+    expect(chooser).toHaveBeenCalledOnce()
+    fireEvent.change(input, { target: { files: [new File(['photo'], 'upload.png', { type: 'image/png' })] } })
+    expect(screen.getByRole('img', { name: 'Selected document' })).toBeVisible()
+    expect(api.checkDocument).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Check document' }))
+    expect(await screen.findByRole('heading', { name: 'Possible spelling mistakes' })).toBeVisible()
+    expect(api.checkDocument).toHaveBeenCalledWith('en', expect.objectContaining({ name: 'upload.png', type: 'image/png' }))
+  })
+
+  it('cancels a selected photo without uploading it and returns to the initial choices', async () => {
+    const user = userEvent.setup()
+    open()
+    fireEvent.change(screen.getByLabelText('Document photo (JPEG or PNG, up to 4 MB)'), { target: { files: [new File(['photo'], 'text.jpg', { type: 'image/jpeg' })] } })
+    expect(screen.getByRole('img', { name: 'Selected document' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('img', { name: 'Selected document' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Check document' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Take a photo' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Upload a photo' })).toBeVisible()
+    expect(api.checkDocument).not.toHaveBeenCalled()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-photo')
+  })
+
   it('uploads, reviews editable corrections and adds corrected words, never the original mistakes', async () => {
     const user = userEvent.setup()
     open()
@@ -89,7 +180,7 @@ describe('document correction review', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Choose one JPEG or PNG photo up to 4 MB.')
     expect(api.checkDocument).not.toHaveBeenCalled()
     view.unmount()
-    render(<DocumentChecker preferences={{ enabled: ['fr'], defaultLanguage: 'fr' }} onUpdated={onUpdated} onBack={() => {}} />)
+    render(<DocumentChecker preferences={{ enabled: ['fr'], defaultLanguage: 'fr' }} onUpdated={onUpdated} />)
     expect(screen.getByText('Enable English or German in Languages to check a document.')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Check document' })).not.toBeInTheDocument()
   })

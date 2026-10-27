@@ -104,6 +104,12 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
   function back() {
     setAutomatic(false)
     speech.stop()
+    if (!challenge) {
+      setPreparedWords(null)
+      setError('')
+      onActiveChange?.(false)
+      return
+    }
     void run(async () => {
       if (challenge && !challenge.writtenAt) await api.advanceChallenge(challenge.id, challenge.nextIndex, timing('stop'))
       setStatus(await api.challengeStatus())
@@ -219,8 +225,8 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
     </div>})}
   </section>) : []
   return <section className={`photo-practice${reporting ? ' statistics-challenges' : ''}`} aria-label={t('Challenges')}>
-    {challenge?.writtenAt && <div className="practice-topline">
-      <span>{t('Challenges')}</span>
+    {(challenge || preparedWords) && <div className="practice-topline">
+      {challenge?.writtenAt && <span>{t('Challenges')}</span>}
       <button className="text-button" disabled={busy} onClick={back}>{t('Back to challenges')}</button>
     </div>}
     {error && <p className="error" role="alert">{message(error)}</p>}
@@ -287,22 +293,24 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
         {!challenge.reviewedAt && !checkMode && <div className="answer-buttons"><button className="button primary" onClick={() => openChallenge(challenge, 'photo')}><Camera size={18} />{t('Auto check')}</button><button className="button secondary" onClick={() => openChallenge(challenge, 'manual')}><Check size={18} />{t('Manual check')}</button><button className="button secondary" disabled={busy} onClick={back}><X size={18} />{t('Close')}</button></div>}
         {!challenge.reviewedAt && checkMode === 'photo' && <>
           <label className="visually-hidden" htmlFor="answer-photo">{t('One photo of your answers (JPEG or PNG, up to 4 MB)')}</label>
-          <input ref={photoInput} id="answer-photo" type="file" hidden accept="image/jpeg,image/png" capture="environment" disabled={busy || !!pendingResults} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = '' }} />
-          {cameraOpen ? <AnswerCamera disabled={busy || !!pendingResults} onCapture={selectPhoto} onUpload={() => photoInput.current?.click()} /> : <>
+          <input ref={photoInput} id="answer-photo" type="file" hidden accept="image/jpeg,image/png" disabled={busy || !!pendingResults} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = '' }} />
+          {cameraOpen ? <AnswerCamera disabled={busy || !!pendingResults} onCapture={selectPhoto} onUpload={() => photoInput.current?.click()} onCancel={() => openChallenge(challenge)} /> : <>
             {(photoUrl || challenge.photo) && <img className="answer-sheet-preview" src={photoUrl || challenge.photo!.dataUrl} alt={t('Selected answer sheet for parent checking')} />}
-            <div className="camera-actions"><button className="button secondary challenge-icon-button" title={t('Retake photo')} aria-label={t('Retake photo')} disabled={busy || !!pendingResults} onClick={() => { setPhoto(null); setPhotoUrl(''); setCameraOpen(true) }}><Camera size={20} aria-hidden="true" /></button></div>
+            <div className="camera-actions">
+              <button className="button secondary challenge-icon-button" title={t('Retake photo')} aria-label={t('Retake photo')} disabled={busy || !!pendingResults} onClick={() => { setPhoto(null); setPhotoUrl(''); setCameraOpen(true) }}><Camera size={20} aria-hidden="true" /></button>
+              {photo && !challenge.recognition && <button className="button primary" disabled={busy || !status?.ocr.enabled || !!pendingResults || status.ocr.used >= status.ocr.limit} onClick={() => void run(async () => {
+                const data = await api.readPhoto(challenge.id, photo)
+                openChallenge(data, 'photo', true)
+                setStatus(await api.challengeStatus())
+              })}>{t(busy ? 'Working…' : 'Send photo to Azure for reading')}</button>}
+              <button className="button secondary challenge-icon-button" title={t('Cancel')} aria-label={t('Cancel')} disabled={busy || !!pendingResults} onClick={() => openChallenge(challenge)}><X size={20} aria-hidden="true" /></button>
+            </div>
+            {photo && !challenge.recognition && <>
+              <p className="fine-print">{t('Sending the photo shares handwriting with Microsoft Azure in your configured region. The server strips image metadata and stores the photo and recognized text privately with this challenge until it is removed. Azure temporarily retains input/results for up to 24 hours; the app also requests early deletion. Crop out names and faces.')}</p>
+              {!status?.ocr.enabled && <p className="notice">{t('Automatic reading needs an Azure Free/F0 endpoint and key. Review the paper manually until these are configured.')}</p>}
+              {status?.ocr.enabled && status.ocr.used >= status.ocr.limit && <p className="notice">{t('The monthly photo budget is exhausted. Use manual review; there is no paid fallback.')}</p>}
+            </>}
           </>}
-          <p className="fine-print">{t('Sending the photo shares handwriting with Microsoft Azure in your configured region. The server strips image metadata and stores the photo and recognized text privately with this challenge until it is removed. Azure temporarily retains input/results for up to 24 hours; the app also requests early deletion. Crop out names and faces.')}</p>
-          {!status?.ocr.enabled && <p className="notice">{t('Automatic reading needs an Azure Free/F0 endpoint and key. Review the paper manually until these are configured.')}</p>}
-          <div className="answer-buttons">
-            <button className="button primary" disabled={busy || !photo || !status?.ocr.enabled || !!pendingResults || status.ocr.used >= status.ocr.limit} onClick={() => void run(async () => {
-              const data = await api.readPhoto(challenge.id, photo!)
-              openChallenge(data, 'photo', true)
-              setStatus(await api.challengeStatus())
-            })}>{t(busy ? 'Working…' : 'Send photo to Azure for reading')}</button>
-            <button className="button secondary" disabled={busy || !!pendingResults} onClick={() => openChallenge(challenge, 'manual')}>{t('Manual check')}</button>
-          </div>
-          {status?.ocr.enabled && status.ocr.used >= status.ocr.limit && <p className="notice">{t('The monthly photo budget is exhausted. Use manual review; there is no paid fallback.')}</p>}
         </>}
       </div>
       {showStatistics && challenge.reviewedAt && <div id="challenge-statistics"><ChallengeStatistics challenges={[challenge]} /></div>}
@@ -325,13 +333,13 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
         {!challenge.reviewedAt && <button className="button primary wide" disabled={busy || answers.some(answer => answer === null)} onClick={() => void save()}>{busy ? t('Saving all results…') : pendingResults ? t('Retry confirming these same results') : t('Confirm all {count} results', { count: challenge.words.length })}</button>}
         {challenge.reviewedAt && <><p className="notice" role="status">{t('Results saved.')}</p><button className="button primary" disabled={busy} onClick={back}><Check size={18} />{t('Done')}</button></>}
       </div>}
-      <details className="challenge-options challenge-details"><summary>{t('Challenge details')}</summary>
+      {!cameraOpen && <details className="challenge-options challenge-details"><summary>{t('Challenge details')}</summary>
         <p><span className="challenge-id">{t('Challenge')} #{challenge.id.slice(0, 8)}</span><br />{t('Started')} {date(challenge.startedAt)}<br />{t('Writing finished')} {date(challenge.writtenAt!)}{challenge.reviewedAt && <><br />{t('Reviewed and saved')} {date(challenge.reviewedAt)}</>}</p>
         {challenge.check && <p>{t('Check method')}: {t(challenge.check.method === 'photo' ? 'Auto check' : 'Manual check')}<br />{t('Check evaluated')}: {date(challenge.check.evaluatedAt)}</p>}
         {challenge.photo && <><p>{t('Photo uploaded')}: {date(challenge.photo.uploadedAt)}<br />{t('Photo evaluated')}: {date(challenge.photo.evaluatedAt)}</p>{(challenge.reviewedAt || checkMode !== 'photo') && <img className="answer-sheet-preview" src={challenge.photo.dataUrl} alt={t('Selected answer sheet for parent checking')} />}</>}
         {challenge.recognition && <div><h3>{t('Photo recognition')}</h3><ol>{challenge.recognition.answers.map(answer => <li key={answer.number}><span dir="auto">{answer.text ?? t('Not recognized — check the paper')}</span> · {answer.confidence === null ? t('Confidence unavailable — mark manually') : t('Recognition confidence: {confidence}%', { confidence: Math.round(answer.confidence * 100) })}</li>)}</ol></div>}
         {!!challenge.telemetry.length && <div className="timing-history"><h3>{t('Challenge timing')}</h3><ol>{challenge.telemetry.map((event, index) => <li key={index}>{t('Word {position}: {seconds} s · {mode} · {interval} s interval', { position: event.fromIndex + 1, seconds: (event.elapsedMs / 1000).toFixed(1), mode: t(event.automatic ? 'Automatic' : 'Manual'), interval: event.intervalSeconds })} · {t(event.action === 'previous' ? 'Previous word' : event.action === 'stop' ? 'Stop' : event.action === 'play' ? 'Play automatically' : event.action === 'listen' ? 'Listen' : 'Next word')}</li>)}</ol></div>}
-      </details>
+      </details>}
     </>}
   </section>
 }

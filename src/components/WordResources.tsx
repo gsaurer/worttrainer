@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ArrowLeft, BookOpen, Plus } from 'lucide-react'
+import { BookOpen, Plus } from 'lucide-react'
 import type { AddedWordList, Language, LanguagePreferences, Word, WordResource } from '../../shared/model'
 import { api } from '../lib/api'
 import { errorMessage, languages } from '../lib/words'
 import { useI18n } from '../i18n/context'
 
-export function WordResources({ words, wordLists = [], preferences, onUpdated, onBack }: {
+export function WordResources({ words, wordLists = [], preferences, onUpdated }: {
   words: Word[]
   wordLists?: AddedWordList[]
   preferences: LanguagePreferences
   onUpdated: () => Promise<void>
-  onBack: () => void
 }) {
   const { t, message } = useI18n()
   const [resources, setResources] = useState<WordResource[]>([])
@@ -66,7 +65,7 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
   }
 
   return <section className="word-resources" aria-label={t('Word lists')}>
-    <button className="text-button resource-command" disabled={saving} onClick={onBack}><ArrowLeft size={18} />{t('Back to collection')}</button>
+    <h2>{t('Import word list')}</h2>
     {loading ? <p role="status">{t('Loading word lists...')}</p> : loadError ? <div role="alert" className="error">
       <p>{t('Could not load word lists: {error}', { error: message(loadError) })}</p>
       <button className="button secondary" onClick={() => { setLoading(true); setRetry(previous => previous + 1) }}>{t('Retry word lists')}</button>
@@ -81,7 +80,7 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
         </select></label>
       </div>
       {resource && <form onSubmit={event => void add(event)}>
-        <div className="resource-section-heading"><h2><BookOpen size={22} />{resource.title}</h2><span>{languages[resource.language].name}</span></div>
+        <div className="resource-section-heading"><h3><BookOpen size={20} aria-hidden="true" />{resource.title}</h3><span>{languages[resource.language].name}</span></div>
         <fieldset className="resource-sections" disabled={saving}>
           <legend className="visually-hidden">{t('Sections')}</legend>
           <label className="resource-section-choice resource-select-all"><input type="checkbox" checked={allSelected} ref={input => { if (input) input.indeterminate = selected.length > 0 && !allSelected }} onChange={event => { setSelection({ resourceId: resource.id, sectionIds: event.target.checked ? resource.sections.map(section => section.id) : [] }); setNotice(''); setError('') }} />{t('All sections')}</label>
@@ -100,6 +99,6 @@ export function WordResources({ words, wordLists = [], preferences, onUpdated, o
       </form>}
     </>}
     {error && <p role="alert" className="error">{t('Could not add words: {error}', { error: message(error) })}</p>}
-    {notice && <div className="resource-import-result"><p role="status">{notice}</p><button className="button secondary resource-command" onClick={onBack}><ArrowLeft size={18} />{t('Done')}</button></div>}
+    {notice && <p className="resource-import-result" role="status">{notice}</p>}
   </section>
 }

@@ -1,5 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDictation } from './useDictation'
 
 class Utterance {
@@ -22,8 +22,60 @@ beforeEach(() => {
   vi.stubGlobal('speechSynthesis', { getVoices: () => [englishVoice, germanVoice], cancel, speak })
   vi.stubGlobal('SpeechSynthesisUtterance', Utterance)
 })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('spoken dictation', () => {
+  it('resumes a paused speech engine so a queued word actually starts', () => {
+    let paused = true
+    const resume = vi.fn(() => { paused = false })
+    const enqueue = vi.fn((utterance: Utterance) => { if (!paused) utterance.onstart?.() })
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [germanVoice], get paused() { return paused }, cancel, resume, speak: enqueue })
+    const { result } = renderHook(useDictation)
+    act(() => result.current.speak('Straße', 'de'))
+    expect(resume).toHaveBeenCalledOnce()
+    expect(result.current.speaking).toBe(true)
+    expect(enqueue).toHaveBeenCalledOnce()
+  })
+
+  it('reports speech that never starts instead of leaving automatic playback running silently', () => {
+    vi.useFakeTimers()
+    const finished = vi.fn()
+    const { result } = renderHook(useDictation)
+    act(() => result.current.speak('Straße', 'de', finished))
+    act(() => vi.advanceTimersByTime(5000))
+    expect(finished).toHaveBeenCalledExactlyOnceWith(false)
+    expect(result.current.error).toContain('audio-start-timeout')
+    expect(result.current.error).not.toContain('Straße')
+    expect(result.current.speaking).toBe(false)
+  })
+
+  it('does not time out a word that has started or completed successfully', () => {
+    vi.useFakeTimers()
+    const finished = vi.fn()
+    const { result } = renderHook(useDictation)
+    act(() => result.current.speak('Straße', 'de', finished))
+    const utterance: Utterance = speak.mock.calls[0][0]
+    act(() => utterance.onstart?.())
+    act(() => vi.advanceTimersByTime(10000))
+    expect(result.current.error).toBe('')
+    expect(finished).not.toHaveBeenCalled()
+    act(() => utterance.onend?.())
+    act(() => vi.advanceTimersByTime(10000))
+    expect(finished).toHaveBeenCalledExactlyOnceWith(true)
+    expect(result.current.error).toBe('')
+  })
+
+  it.each(['stop', 'unmount'])('clears the speech startup timeout after %s', action => {
+    vi.useFakeTimers()
+    const finished = vi.fn()
+    const { result, unmount } = renderHook(useDictation)
+    act(() => result.current.speak('Straße', 'de', finished))
+    if (action === 'stop') act(() => result.current.stop())
+    else unmount()
+    act(() => vi.advanceTimersByTime(10000))
+    expect(finished).not.toHaveBeenCalled()
+  })
+
   it('uses a matching additional-language voice rather than a different language', () => {
     const french = { lang: 'fr-FR', localService: true }
     vi.stubGlobal('speechSynthesis', { getVoices: () => [englishVoice, french], cancel, speak })

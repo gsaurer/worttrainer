@@ -10,16 +10,12 @@ const words: Word[] = [
 ]
 
 describe('word collection', () => {
-  it('keeps word entry and word lists together and visible for an existing collection', async () => {
-    const user = userEvent.setup()
-    const openWordLists = vi.fn()
-    render(<Collection words={words} loading={false} refresh={vi.fn()} onOpenWordLists={openWordLists} />)
-    const add = screen.getByRole('region', { name: 'Add a word' })
-    expect(within(add).getByRole('textbox', { name: 'Word' })).toBeVisible()
-    expect(within(add).getByRole('button', { name: 'Add word' })).toBeVisible()
-    await user.click(within(add).getByRole('button', { name: 'Word lists' }))
-    expect(openWordLists).toHaveBeenCalledOnce()
+  it('keeps the existing words separate from word entry and imports', () => {
+    render(<Collection words={words} loading={false} refresh={vi.fn()} />)
     expect(screen.getByRole('searchbox', { name: 'Search words' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Your words' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: 'Add a word' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Word lists' })).not.toBeInTheDocument()
   })
 
   it('keeps disabled-language words visible and filterable without a search', async () => {
