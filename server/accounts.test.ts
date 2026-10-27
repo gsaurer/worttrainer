@@ -93,13 +93,52 @@ describe('independent private accounts', () => {
   it('registers a new empty collection without changing any existing account', async () => {
     const original = store.words(first.id)
     const response = await post('/api/signup', { email: ' NEW@example.com ', password }, '').expect(201)
-    expect(response.body).toEqual({ authenticated: true, emailMigrationRequired: false, email: 'new@example.com', websiteLanguage: 'en' })
+    expect(response.body).toEqual({ authenticated: true, emailMigrationRequired: false, email: 'new@example.com', websiteLanguage: 'en', onboardingRequired: true })
     expect((await words(cookieFrom(response)).expect(200)).body).toEqual([])
     expect((await request(app).get('/api/challenges').set('Cookie', cookieFrom(response)).expect(200)).body.challenges).toEqual([])
     expect(store.words(first.id)).toEqual(original)
     expect(store.challenges(first.id)).toHaveLength(1)
     expect((await words(first.cookie).expect(200)).body).toEqual(original)
   }, 15_000)
+
+  it.each(['de', 'en'])('completes first setup with ten existing %s demo words, once and privately', async language => {
+    const original = store.exportData(first.id)
+    await post('/api/onboarding', { language, source: 'demo' }, '').expect(401)
+    const response = await post('/api/onboarding', { language, source: 'demo' }).expect(200)
+    expect(response.body).toHaveLength(10)
+    expect(response.body.every((entry: Word) => entry.language === language && entry.category === 'new' && entry.last_practiced_at === null)).toBe(true)
+    expect(store.languagePreferences(second.id)).toEqual({ enabled: [language], defaultLanguage: language })
+    expect((await request(app).get('/api/session').set('Cookie', second.cookie)).body.onboardingRequired).toBe(false)
+    const retried = await post('/api/onboarding', { language, source: 'demo' }).expect(200)
+    expect(retried.body).toEqual(response.body)
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    const restarted = createApp({ store: reopened, origin, secureCookie: false })
+    expect((await request(restarted).get('/api/session').set('Cookie', second.cookie)).body.onboardingRequired).toBe(false)
+    expect(reopened.words(second.id)).toHaveLength(10)
+    expect(store.exportData(first.id)).toMatchObject({ words: original.words, attempts: original.attempts, challenges: original.challenges })
+    expect(store.challenges(second.id)).toEqual([])
+  })
+
+  it('validates ten personal words before changing setup and preserves existing account data', async () => {
+    const entries = ['beautiful', 'because', 'friend', 'people', 'different', 'enough', 'thought', 'through', 'which', 'where']
+    await post('/api/onboarding', { language: 'fr', source: 'demo' }).expect(400)
+    await post('/api/onboarding', { language: 'en', source: 'custom', words: entries.slice(1) }).expect(400)
+    await post('/api/onboarding', { language: 'en', source: 'custom', words: entries.map(() => 'duplicate') }).expect(400)
+    await post('/api/onboarding', { language: 'en', source: 'custom', words: [...entries.slice(1), 'bad\nword'] }).expect(400)
+    await post('/api/onboarding', { language: 'en', source: 'demo', accountId: first.id }).expect(400)
+    expect(store.words(second.id)).toEqual([])
+    expect(store.languagePreferences(second.id)).toEqual({ enabled: ['de', 'en'], defaultLanguage: 'de' })
+    const response = await post('/api/onboarding', { language: 'en', source: 'custom', words: entries }).expect(200)
+    expect(response.body.map((entry: Word) => entry.text)).toEqual(entries)
+    const file = join(directory, 'store.accounts', `${second.id}.json`)
+    const saved = JSON.parse(await readFile(file, 'utf8'))
+    delete saved.onboardingRequired
+    await writeFile(file, JSON.stringify(saved))
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    const existing = createApp({ store: reopened, origin, secureCookie: false })
+    expect((await request(existing).get('/api/session').set('Cookie', second.cookie)).body.onboardingRequired).toBe(false)
+    expect(reopened.words(second.id).map(entry => entry.text)).toEqual(entries)
+  })
 
   it('serializes concurrent case-insensitive registrations without duplicate accounts', async () => {
     const responses = await Promise.all([

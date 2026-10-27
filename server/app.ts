@@ -14,7 +14,7 @@ import { wordResources } from './word-resources.js'
 import { pushSubscriptionSchema, reminderScheduleSchema, type ReminderService } from './reminders.js'
 import type { FeatureFlags } from './feature-flags.js'
 import { mcpHandler, mcpTokenPrefix, mcpTokenSchema } from './mcp.js'
-import { wordInputSchema } from './words.js'
+import { firstRunSchema, wordInputSchema } from './words.js'
 import { createOAuth } from './oauth.js'
 import type { BuildInfo, ServiceStatus } from '../shared/status.js'
 import { loadBuildInfo } from './build-info.js'
@@ -152,7 +152,7 @@ export function createApp(options: AppOptions) {
       authenticated: !!signedIn,
       emailMigrationRequired: !!account && !('email' in account),
       email: signedIn && account && 'email' in account ? account.email : null,
-      ...(signedIn ? { websiteLanguage: store.websiteLanguage(signedIn), ...featuresOf(signedIn) } : {}),
+      ...(signedIn ? { websiteLanguage: store.websiteLanguage(signedIn), onboardingRequired: store.onboardingRequired(signedIn), ...featuresOf(signedIn) } : {}),
     }
   }
 
@@ -172,7 +172,7 @@ export function createApp(options: AppOptions) {
     const session = newSession()
     await store.register(account, session.stored, input.websiteLanguage)
     setCookie(res, session.token)
-    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email, websiteLanguage: input.websiteLanguage, ...featuresOf(session.stored.accountId) } satisfies AuthState)
+    res.status(201).json({ authenticated: true, emailMigrationRequired: false, email: account.email, websiteLanguage: input.websiteLanguage, onboardingRequired: true, ...featuresOf(session.stored.accountId) } satisfies AuthState)
   })
   app.post('/api/login', authLimiter, async (req, res) => {
     const input = parse(z.object({ email: parentEmailSchema, password: z.string().min(1).max(128) }).strict(), req.body)
@@ -184,7 +184,7 @@ export function createApp(options: AppOptions) {
     if ('email' in record.account) await store.addSession(session.stored, record.account.passwordHash)
     else await store.migrateEmail(input.email, session.stored, record.account.passwordHash)
     setCookie(res, session.token)
-    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email, websiteLanguage: store.websiteLanguage(record.id), ...featuresOf(record.id) } satisfies AuthState)
+    res.json({ authenticated: true, emailMigrationRequired: false, email: input.email, websiteLanguage: store.websiteLanguage(record.id), onboardingRequired: store.onboardingRequired(record.id), ...featuresOf(record.id) } satisfies AuthState)
   })
   app.post('/api/logout', async (req, res) => {
     const token = sessionToken(req)
@@ -220,6 +220,9 @@ export function createApp(options: AppOptions) {
   })
 
   app.get('/api/languages', requireAuth, (req, res) => { res.json(store.languagePreferences(accountId(req))) })
+  app.post('/api/onboarding', requireAuth, async (req, res) => {
+    res.json(await store.completeFirstRun(accountId(req), parse(firstRunSchema, req.body)))
+  })
   app.get('/api/reminders', requireAuth, (req, res) => {
     const device = parse(z.string().regex(/^[a-f0-9]{64}$/).optional(), req.query.device)
     res.json(options.reminders?.settings(accountId(req), device) ?? { time: '17:00', timeZone: 'UTC', enabled: false, deviceEnabled: false, configured: false, publicKey: null })

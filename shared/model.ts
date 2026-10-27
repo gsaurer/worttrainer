@@ -25,6 +25,10 @@ export type ResourceImport = {
   language: Language
 }
 
+export type FirstRunInput = { language: 'de' | 'en' } & (
+  { source: 'demo' } | { source: 'custom'; words: string[] }
+)
+
 export type AddedWordList = {
   resourceId: string
   title: string
@@ -54,6 +58,7 @@ export type AuthState = {
   email: string | null
   websiteLanguage?: WebsiteLanguage
   features?: string[]
+  onboardingRequired?: boolean
 }
 
 export type PhotoRecognition = {

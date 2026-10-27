@@ -16,3 +16,11 @@ export const mistakeReportSchema = z.object({
   }).strict()).min(1).max(100).refine(words => new Set(words.map(word => word.correctWord.toLowerCase())).size === words.length,
     'Include each correct word only once per report.').describe('All confirmed incorrect words from one report, saved together in one history entry.'),
 }).strict()
+
+export const firstRunSchema = z.discriminatedUnion('source', [
+  z.object({ language: z.enum(['de', 'en']), source: z.literal('demo') }).strict(),
+  z.object({
+    language: z.enum(['de', 'en']), source: z.literal('custom'),
+    words: z.array(wordInputSchema.shape.text).length(10, 'Enter ten different words.').refine(words => new Set(words.map(word => word.toLowerCase())).size === words.length, 'Enter ten different words.'),
+  }).strict(),
+])

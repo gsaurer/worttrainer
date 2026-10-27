@@ -82,6 +82,26 @@ form .button { margin-top: 24px; }
 .nav-note { margin-left: auto; color: #7c826e; font-family: var(--serif); font-style: italic; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-end; padding: 24px 0; }
 .workspace-content { padding-top: 24px; }
+.first-run { max-width: 640px; margin: 24px auto 48px; min-width: 0; letter-spacing: 0; }
+.first-run h1 { font-size: 2rem; line-height: 1.2; letter-spacing: 0; overflow-wrap: anywhere; }
+.first-run h2 { font-size: 1.3rem; margin: 24px 0 20px; letter-spacing: 0; }
+.first-run-step, .first-run-count { color: var(--muted); font-size: .85rem; margin-bottom: 12px; }
+.first-run-choices { border: 0; padding: 0; margin: 0 0 24px; min-width: 0; }
+.first-run .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.first-run .segmented button { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 52px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.first-run .segmented svg { width: 18px; height: 18px; }
+.first-run-words, .first-run-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; margin: 0 0 20px; padding: 0; list-style: none; }
+.first-run-words li { min-width: 0; }
+.first-run-words label { margin: 0 0 8px; }
+.first-run-preview { list-style: decimal inside; padding: 8px 0; }
+.first-run-preview li { min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.first-run-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.first-run-actions .button { margin: 8px 0 0; gap: 8px; max-width: 100%; }
+@media (max-width: 480px) {
+  .first-run { margin-top: 12px; }
+  .first-run-words { gap: 12px; }
+  .first-run .segmented button { padding: 10px 6px; font-size: .8rem; }
+}
 .page-heading h1 { font-size: 2.5rem; }
 .page-heading > p { font-family: var(--serif); font-style: italic; color: #717b68; font-size: 1.05rem; line-height: 1.6; margin: 0 0 6px; text-align: right; }
 .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }

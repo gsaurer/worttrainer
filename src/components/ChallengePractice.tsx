@@ -24,8 +24,9 @@ function ChallengeStatistics({ challenges }: { challenges: Challenge[] }) {
   </section>
 }
 
-export function ChallengePractice({ words, onUpdated, loading = false, filters, selectionLabel, onActiveChange, view = 'practice' }: {
+export function ChallengePractice({ words, initialWords, onUpdated, loading = false, filters, selectionLabel, onActiveChange, view = 'practice' }: {
   words: Word[]
+  initialWords?: Word[]
   onUpdated: () => Promise<void>
   loading?: boolean
   filters?: ReactNode
@@ -37,7 +38,7 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
   const autoCheckEnabled = useFeature('challenge-auto-check')
   const [status, setStatus] = useState<ChallengeStatus | null>(null)
   const [challenge, setChallenge] = useState<Challenge | null>(null)
-  const [preparedWords, setPreparedWords] = useState<Word[] | null>(null)
+  const [preparedWords, setPreparedWords] = useState<Word[] | null>(initialWords ?? null)
   const [answers, setAnswers] = useState<(boolean | null)[]>([])
   const [pendingResults, setPendingResults] = useState<boolean[] | null>(null)
   const [photo, setPhoto] = useState<File | null>(null)

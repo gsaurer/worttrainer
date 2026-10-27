@@ -10,7 +10,8 @@ import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from
 import { HttpError } from './errors.js'
 import { challengeSchema, recognitionSchema } from './challenge-schema.js'
 import { wordResources } from './word-resources.js'
-import { mistakeReportSchema } from './words.js'
+import { firstRunSchema, mistakeReportSchema } from './words.js'
+import type { FirstRunInput } from '../shared/model.js'
 import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList, PracticeWordList, PracticeAttempt } from '../shared/model.js'
 import { oauthStateSchema, type OAuthState } from './oauth.js'
 
@@ -73,7 +74,7 @@ const legacyStoreSchema = z.object({
     context.addIssue({ code: 'custom', message: 'Unowned stored data.' })
   }
 })
-const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, websiteLanguage: websiteLanguageSchema.default('en'), languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
+const accountDataSchema = z.object({ id: z.uuid(), account: accountSchema, onboardingRequired: z.boolean().optional(), websiteLanguage: websiteLanguageSchema.default('en'), languagePreferences: languagePreferencesSchema.default(initialLanguagePreferences), ...collectionShape }).strict().superRefine(validateCollection)
 function validateOwnership(data: { accounts: { id: string; account: Account }[]; sessions: StoredSession[] }, context: z.RefinementCtx) {
   const ids = new Set(data.accounts.map(account => account.id))
   const emails = data.accounts.flatMap(item => 'email' in item.account ? [item.account.email] : [])
@@ -110,6 +111,7 @@ const accountFileSchema = z.preprocess(value => {
   format: z.literal('worttrainer-account-data'), schemaVersion: z.literal(3),
   accountId: z.uuid(), languagePreferences: languagePreferencesSchema,
   websiteLanguage: websiteLanguageSchema.default('en'),
+  onboardingRequired: z.boolean().optional(),
   ...collectionShape,
   wordLists: wordListsSchema,
 }).strict().superRefine(validateCollection))
@@ -132,6 +134,7 @@ function privateData(data: AccountData): z.infer<typeof accountFileSchema> {
     format: 'worttrainer-account-data', schemaVersion: 3, accountId: data.id,
     languagePreferences: data.languagePreferences,
     websiteLanguage: data.websiteLanguage,
+    ...(data.onboardingRequired === undefined ? {} : { onboardingRequired: data.onboardingRequired }),
     words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists,
   }
 }
@@ -291,7 +294,7 @@ export class FileStore {
         } catch (error) {
           throw new Error(`Cannot read private account data ${target}. Restore its matching backup.`, { cause: error })
         }
-        accounts.push({ ...identity, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists })
+        accounts.push({ ...identity, onboardingRequired: data.onboardingRequired, websiteLanguage: data.websiteLanguage, languagePreferences: data.languagePreferences, words: data.words, attempts: data.attempts, challenges: data.challenges, wordLists: data.wordLists })
       }
       return new FileStore(file, stateSchema.parse({ accounts, sessions: index.sessions, ocrUsage: index.ocrUsage, oauth: index.oauth }))
     } catch (error) {
@@ -326,6 +329,29 @@ export class FileStore {
   challenges(accountId: string): Challenge[] { return structuredClone(owned(this.state, accountId).challenges.filter(challenge => !challenge.deletedAt)) }
   languagePreferences(accountId: string): LanguagePreferences { return structuredClone(owned(this.state, accountId).languagePreferences) }
   websiteLanguage(accountId: string): WebsiteLanguage { return owned(this.state, accountId).websiteLanguage }
+  onboardingRequired(accountId: string): boolean { return owned(this.state, accountId).onboardingRequired === true }
+
+  completeFirstRun(accountId: string, input: FirstRunInput) {
+    const checked = firstRunSchema.parse(input)
+    const demoId = checked.language === 'de' ? 'demo-deutsche-stolperwoerter' : 'demo-english-spelling-traps'
+    const texts = checked.source === 'custom' ? checked.words : wordResources.find(resource => resource.id === demoId)?.sections.flatMap(section => section.entries.map(entry => entry.word)).slice(0, 10)
+    if (!texts || texts.length !== 10) throw new HttpError(503, 'Starter words are not available. Please try again.')
+    return this.accountTransaction(accountId, state => {
+      if (!state.onboardingRequired) return state.words.filter(word => word.language === state.languagePreferences.defaultLanguage).slice(0, 10).map(wordView)
+      const selected: Word[] = []
+      for (const text of texts) {
+        let word = state.words.find(word => word.language === checked.language && word.text.toLowerCase() === text.toLowerCase())
+        if (!word) {
+          word = { id: randomUUID(), text, language: checked.language, category: 'new', consecutive_mistakes: 0, created_at: new Date().toISOString(), last_practiced_at: null }
+          state.words.push(word)
+        }
+        selected.push(wordView(word))
+      }
+      state.languagePreferences = { enabled: [...new Set([...state.languagePreferences.enabled.filter(language => language !== 'de' && language !== 'en'), checked.language])], defaultLanguage: checked.language }
+      state.onboardingRequired = false
+      return selected
+    })
+  }
 
   setWebsiteLanguage(accountId: string, language: WebsiteLanguage) {
     return this.accountTransaction(accountId, state => {
@@ -498,7 +524,7 @@ export class FileStore {
   register(account: z.infer<typeof emailAccountSchema>, session: StoredSession, websiteLanguage: WebsiteLanguage = 'en') {
     return this.transaction(state => {
       if (state.accounts.some(item => 'email' in item.account && item.account.email === account.email)) throw new HttpError(409, 'This email is already registered. Sign in instead.')
-      state.accounts.push({ id: session.accountId, account, websiteLanguage, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], challenges: [], wordLists: [] })
+      state.accounts.push({ id: session.accountId, account, onboardingRequired: true, websiteLanguage, languagePreferences: initialLanguagePreferences(), words: [], attempts: [], challenges: [], wordLists: [] })
       state.sessions.push(session)
     }, async state => {
       await ensureAccountFile(this.file, owned(state, session.accountId))

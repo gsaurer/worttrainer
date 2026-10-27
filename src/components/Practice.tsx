@@ -5,9 +5,10 @@ import { categories, languages } from '../lib/words'
 import { ChallengePractice } from './ChallengePractice'
 import { useI18n } from '../i18n/context'
 
-export function Practice({ words, wordLists = [], onUpdated, loading, onActiveChange, preferences = initialLanguagePreferences() }: {
+export function Practice({ words, wordLists = [], initialWords, onUpdated, loading, onActiveChange, preferences = initialLanguagePreferences() }: {
   words: Word[]
   wordLists?: PracticeWordList[]
+  initialWords?: Word[]
   onUpdated: () => Promise<void>
   loading: boolean
   onActiveChange?: (active: boolean) => void
@@ -30,7 +31,7 @@ export function Practice({ words, wordLists = [], onUpdated, loading, onActiveCh
   const selectedIds = selectedList ? new Set(selectedSection?.wordIds ?? selectedList.wordIds) : null
   const candidates = words.filter(word => word.language === language && (!selectedIds || selectedIds.has(word.id)) && (category === 'all' || word.category === category))
 
-  return <ChallengePractice words={candidates} onUpdated={onUpdated} loading={loading} onActiveChange={onActiveChange} selectionLabel={`${languages[language].name} · ${category === 'all' ? t('All categories') : categoryLabel(category)}${selectedList ? ` · ${selectedList.title}` : ''}${selectedSection ? ` · ${selectedSection.title}` : ''}`} filters={<>
+  return <ChallengePractice words={candidates} initialWords={initialWords} onUpdated={onUpdated} loading={loading} onActiveChange={onActiveChange} selectionLabel={`${languages[language].name} · ${category === 'all' ? t('All categories') : categoryLabel(category)}${selectedList ? ` · ${selectedList.title}` : ''}${selectedSection ? ` · ${selectedSection.title}` : ''}`} filters={<>
     <div><label htmlFor="practice-language">{t('Language')}</label><select id="practice-language" value={language} onChange={event => { setLanguage(event.target.value as Language); setListId(''); setSectionId('') }}>{preferences.enabled.map(value => <option key={value} value={value}>{languages[value].name}</option>)}</select></div>
     {availableLists.length > 0 && <div>
       <label htmlFor="practice-source">{t('Practice from')}</label>

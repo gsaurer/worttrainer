@@ -201,9 +201,10 @@ describe('one private practice file per account', () => {
     ])
     const text = await readFile(practiceFile(first), 'utf8')
     const data = JSON.parse(text)
-    expect(Object.keys(data).sort()).toEqual(['accountId', 'attempts', 'challenges', 'format', 'languagePreferences', 'schemaVersion', 'websiteLanguage', 'wordLists', 'words'])
+    expect(Object.keys(data).sort()).toEqual(['accountId', 'attempts', 'challenges', 'format', 'languagePreferences', 'onboardingRequired', 'schemaVersion', 'websiteLanguage', 'wordLists', 'words'])
     expect(data).toMatchObject({
       format: 'worttrainer-account-data', schemaVersion: 3, accountId: first,
+      onboardingRequired: true,
       languagePreferences: { enabled: ['de', 'fr'], defaultLanguage: 'fr' },
       words: [{ id: word.id, category: 'new' }],
       attempts: [{ id: challenge.words[0].attemptId, correct: true }],

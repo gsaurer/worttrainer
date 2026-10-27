@@ -1,4 +1,4 @@
-import type { AccountDataExport, AuthState, Language, LanguagePreferences, NavigationTiming, Challenge, ChallengeStatus, ChallengeCheckInput, WebsiteLanguage, Word } from '../../shared/model'
+import type { AccountDataExport, AuthState, FirstRunInput, Language, LanguagePreferences, NavigationTiming, Challenge, ChallengeStatus, ChallengeCheckInput, WebsiteLanguage, Word } from '../../shared/model'
 import type { DocumentCheck, PracticeWordList, ResourceImport, WordResource } from '../../shared/model'
 import type { DevicePushSubscription, ReminderSchedule, ReminderSettings } from '../../shared/reminders'
 import type { ConnectedAppsState, ConnectionRequest } from '../../shared/oauth'
@@ -34,6 +34,7 @@ export const api = {
   session: () => request<AuthState>('/session'),
   login: (email: string, password: string) => request<AuthState>('/login', 'POST', { email, password }),
   signup: (email: string, password: string, websiteLanguage: WebsiteLanguage = 'en') => request<AuthState>('/signup', 'POST', { email, password, websiteLanguage }),
+  completeFirstRun: (input: FirstRunInput) => request<Word[]>('/onboarding', 'POST', input, true),
   saveWebsiteLanguage: (websiteLanguage: WebsiteLanguage) => request<{ websiteLanguage: WebsiteLanguage }>('/website-language', 'POST', { websiteLanguage }, true),
   logout: () => request<void>('/logout', 'POST', {}),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/password', 'POST', { currentPassword, newPassword }),

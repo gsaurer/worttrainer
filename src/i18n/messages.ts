@@ -1,6 +1,23 @@
 import type { WebsiteLanguage } from '../../shared/model'
 
 export const german = {
+  'Step {step} of 2': 'Schritt {step} von 2',
+  'Your first ten words': 'Deine ersten zehn Wörter',
+  'Which language?': 'Welche Sprache?',
+  'Words your child finds tricky': 'Wörter, die deinem Kind schwerfallen',
+  'Practice language': 'Übungssprache',
+  'Word choice': 'Wortauswahl',
+  'Your own words': 'Eigene Wörter',
+  'Starter words': 'Wörter zum Einstieg',
+  'Word {number}': 'Wort {number}',
+  '{count} of 10 words': '{count} von 10 Wörtern',
+  'Loading starter words...': 'Einstiegswörter werden geladen...',
+  'Starter words are not available. Please try again.': 'Die Einstiegswörter sind gerade nicht verfügbar. Bitte versuche es erneut.',
+  'Enter ten different words.': 'Gib zehn verschiedene Wörter ein.',
+  'Save and practice': 'Speichern und üben',
+  'Continue': 'Weiter',
+  'Saving...': 'Wird gespeichert...',
+  'Back': 'Zurück',
   'Home': 'Start',
   'Collection': 'Wortsammlung',
   'Collection sections': 'Bereiche der Wortsammlung',

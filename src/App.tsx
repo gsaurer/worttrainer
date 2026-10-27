@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, CircleUserRound, Download, List, LogOut, Plus, Settings } from 'lucide-react'
-import type { AuthState, WebsiteLanguage } from '../shared/model'
+import type { AuthState, WebsiteLanguage, Word } from '../shared/model'
 import { api } from './lib/api'
 import { FeaturesProvider, noFeatures, useFeature } from './lib/features'
 import { errorMessage } from './lib/words'
 import { useWords } from './hooks/useWords'
 import { Auth } from './components/Auth'
+import { FirstRun } from './components/FirstRun'
 import { Brand } from './components/Icons'
 import { Collection } from './components/Collection'
 import { AddWord } from './components/AddWord'
@@ -83,18 +84,22 @@ function Application() {
   }, [])
 
   if (!auth) return <main className="loading-screen"><Brand />{error ? <><p className="error" role="alert">{t('Could not connect to the Worttrainer server: {error}', { error: message(error) })}</p><button className="button primary" onClick={() => void reconnect()}>{t('Retry connection')}</button></> : <p role="status">{t('Opening your little word collection…')}</p>}</main>
-  if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FeaturesProvider value={auth.features ?? noFeatures}>{oauthRequest ? <OAuthConsent key={auth.email} requestId={oauthRequest} onComplete={redirect => window.location.assign(redirect)} onSwitchAccount={async () => { await signOutAccount(); requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} /> : <FamilyApp key={auth.email} onSignedOut={() => { requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onWebsiteLanguageSaved={language => {
+  if (auth.authenticated && !auth.emailMigrationRequired) return <I18nProvider language={auth.websiteLanguage ?? 'en'}><FeaturesProvider value={auth.features ?? noFeatures}>{oauthRequest ? <OAuthConsent key={auth.email} requestId={oauthRequest} onComplete={redirect => window.location.assign(redirect)} onSwitchAccount={async () => { await signOutAccount(); requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} /> : <FamilyApp key={auth.email} onboardingRequired={auth.onboardingRequired === true} onFirstRunComplete={() => {
+    requests.current++
+    setAuth(current => current?.email === auth.email ? { ...current, onboardingRequired: false } : current)
+  }} onSignedOut={() => { requests.current++; setAuth({ authenticated: false, emailMigrationRequired: false, email: null }) }} onWebsiteLanguageSaved={language => {
     requests.current++
     setAuth(current => current?.email === auth.email ? { ...current, websiteLanguage: language } : current)
   }} email={auth.email ?? ''} />}</FeaturesProvider></I18nProvider>
   return <>{error && <div className="auth-error error" role="alert">{message(error)}<button className="text-button" onClick={() => setError('')}>{t('Dismiss')}</button></div>}<Auth emailMigrationRequired={auth.emailMigrationRequired} onAuthenticated={state => { requests.current++; setError(''); setAuth(state) }} /></>
 }
 
-function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: string; onSignedOut: () => void; onWebsiteLanguageSaved: (language: WebsiteLanguage) => void }) {
+function FamilyApp({ email, onboardingRequired, onFirstRunComplete, onSignedOut, onWebsiteLanguageSaved }: { email: string; onboardingRequired: boolean; onFirstRunComplete: () => void; onSignedOut: () => void; onWebsiteLanguageSaved: (language: WebsiteLanguage) => void }) {
   const { t, message } = useI18n()
   const [tab, setTab] = useState<'home' | 'collection' | 'statistics' | 'settings'>('home')
   const [collectionView, setCollectionView] = useState<'words' | 'add'>('add')
   const [practiceActive, setPracticeActive] = useState(false)
+  const [firstPractice, setFirstPractice] = useState<Word[] | null>(null)
   const documentEnabled = useFeature('document-check')
   const { words, wordLists, preferences, loading, error, refresh, saveLanguages } = useWords(tab)
   const [signingOut, setSigningOut] = useState(false)
@@ -144,17 +149,23 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
       <button ref={accountToggle} className="account-toggle" aria-label={t('Account menu')} title={email} aria-expanded={accountOpen} aria-controls="account-actions" onClick={() => setAccountOpen(previous => !previous)}><CircleUserRound /><ChevronDown size={16} /></button>
       {accountOpen && <div id="account-actions" className="account-panel" role="group" aria-label={t('Account')}>
         <p className="account-identity">{email}</p>
-        <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Settings size={18} />{t('Settings')}</button>
-        {!installedWebApp() && <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Download size={18} />{t('Install app')}</button>}
+        {!onboardingRequired && <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Settings size={18} />{t('Settings')}</button>}
+        {!onboardingRequired && !installedWebApp() && <button onClick={() => { setTab('settings'); setAccountOpen(false) }}><Download size={18} />{t('Install app')}</button>}
         <button disabled={signingOut} onClick={() => void signOut()}><LogOut size={18} />{t(signingOut ? 'Signing out…' : 'Sign out')}</button>
       </div>}
     </div></header>}
-    {!practiceActive && <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>}
+    {!practiceActive && !onboardingRequired && <nav className="main-nav" aria-label={t('Main navigation')}><button aria-current={tab === 'home' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('home') }}>{t('Home')}</button><button aria-current={tab === 'collection' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('collection') }}>{t('Collection')}</button><button aria-current={tab === 'statistics' ? 'page' : undefined} onClick={() => { setAccountOpen(false); setTab('statistics') }}>{t('Progress')}</button></nav>}
     <main className={tab === 'settings' ? 'settings-page' : showPageTitle ? undefined : 'workspace-content'}>
-      {showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>}
+      {!onboardingRequired && (showPageTitle ? <div className="page-heading"><h1>{pageTitle}</h1></div> : <h1 className="visually-hidden">{pageTitle}</h1>)}
       {authError && <p className="error" role="alert">{t('Could not sign out: {error}', { error: message(authError) })}</p>}
       {error && <div className="error" role="alert">{error} <button className="text-button" disabled={loading} onClick={() => void refresh()}>{t('Retry loading')}</button></div>}
-      {tab === 'settings' ? <div className="settings-layout">
+      {onboardingRequired ? <FirstRun onComplete={async words => {
+        await refresh()
+        setFirstPractice(words)
+        setTab('home')
+        setPracticeActive(true)
+        onFirstRunComplete()
+      }} /> : tab === 'settings' ? <div className="settings-layout">
         <nav className="settings-navigation" aria-label={t('Settings sections')}>
           <a href="#settings-languages">{t('Language preferences')}</a>
           <a href="#settings-device">{t('This device')}</a>
@@ -190,7 +201,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
           <WordResources words={words} wordLists={wordLists} preferences={preferences} onUpdated={refresh} />
         </div>
       </div> : tab === 'statistics' ? <Statistics words={words} preferences={preferences} loading={loading} refresh={refresh} onActiveChange={setPracticeActive} /> : <div className="home-actions">
-        <Practice words={words} wordLists={wordLists} loading={loading} onUpdated={refresh} preferences={preferences} onActiveChange={setPracticeActive} />
+        <Practice words={words} wordLists={wordLists} initialWords={firstPractice ?? undefined} loading={loading} onUpdated={refresh} preferences={preferences} onActiveChange={active => { setPracticeActive(active); if (!active) setFirstPractice(null) }} />
         {!practiceActive && documentEnabled && <DocumentChecker key={preferences.enabled.join(',')} preferences={preferences} onUpdated={refresh} />}
       </div>}
     </main>

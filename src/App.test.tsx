@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
+import { FirstRun } from './components/FirstRun'
 import { api } from './lib/api'
 import type { AuthState, Challenge, DocumentCheck, Word } from '../shared/model'
 import { initialLanguagePreferences } from '../shared/languages'
@@ -41,6 +42,111 @@ beforeEach(() => {
 })
 
 describe('public registration and private account state', () => {
+  it('guides a new signup into its first ten-word challenge without creating practice history', async () => {
+    const user = userEvent.setup()
+    const entries = ['beautiful', 'because', 'friend', 'people', 'different', 'enough', 'thought', 'through', 'which', 'where']
+    const starter: Word[] = entries.map((text, index) => ({ id: `starter-${index}`, text, language: 'en', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-27T12:00:00Z', last_practiced_at: null }))
+    vi.spyOn(api, 'signup').mockResolvedValue({ ...account, onboardingRequired: true })
+    const save = vi.spyOn(api, 'completeFirstRun').mockImplementation(async () => {
+      vi.mocked(api.words).mockResolvedValue(starter)
+      vi.mocked(api.languagePreferences).mockResolvedValue({ enabled: ['en'], defaultLanguage: 'en' })
+      return starter
+    })
+    const create = vi.spyOn(api, 'createChallenge')
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Create account' }))
+    await user.type(screen.getByLabelText('Parent email'), account.email)
+    await user.type(screen.getByLabelText('Password', { exact: true }), 'a long test passphrase')
+    await user.type(screen.getByLabelText('Confirm password'), 'a long test passphrase')
+    await user.click(screen.getByRole('button', { name: 'Create my account' }))
+    expect(await screen.findByRole('heading', { name: 'Your first ten words' })).toBeVisible()
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'English' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Your own words' }))
+    for (const [index, word] of entries.entries()) fireEvent.change(screen.getByRole('textbox', { name: `Word ${index + 1}` }), { target: { value: word } })
+    await user.click(screen.getByRole('button', { name: 'Save and practice' }))
+    expect(save).toHaveBeenCalledWith({ language: 'en', source: 'custom', words: entries })
+    expect(await screen.findByRole('heading', { name: 'Ready to write?' })).toBeVisible()
+    expect(screen.getByText('10 words')).toBeVisible()
+    expect(create).not.toHaveBeenCalled()
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back to challenges' }))
+    expect(await screen.findByRole('heading', { name: 'Start a challenge' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'Your first ten words' })).not.toBeInTheDocument()
+  }, 15_000)
+
+  it('resumes unfinished first setup on sign-in in German and supports starter words', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.session).mockResolvedValue({ ...account, websiteLanguage: 'de', onboardingRequired: true })
+    const starter: Word[] = Array.from({ length: 10 }, (_, index) => ({ id: `starter-${index}`, text: `Wort${index + 1}`, language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-27T12:00:00Z', last_practiced_at: null }))
+    vi.mocked(api.wordResources).mockResolvedValue([{ id: 'demo-deutsche-stolperwoerter', language: 'de', title: 'Demo', sections: [{ id: 'starter', title: 'Starter', entries: starter.map(word => ({ id: word.id, word: word.text, sentence: 'Ein Satz.', translations: [] })) }] }])
+    const save = vi.spyOn(api, 'completeFirstRun').mockImplementation(async () => {
+      vi.mocked(api.words).mockResolvedValue(starter)
+      vi.mocked(api.languagePreferences).mockResolvedValue({ enabled: ['de'], defaultLanguage: 'de' })
+      return starter
+    })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Deine ersten zehn Wörter' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deutsch' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Weiter' }))
+    expect(screen.getByRole('button', { name: 'Wörter zum Einstieg' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('Wort10')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Speichern und üben' }))
+    expect(save).toHaveBeenCalledWith({ language: 'de', source: 'demo' })
+    expect(await screen.findByRole('heading', { name: 'Bereit zum Schreiben?' })).toBeVisible()
+  })
+
+  it('collects ten unique personal words and preserves them after a failed first-run save', async () => {
+    const user = userEvent.setup()
+    const finish = vi.fn().mockResolvedValue(undefined)
+    const save = vi.spyOn(api, 'completeFirstRun').mockRejectedValueOnce(new Error('Please try again.')).mockResolvedValue([])
+    render(<FirstRun onComplete={finish} />)
+    await user.click(screen.getByRole('button', { name: 'English' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Your own words' }))
+    expect(screen.getAllByRole('textbox')).toHaveLength(10)
+    expect(screen.getByRole('button', { name: 'Save and practice' })).toBeDisabled()
+    const entries = ['beautiful', 'because', 'friend', 'people', 'different', 'enough', 'thought', 'through', 'which', 'where']
+    for (const [index, word] of entries.entries()) await user.type(screen.getByRole('textbox', { name: `Word ${index + 1}` }), word)
+    await user.clear(screen.getByRole('textbox', { name: 'Word 10' }))
+    await user.type(screen.getByRole('textbox', { name: 'Word 10' }), 'BEAUTIFUL')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter ten different words.')
+    expect(screen.getByRole('button', { name: 'Save and practice' })).toBeDisabled()
+    await user.clear(screen.getByRole('textbox', { name: 'Word 10' }))
+    await user.type(screen.getByRole('textbox', { name: 'Word 10' }), 'where')
+    await user.click(screen.getByRole('button', { name: 'Save and practice' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please try again.')
+    expect(screen.getByRole('textbox', { name: 'Word 1' })).toHaveValue('beautiful')
+    expect(finish).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Save and practice' }))
+    expect(save).toHaveBeenLastCalledWith({ language: 'en', source: 'custom', words: entries })
+    await waitFor(() => expect(finish).toHaveBeenCalledOnce())
+  })
+
+  it('defaults to ten starter words in the selected language without saving before confirmation', async () => {
+    const user = userEvent.setup()
+    const finish = vi.fn().mockResolvedValue(undefined)
+    const entries = Array.from({ length: 10 }, (_, index) => ({ id: `entry-${index}`, word: `Wort${index + 1}`, sentence: 'Ein Satz.', translations: [] }))
+    vi.mocked(api.wordResources).mockResolvedValue([{ id: 'demo-deutsche-stolperwoerter', language: 'de', title: 'Demo', sections: [{ id: 'starter', title: 'Starter', entries }] }])
+    const save = vi.spyOn(api, 'completeFirstRun').mockResolvedValue([])
+    render(<FirstRun onComplete={finish} />)
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    const choices = within(screen.getByRole('group', { name: 'Word choice' })).getAllByRole('button')
+    expect(choices.map(button => button.textContent)).toEqual(['Starter words', 'Your own words'])
+    expect(choices[0]).toHaveAttribute('aria-pressed', 'true')
+    expect(choices[1]).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(await screen.findByText('Wort10')).toBeVisible()
+    expect(screen.getAllByRole('listitem')).toHaveLength(10)
+    expect(save).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Save and practice' }))
+    expect(save).toHaveBeenCalledWith({ language: 'de', source: 'demo' })
+    await waitFor(() => expect(finish).toHaveBeenCalledOnce())
+  })
+
   it('groups settings by purpose and keeps language saves on the settings page', async () => {
     const user = userEvent.setup()
     vi.mocked(api.session).mockResolvedValue(account)
