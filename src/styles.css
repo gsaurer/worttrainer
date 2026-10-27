@@ -201,6 +201,18 @@ form .button { margin-top: 24px; }
 .settings-content .fine-print { max-width: 60ch; }
 .settings-panel { padding: 24px; }
 .settings-panel h2 { margin-bottom: 16px; }
+.status-versions { margin: 0; font-size: .85rem; }
+.status-versions > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.status-versions dt { font-weight: 600; }
+.status-versions dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.status-versions strong { color: var(--muted); font-weight: 500; }
+.build-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+.build-detail code, .build-detail time { color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
+.status-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
+.status-actions a { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: .85rem; }
+.status-refresh { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: 0 0 40px; }
+.status-update { margin-top: 16px; font-size: .85rem; }
+.status-update .button { margin-top: 12px; }
 .connection-address { display: flex; gap: 8px; align-items: center; }
 .connection-address input { min-width: 0; width: 100%; margin: 0; }
 .connection-icon { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; justify-content: center; }

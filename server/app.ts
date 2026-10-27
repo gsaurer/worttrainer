@@ -16,6 +16,8 @@ import type { FeatureFlags } from './feature-flags.js'
 import { mcpHandler, mcpTokenPrefix, mcpTokenSchema } from './mcp.js'
 import { wordInputSchema } from './words.js'
 import { createOAuth } from './oauth.js'
+import type { BuildInfo, ServiceStatus } from '../shared/status.js'
+import { loadBuildInfo } from './build-info.js'
 
 export type AppOptions = {
   store: FileStore
@@ -26,6 +28,7 @@ export type AppOptions = {
   ocr?: OcrOptions
   reminders?: ReminderService
   features?: FeatureFlags
+  build?: BuildInfo
 }
 
 const cookieName = 'worttrainer_session'
@@ -47,6 +50,9 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 export function createApp(options: AppOptions) {
   const { store } = options
   const app = express()
+  const startedAt = new Date().toISOString()
+  const started = performance.now()
+  const build = options.build ?? loadBuildInfo()
   app.disable('x-powered-by')
   if (options.trustProxy) app.set('trust proxy', 1)
   app.use((_req, res, next) => {
@@ -55,6 +61,10 @@ export function createApp(options: AppOptions) {
     res.setHeader('X-Frame-Options', 'DENY')
     if (options.production) res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     next()
+  })
+  app.get('/api/status', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({ status: 'ok', backend: build, frontend: build, startedAt, uptimeSeconds: Math.floor((performance.now() - started) / 1000) } satisfies ServiceStatus)
   })
   const oauth = createOAuth(store, options.origin)
   app.all('/api/mcp', mcpHandler(store, options.origin, oauth))

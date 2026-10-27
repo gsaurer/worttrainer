@@ -2,6 +2,7 @@ import type { AccountDataExport, AuthState, Language, LanguagePreferences, Navig
 import type { DocumentCheck, PracticeWordList, ResourceImport, WordResource } from '../../shared/model'
 import type { DevicePushSubscription, ReminderSchedule, ReminderSettings } from '../../shared/reminders'
 import type { ConnectedAppsState, ConnectionRequest } from '../../shared/oauth'
+import { serviceStatusSchema, type ServiceStatus } from '../../shared/status'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -29,6 +30,7 @@ async function readResponse<T>(response: Response, protectedRequest: boolean): P
 }
 
 export const api = {
+  status: async (signal?: AbortSignal) => serviceStatusSchema.parse(await readResponse<ServiceStatus>(await fetch('/api/status', { signal, cache: 'no-store', credentials: 'omit' }), false)),
   session: () => request<AuthState>('/session'),
   login: (email: string, password: string) => request<AuthState>('/login', 'POST', { email, password }),
   signup: (email: string, password: string, websiteLanguage: WebsiteLanguage = 'en') => request<AuthState>('/signup', 'POST', { email, password, websiteLanguage }),

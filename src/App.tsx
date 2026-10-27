@@ -19,6 +19,7 @@ import { LanguageSettings } from './components/LanguageSettings'
 import { WebsiteLanguageSettings } from './components/WebsiteLanguageSettings'
 import { InstallWebApp, ReminderSettings } from './components/WebAppSettings'
 import { ConnectedApps, OAuthConsent } from './components/ConnectedApps'
+import { AppStatus } from './components/AppStatus'
 import { currentPushSubscription, installedWebApp } from './lib/pwa'
 import { I18nProvider } from './i18n/I18n'
 import { useI18n } from './i18n/context'
@@ -159,6 +160,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
           <a href="#settings-device">{t('This device')}</a>
           <a href="#settings-connections">{t('Connected apps')}</a>
           <a href="#settings-account">{t('Account')}</a>
+          <a href="#settings-status">{t('App status')}</a>
         </nav>
         <div className="settings-content">
           <div id="settings-languages" className="settings-group" role="group" aria-label={t('Language preferences')}>
@@ -174,6 +176,7 @@ function FamilyApp({ email, onSignedOut, onWebsiteLanguageSaved }: { email: stri
             <section className="settings-panel word-panel" aria-labelledby="account-title"><h2 id="account-title">{t('Account')}</h2><p className="settings-email">{email}</p><PasswordSettings /></section>
             <section className="settings-panel word-panel" aria-labelledby="export-title"><h2 id="export-title">{t('Your data')}</h2><DataExport /></section>
           </div>
+          <div id="settings-status" className="settings-group"><AppStatus /></div>
         </div>
       </div> : !preferences ? !error && <p role="status">{t('Loading your languages…')}</p> : tab === 'collection' ? <div className="collection-workspace">
         <nav className="main-nav collection-navigation" aria-label={t('Collection sections')}>

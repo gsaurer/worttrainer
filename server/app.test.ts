@@ -6,8 +6,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { brotliCompressSync, deflateSync, gzipSync } from 'node:zlib'
 import request from 'supertest'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
+import { FeatureFlags } from './feature-flags.js'
 import { FileStore } from './store.js'
 import { hashPassword } from './passwords.js'
 import type { Word } from '../shared/model.js'
@@ -47,6 +48,22 @@ afterAll(async () => { await rm(directory, { recursive: true, force: true }) })
 beforeEach(() => { app = createApp(options()) })
 
 describe('real self-hosted authentication and JSON persistence', () => {
+  it('serves public uncached status and both build identities without accessing account features', async () => {
+    const build = { version: '0.1.0', buildId: 'b'.repeat(64), commit: 'a'.repeat(40), dirty: false, builtAt: '2026-10-27T10:00:00.000Z' }
+    const features = await FeatureFlags.open(join(directory, 'store.json'), store)
+    const refresh = vi.spyOn(features, 'refresh')
+    const server = createApp({ ...options(), build, features })
+    const response = await request(server).get('/api/status').expect(200).expect('Content-Type', /json/).expect('Cache-Control', 'no-store')
+    expect(response.body).toEqual({ status: 'ok', backend: build, frontend: build, startedAt: expect.any(String), uptimeSeconds: expect.any(Number) })
+    expect(Number.isNaN(Date.parse(response.body.startedAt))).toBe(false)
+    expect(response.body.uptimeSeconds).toBeGreaterThanOrEqual(0)
+    expect(response.headers['set-cookie']).toBeUndefined()
+    const repeated = await request(server).get('/api/status').expect(200)
+    expect(repeated.body.startedAt).toBe(response.body.startedAt)
+    expect(refresh).not.toHaveBeenCalled()
+    await request(app).get('/api/health').expect(200).expect({ ok: true })
+  })
+
   it('allows normal signup without a setup token and protects all collection endpoints', async () => {
     expect((await request(app).get('/api/session')).body).toEqual({ authenticated: false, emailMigrationRequired: false, email: null })
     await request(app).get('/api/words').expect(401)

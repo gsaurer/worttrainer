@@ -1,6 +1,10 @@
 services:
   worttrainer:
-    build: .
+    build:
+      context: .
+      args:
+        BUILD_COMMIT: ${BUILD_COMMIT:-}
+        BUILD_DIRTY: ${BUILD_DIRTY:-}
     init: true
     restart: unless-stopped
     ports:

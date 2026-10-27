@@ -6,6 +6,9 @@ import { api } from './lib/api'
 import type { AuthState, Challenge, DocumentCheck, Word } from '../shared/model'
 import { initialLanguagePreferences } from '../shared/languages'
 import * as pwa from './lib/pwa'
+import type { BuildInfo } from '../shared/status'
+
+declare const __BUILD_INFO__: BuildInfo
 
 const anonymous = { authenticated: false, emailMigrationRequired: false, email: null }
 const account = { authenticated: true, emailMigrationRequired: false, email: 'parent@example.com' }
@@ -27,6 +30,7 @@ async function openYourWords(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   window.history.replaceState(null, '', '/')
   vi.spyOn(api, 'session').mockResolvedValue(anonymous)
+  vi.spyOn(api, 'status').mockResolvedValue({ status: 'ok', frontend: __BUILD_INFO__, backend: __BUILD_INFO__, startedAt: '2026-10-27T10:00:00.000Z', uptimeSeconds: 100 })
   vi.spyOn(api, 'words').mockResolvedValue([])
   vi.spyOn(api, 'addedWordLists').mockResolvedValue([])
   vi.spyOn(api, 'wordResources').mockResolvedValue([])
@@ -44,7 +48,9 @@ describe('public registration and private account state', () => {
     render(<App />)
     await openSettings(user)
     const navigation = screen.getByRole('navigation', { name: 'Settings sections' })
-    expect(within(navigation).getAllByRole('link').map(link => link.textContent)).toEqual(['Language preferences', 'This device', 'Connected apps', 'Account'])
+    expect(within(navigation).getAllByRole('link').map(link => link.textContent)).toEqual(['Language preferences', 'This device', 'Connected apps', 'Account', 'App status'])
+    expect(await screen.findByRole('region', { name: 'App status' })).toBeVisible()
+    expect(await screen.findByText('Online')).toBeVisible()
     const languages = screen.getByRole('group', { name: 'Language preferences' })
     expect(within(languages).getByRole('region', { name: 'Website language' })).toBeVisible()
     expect(within(languages).getByRole('region', { name: 'Languages' })).toBeVisible()

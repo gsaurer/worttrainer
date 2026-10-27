@@ -3,7 +3,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+ARG BUILD_COMMIT
+ARG BUILD_DIRTY
+RUN BUILD_COMMIT="$BUILD_COMMIT" BUILD_DIRTY="$BUILD_DIRTY" npm run build
 
 FROM node:22-bookworm-slim
 WORKDIR /app
