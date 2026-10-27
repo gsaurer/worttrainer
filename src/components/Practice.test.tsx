@@ -5,6 +5,7 @@ import type { PracticeWordList, Challenge, Word } from '../../shared/model'
 import { api } from '../lib/api'
 import { Practice } from './Practice'
 import { I18nProvider } from '../i18n/I18n'
+import { FeaturesProvider } from '../lib/features'
 
 const word: Word = { id: '11111111-1111-4111-8111-111111111111', text: 'Schmetterling', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
 const list: PracticeWordList = { resourceId: 'school', title: 'School list', language: 'de', sectionIds: ['animals'], wordIds: [word.id], sections: [{ id: 'animals', title: 'Animals', wordIds: [word.id] }] }
@@ -234,7 +235,7 @@ describe('whole-challenge dictation', () => {
     await user.click(screen.getByRole('button', { name: 'Finish challenge' }))
     expect(screen.getByRole('heading', { name: 'Challenge finished.' })).toBeInTheDocument()
     expect(document.body).not.toHaveTextContent(word.text)
-    expect(screen.getByRole('button', { name: 'Auto check' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Auto check' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Manual check' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Correct' })).not.toBeInTheDocument()
     expect(review).not.toHaveBeenCalled()
@@ -261,7 +262,7 @@ describe('whole-challenge dictation', () => {
     vi.spyOn(api, 'challengeStatus').mockResolvedValue({ challenges: [finished], ocr: { enabled: true, month: '2026-10', used: 0, limit: 450 } })
     const read = vi.spyOn(api, 'readPhoto').mockResolvedValue(recognized)
     const review = vi.spyOn(api, 'reviewChallenge').mockResolvedValue({ ...recognized, reviewedAt: timestamp, results: [false], check: { method: 'photo', spellings: ['Schmeterling'], evaluatedAt: timestamp } })
-    render(<Practice words={[word]} loading={false} onUpdated={vi.fn()} />)
+    render(<FeaturesProvider value={['challenge-auto-check']}><Practice words={[word]} loading={false} onUpdated={vi.fn()} /></FeaturesProvider>)
     await user.click(await screen.findByRole('button', { name: 'Auto check' }))
     expect(document.body).not.toHaveTextContent(word.text)
     const image = new File(['photo'], 'answers.png', { type: 'image/png' })

@@ -120,6 +120,45 @@ describe('feature flags', () => {
     await request(app).post('/api/documents/words').set('Origin', origin).set('Cookie', first.cookie).send({ language: 'en', words: ['beautiful'] }).expect(404)
   })
 
+  it('gates challenge auto checking independently and before OCR for each account', async () => {
+    await write({ 'document-check': { all: true }, 'challenge-auto-check': { accounts: ['first@example.test'] } })
+    const flags = await FeatureFlags.open(dataFile, store)
+    const normalize = vi.spyOn(ocr, 'normalizePhoto').mockResolvedValue(Buffer.from('normalized'))
+    const read = vi.spyOn(ocr, 'readAzurePhoto').mockResolvedValue({ answers: [{ number: 1, text: 'beautiful', confidence: 0.9 }], warnings: [] })
+    const options = { store, origin, secureCookie: false, ocr: { endpoint: 'https://example.cognitiveservices.azure.com', key: 'test', monthlyLimit: 5 } }
+    const app = createApp({ ...options, features: flags })
+    const prepare = async (owner: string) => {
+      const word = await store.addWord(owner, 'beautiful', 'en')
+      const challenge = await store.createChallenge(owner, [word.id])
+      await store.advanceChallenge(owner, challenge.id, 1, { fromIndex: 0, elapsedMs: 5000, intervalSeconds: 5, automatic: false, action: 'next' })
+      return challenge.id
+    }
+    const firstChallenge = await prepare(first.id)
+    const secondChallenge = await prepare(second.id)
+    const upload = (id: string, cookie?: string, target = app) => {
+      const operation = request(target).post(`/api/challenges/${id}/photo`).set('Origin', origin).set('Content-Type', 'image/jpeg')
+      return (cookie ? operation.set('Cookie', cookie) : operation).send(Buffer.from('photo'))
+    }
+    await upload(firstChallenge).expect(401)
+    await upload(secondChallenge, second.cookie).expect(404)
+    await upload(firstChallenge, first.cookie, createApp(options)).expect(404)
+    expect(normalize).not.toHaveBeenCalled()
+    expect(read).not.toHaveBeenCalled()
+    expect(store.ocrUsage().used).toBe(0)
+    expect((await request(app).get('/api/challenges').set('Cookie', second.cookie).expect(200)).body.ocr.enabled).toBe(false)
+    expect((await request(app).get('/api/challenges').set('Cookie', first.cookie).expect(200)).body.ocr.enabled).toBe(true)
+    await upload(firstChallenge, first.cookie).expect(200)
+    expect(read).toHaveBeenCalledOnce()
+    expect(store.ocrUsage().used).toBe(1)
+    expect(store.exportData(second.id).attempts).toEqual([])
+    expect(store.challenge(second.id, secondChallenge).recognition).toBeNull()
+    await write({ 'document-check': { all: true } })
+    await flags.refresh(Date.now() + 2000)
+    await upload(firstChallenge, first.cookie).expect(404)
+    expect(read).toHaveBeenCalledOnce()
+    expect((await request(app).get('/api/challenges').set('Cookie', first.cookie).expect(200)).body.ocr.enabled).toBe(false)
+  })
+
   it('adds reviewed words atomically without duplicates, changed progress or account leakage', async () => {
     await write({ 'document-check': { all: true } })
     const app = createApp({ store, origin, secureCookie: false, features: await FeatureFlags.open(dataFile, store) })

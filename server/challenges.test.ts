@@ -8,6 +8,7 @@ import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { FileStore } from './store.js'
+import { FeatureFlags } from './feature-flags.js'
 import { challengeSchema } from './challenge-schema.js'
 import type { Challenge } from '../shared/model.js'
 
@@ -20,7 +21,8 @@ let cookie: string
 let ids: string[]
 let photo: Buffer
 let accountId: string
-const options = () => ({ store, origin, secureCookie: false, ocr })
+let features: FeatureFlags
+const options = () => ({ store, origin, secureCookie: false, ocr, features })
 const post = (path: string, body: object) => request(app).post(path).set('Origin', origin).set('Cookie', cookie).send(body)
 const upload = (id: string, bytes = photo) => request(app).post(`/api/challenges/${id}/photo`).set('Origin', origin).set('Cookie', cookie).set('Content-Type', 'image/png').send(bytes)
 const advance = (id: string, fromIndex: number, nextIndex: number) => post(`/api/challenges/${id}/advance`, { fromIndex, nextIndex, elapsedMs: 4500, intervalSeconds: 5, automatic: false, action: nextIndex < fromIndex ? 'previous' : 'next' })
@@ -39,6 +41,8 @@ beforeEach(async () => {
   accountId = randomUUID()
   await store.register({ email: 'parent@example.com', salt: '00'.repeat(16), passwordHash: 'aa'.repeat(64) }, { accountId, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 60_000 })
   ids = [ (await store.addWord(accountId, 'Straße', 'de')).id, (await store.addWord(accountId, 'Schmetterling', 'de')).id ]
+  await writeFile(join(directory, 'store.feature-flags.json'), JSON.stringify({ flags: { 'challenge-auto-check': { all: true } } }))
+  features = await FeatureFlags.open(join(directory, 'store.json'), store)
   app = createApp(options())
   photo = await sharp({ create: { width: 30, height: 40, channels: 3, background: '#ffffff' } }).png().toBuffer()
 })
@@ -218,7 +222,115 @@ describe('persisted photo challenges and parent-confirmed batches', () => {
     expect(transport).toHaveBeenCalledTimes(1)
     expect((await FileStore.open(file)).ocrUsage().used).toBe(450)
   })
-  it('can remove a saved sheet and recognized text without undoing its practice results', async () => {
+  it('soft-deletes a challenge and ignores its practice results while preserving later practice', async () => {
+    const first = await newChallenge()
+    await finish(first)
+    await review(first.id, [false, false]).expect(200)
+    const later = await newChallenge()
+    await finish(later)
+    await review(later.id, [false, false]).expect(200)
+    expect(store.words(accountId).every(word => word.category === 'minus')).toBe(true)
+    const laterTime = store.challenge(accountId, later.id).reviewedAt
+    await request(app).delete(`/api/challenges/${first.id}`).set('Cookie', cookie).set('Origin', origin).send({ removePractice: true }).expect(204)
+    expect(store.words(accountId)).toEqual(expect.arrayContaining(ids.map(id => expect.objectContaining({ id, category: 'new', consecutive_mistakes: 1, last_practiced_at: laterTime }))))
+    expect(store.challenges(accountId).map(challenge => challenge.id)).toEqual([later.id])
+    const exported = store.exportData(accountId)
+    expect(exported.challenges).toHaveLength(2)
+    expect(exported.challenges.find(challenge => challenge.id === first.id)).toMatchObject({ deletedAt: expect.any(String) })
+    expect(exported.attempts).toHaveLength(4)
+    for (const snapshot of first.words) {
+      expect(exported.attempts.find(attempt => attempt.id === snapshot.attemptId)).toMatchObject({ deletedAt: expect.any(String), correct: false })
+    }
+    expect(exported.statistics).toMatchObject({ started: 1, completed: 1, incorrect: 2, reviewed: 2 })
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.words(accountId)).toEqual(store.words(accountId))
+    expect(reopened.challenges(accountId).map(challenge => challenge.id)).toEqual([later.id])
+    expect(reopened.exportData(accountId).attempts).toEqual(exported.attempts)
+  })
+
+  it('ignores deleted correct answers in future streaks and resets only the linked word history', async () => {
+    await store.mark(accountId, ids[0], true, randomUUID())
+    const previousTime = store.words(accountId).find(word => word.id === ids[0])!.last_practiced_at
+    const challenge = await newChallenge()
+    await finish(challenge)
+    await review(challenge.id, [true, false]).expect(200)
+    const remove = () => request(app).delete(`/api/challenges/${challenge.id}`).set('Cookie', cookie).set('Origin', origin).send({ removePractice: true })
+    await remove().expect(204)
+    expect(store.words(accountId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: ids[0], category: 'new', consecutive_mistakes: 0, last_practiced_at: previousTime }),
+      expect.objectContaining({ id: ids[1], category: 'new', consecutive_mistakes: 0, last_practiced_at: null }),
+    ]))
+    const beforeRetry = store.exportData(accountId)
+    await remove().expect(204)
+    expect(store.exportData(accountId)).toMatchObject({ words: beforeRetry.words, attempts: beforeRetry.attempts, challenges: beforeRetry.challenges })
+    expect(await store.mark(accountId, ids[0], true, randomUUID())).toMatchObject({ category: 'new' })
+    expect(await store.mark(accountId, ids[0], true, randomUUID())).toMatchObject({ category: 'plus' })
+    expect(await store.mark(accountId, ids[1], false, randomUUID())).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
+  })
+
+  it('preserves explicit category moves while replaying remaining practice after deletion', async () => {
+    const first = await newChallenge()
+    await finish(first)
+    await review(first.id, [false, false]).expect(200)
+    await store.moveWord(accountId, ids[0], 'plus')
+    await store.moveWord(accountId, ids[1], 'minus')
+    const later = await newChallenge()
+    await finish(later)
+    await review(later.id, [true, true]).expect(200)
+    await store.deleteChallenge(accountId, first.id, true)
+    expect(store.words(accountId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: ids[0], category: 'plus', consecutive_mistakes: 0 }),
+      expect.objectContaining({ id: ids[1], category: 'minus', consecutive_mistakes: 0 }),
+    ]))
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    await reopened.deleteChallenge(accountId, later.id, true)
+    expect(reopened.words(accountId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: ids[0], category: 'plus', consecutive_mistakes: 0, last_practiced_at: null }),
+      expect.objectContaining({ id: ids[1], category: 'minus', consecutive_mistakes: 0, last_practiced_at: null }),
+    ]))
+  })
+
+  it('rejects invalid deletion options, foreign challenges and mutations of deleted challenges', async () => {
+    const challenge = await newChallenge()
+    const before = store.exportData(accountId)
+    const path = `/api/challenges/${challenge.id}`
+    await request(app).delete(path).set('Origin', origin).send({ removePractice: true }).expect(401)
+    await request(app).delete(path).set('Cookie', cookie).set('Origin', 'https://other.example').send({ removePractice: true }).expect(403)
+    for (const body of [{ removePractice: 'true' }, { removePractice: null }, { removePractice: true, accountId: randomUUID() }]) {
+      await request(app).delete(path).set('Cookie', cookie).set('Origin', origin).send(body).expect(400)
+    }
+    const otherId = randomUUID()
+    await store.register({ email: 'other@example.test', salt: '00'.repeat(16), passwordHash: 'bb'.repeat(64) }, {
+      accountId: otherId, tokenHash: randomBytes(32).toString('hex'), expiresAt: Date.now() + 60_000,
+    })
+    const otherWord = await store.addWord(otherId, 'private', 'en')
+    const otherChallenge = await store.createChallenge(otherId, [otherWord.id])
+    await request(app).delete(`/api/challenges/${otherChallenge.id}`).set('Cookie', cookie).set('Origin', origin).send({ removePractice: true }).expect(404)
+    expect(store.challenges(otherId)).toEqual([otherChallenge])
+    expect(store.exportData(accountId)).toMatchObject({ words: before.words, attempts: before.attempts, challenges: before.challenges })
+    await request(app).delete(path).set('Cookie', cookie).set('Origin', origin).send({ removePractice: true }).expect(204)
+    await advance(challenge.id, 0, 1).expect(404)
+    await review(challenge.id, [true, true]).expect(404)
+    await upload(challenge.id).expect(404)
+    expect(store.ocrUsage().used).toBe(0)
+    expect(store.words(accountId)).toEqual(before.words)
+    expect(store.exportData(accountId).attempts).toEqual([])
+    expect(store.challenges(accountId)).toEqual([])
+  })
+
+  it('accepts an empty JSON request while keeping practice results', async () => {
+    const challenge = await newChallenge()
+    await finish(challenge)
+    await review(challenge.id, [true, false]).expect(200)
+    const before = store.exportData(accountId)
+    await request(app).delete(`/api/challenges/${challenge.id}`).set('Cookie', cookie).set('Origin', origin).expect(415)
+    await request(app).delete(`/api/challenges/${challenge.id}`).set('Cookie', cookie).set('Origin', origin).set('Content-Type', 'application/json').set('Content-Length', '0').expect(204)
+    expect(store.words(accountId)).toEqual(before.words)
+    expect(store.exportData(accountId).attempts).toEqual(before.attempts)
+    expect(store.challenges(accountId)).toEqual([])
+  })
+
+  it('can remove a saved sheet from active history without undoing its practice results', async () => {
     const challenge = await newChallenge()
     await finish(challenge)
     await review(challenge.id, [true, false]).expect(200)
@@ -228,6 +340,9 @@ describe('persisted photo challenges and parent-confirmed batches', () => {
     expect(store.words(accountId)).toEqual(progress)
     const saved = JSON.parse(await readFile(join(directory, 'store.accounts', `${accountId}.json`), 'utf8'))
     expect(saved.attempts).toHaveLength(2)
+    expect(saved.attempts.every((attempt: { deletedAt?: string }) => !attempt.deletedAt)).toBe(true)
+    expect(saved.challenges).toHaveLength(1)
+    expect(saved.challenges[0]).toMatchObject({ id: challenge.id, deletedAt: expect.any(String), results: [true, false] })
   })
   it('removes stored recognition snapshots on word deletion and does not partially apply a stale batch', async () => {
     const challenge = await newChallenge()

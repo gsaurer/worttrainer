@@ -21,6 +21,7 @@ export function selectPracticeWords(words: Word[], size: number, challenges: rea
   const count = Math.min(Math.max(0, Math.floor(size)), words.length)
   const lastActivity = new Map(words.map(word => [word.id, word.last_practiced_at === null ? -Infinity : Date.parse(word.last_practiced_at)]))
   for (const challenge of challenges) {
+    if (challenge.deletedAt) continue
     const startedAt = Date.parse(challenge.startedAt)
     for (const word of challenge.words) {
       const previous = lastActivity.get(word.id)

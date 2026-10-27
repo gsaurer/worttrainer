@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'rea
 import { BarChart3, Camera, Check, ChevronDown, Play, SkipBack, SkipForward, Square, Trash2, Volume2, X } from 'lucide-react'
 import { challengeStatistics, suggestedResult, type NavigationTiming, type Challenge, type ChallengeStatus, type Word } from '../../shared/model'
 import { api } from '../lib/api'
+import { useFeature } from '../lib/features'
 import { errorMessage, languages, selectPracticeWords } from '../lib/words'
 import { useDictation } from '../hooks/useDictation'
 import { useI18n } from '../i18n/context'
@@ -33,6 +34,7 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
   view?: 'practice' | 'statistics'
 }) {
   const { t, message, date } = useI18n()
+  const autoCheckEnabled = useFeature('challenge-auto-check')
   const [status, setStatus] = useState<ChallengeStatus | null>(null)
   const [challenge, setChallenge] = useState<Challenge | null>(null)
   const [preparedWords, setPreparedWords] = useState<Word[] | null>(null)
@@ -40,9 +42,11 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
   const [pendingResults, setPendingResults] = useState<boolean[] | null>(null)
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoUrl, setPhotoUrl] = useState('')
-  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraRequested, setCameraOpen] = useState(false)
   const photoInput = useRef<HTMLInputElement>(null)
-  const [checkMode, setCheckMode] = useState<'manual' | 'photo' | null>(null)
+  const [selectedCheckMode, setCheckMode] = useState<'manual' | 'photo' | null>(null)
+  const checkMode = !autoCheckEnabled && selectedCheckMode === 'photo' && !challenge?.reviewedAt ? 'manual' : selectedCheckMode
+  const cameraOpen = checkMode === 'photo' && cameraRequested
   const [spellings, setSpellings] = useState<string[]>([])
   const [intervalSeconds, setIntervalSeconds] = useState(5)
   const [automatic, setAutomatic] = useState(false)
@@ -50,6 +54,7 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [removePractice, setRemovePractice] = useState(false)
   const [showStatistics, setShowStatistics] = useState(false)
   const working = useRef(false)
   const wordStartedAt = useRef(0)
@@ -207,7 +212,7 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
   const challengeSizes = [10, 15, 20]
   const shortChallenge = !loading && words.length > 0 && words.length < 20
   const reporting = view === 'statistics'
-  const history = status?.challenges.filter(item => reporting || !item.reviewedAt) ?? []
+  const history = status?.challenges.filter(item => !item.deletedAt && (reporting || !item.reviewedAt)) ?? []
   const historyGroups = reporting ? [{ label: t('Challenge history'), challenges: history }] : [
     { label: t('Continue learning'), challenges: history.filter(item => !item.writtenAt) },
     { label: t('Ready to check'), challenges: history.filter(item => !!item.writtenAt) },
@@ -218,10 +223,21 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
       return <div className="photo-history-row" key={item.id}>
       <div><strong>{languages[item.words[0].language].name} · {item.words.length} {t(item.words.length === 1 ? 'word' : 'words')}</strong>{reporting && <small><span className="challenge-id" title={item.id}>{t('Challenge')} #{item.id.slice(0, 8)}</span> · {t('Started')} {date(item.startedAt)}<br />{item.reviewedAt ? t('Reviewed {date} · {correct} correct · {incorrect} incorrect · {accuracy}%', { date: date(item.reviewedAt), correct: stats.correct, incorrect: stats.incorrect, accuracy: stats.accuracy ?? '—' }) : item.writtenAt ? t('Written · awaiting parent review · no results recorded yet') : t('{position} of {count} written · in progress', { position: item.nextIndex, count: item.words.length })}</small>}</div>
       <div className="history-check-actions">
-        {item.writtenAt && !item.reviewedAt ? <><button className="button secondary challenge-icon-button" title={t('Auto check')} aria-label={t('Auto check')} disabled={busy} onClick={() => openChallenge(item, 'photo')}><Camera size={18} aria-hidden="true" /></button><button className="button secondary challenge-icon-button" title={t('Manual check')} aria-label={t('Manual check')} disabled={busy} onClick={() => openChallenge(item, 'manual')}><Check size={18} aria-hidden="true" /></button></> : <button className={`button secondary${item.reviewedAt ? '' : ' challenge-icon-button'}`} title={t(item.reviewedAt ? 'View results' : 'Continue challenge')} aria-label={t(item.reviewedAt ? 'View results' : 'Continue challenge')} disabled={busy} onClick={() => openChallenge(item)}>{item.reviewedAt ? t('View results') : <Play size={18} aria-hidden="true" />}</button>}
-        <button className="button secondary challenge-icon-button" title={t('Remove challenge')} aria-label={t('Remove challenge')} aria-expanded={deleteId === item.id} aria-controls={`remove-challenge-${item.id}`} disabled={busy} onClick={() => setDeleteId(item.id)}><Trash2 size={18} aria-hidden="true" /></button>
+        {item.writtenAt && !item.reviewedAt ? <>{autoCheckEnabled && <button className="button secondary challenge-icon-button" title={t('Auto check')} aria-label={t('Auto check')} disabled={busy} onClick={() => openChallenge(item, 'photo')}><Camera size={18} aria-hidden="true" /></button>}<button className="button secondary challenge-icon-button" title={t('Manual check')} aria-label={t('Manual check')} disabled={busy} onClick={() => openChallenge(item, 'manual')}><Check size={18} aria-hidden="true" /></button></> : <button className={`button secondary${item.reviewedAt ? '' : ' challenge-icon-button'}`} title={t(item.reviewedAt ? 'View results' : 'Continue challenge')} aria-label={t(item.reviewedAt ? 'View results' : 'Continue challenge')} disabled={busy} onClick={() => openChallenge(item)}>{item.reviewedAt ? t('View results') : <Play size={18} aria-hidden="true" />}</button>}
+        <button className="button secondary challenge-icon-button" title={t('Remove challenge')} aria-label={t('Remove challenge')} aria-expanded={deleteId === item.id} aria-controls={`remove-challenge-${item.id}`} disabled={busy} onClick={() => { setDeleteId(item.id); setRemovePractice(false) }}><Trash2 size={18} aria-hidden="true" /></button>
       </div>
-      {deleteId === item.id && <div className="challenge-delete-confirmation" id={`remove-challenge-${item.id}`}><span>{t('Remove this challenge and its results? Word progress stays.')}</span><button className="text-button danger" disabled={busy} onClick={() => void run(async () => { await api.deleteChallenge(item.id); setStatus(await api.challengeStatus()); setDeleteId(null) })}>{t('Confirm removal')}</button><button className="text-button" disabled={busy} onClick={() => setDeleteId(null)}>{t('Cancel')}</button></div>}
+      {deleteId === item.id && <div className="challenge-delete-confirmation" id={`remove-challenge-${item.id}`}>
+        <span>{t('Remove this challenge?')}</span>
+        {item.reviewedAt && <label className="challenge-delete-option"><input type="checkbox" checked={removePractice} disabled={busy} onChange={event => setRemovePractice(event.target.checked)} /><span>{t('Also remove its practice results')}</span></label>}
+        <p className="fine-print">{t(removePractice ? 'Word ratings will be recalculated from the remaining practice results.' : 'Word progress stays.')}</p>
+        <button className="text-button danger" disabled={busy} onClick={() => void run(async () => {
+          await api.deleteChallenge(item.id, removePractice)
+          setStatus(current => current ? { ...current, challenges: current.challenges.filter(challenge => challenge.id !== item.id) } : current)
+          setDeleteId(null)
+          if (removePractice) await onUpdated()
+          setStatus(await api.challengeStatus())
+        })}>{t('Confirm removal')}</button><button className="text-button" disabled={busy} onClick={() => setDeleteId(null)}>{t('Cancel')}</button>
+      </div>}
     </div>})}
   </section>) : []
   return <section className={`photo-practice${reporting ? ' statistics-challenges' : ''}`} aria-label={t('Challenges')}>
@@ -290,7 +306,7 @@ export function ChallengePractice({ words, onUpdated, loading = false, filters, 
       <div className="photo-intro">
         <h2>{t(challenge.reviewedAt ? 'Your answers' : checkMode ? 'Check your answers' : 'Challenge finished.')}</h2>
         {challenge.reviewedAt && <button className="text-button statistics-toggle" aria-expanded={showStatistics} aria-controls="challenge-statistics" onClick={() => setShowStatistics(previous => !previous)}><BarChart3 size={18} />{t('Progress')}</button>}
-        {!challenge.reviewedAt && !checkMode && <div className="answer-buttons"><button className="button primary" onClick={() => openChallenge(challenge, 'photo')}><Camera size={18} />{t('Auto check')}</button><button className="button secondary" onClick={() => openChallenge(challenge, 'manual')}><Check size={18} />{t('Manual check')}</button><button className="button secondary" disabled={busy} onClick={back}><X size={18} />{t('Close')}</button></div>}
+        {!challenge.reviewedAt && !checkMode && <div className="answer-buttons">{autoCheckEnabled && <button className="button primary" onClick={() => openChallenge(challenge, 'photo')}><Camera size={18} />{t('Auto check')}</button>}<button className={`button ${autoCheckEnabled ? 'secondary' : 'primary'}`} onClick={() => openChallenge(challenge, 'manual')}><Check size={18} />{t('Manual check')}</button><button className="button secondary" disabled={busy} onClick={back}><X size={18} />{t('Close')}</button></div>}
         {!challenge.reviewedAt && checkMode === 'photo' && <>
           <label className="visually-hidden" htmlFor="answer-photo">{t('One photo of your answers (JPEG or PNG, up to 4 MB)')}</label>
           <input ref={photoInput} id="answer-photo" type="file" hidden accept="image/jpeg,image/png" disabled={busy || !!pendingResults} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = '' }} />

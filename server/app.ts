@@ -266,7 +266,7 @@ export function createApp(options: AppOptions) {
     res.json(await store.mark(accountId(req), input.wordId, input.correct, input.attemptId))
   })
   app.get('/api/challenges', requireAuth, (req, res) => {
-    res.json({ challenges: store.challenges(accountId(req)), ocr: { enabled: !!options.ocr, ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
+    res.json({ challenges: store.challenges(accountId(req)), ocr: { enabled: !!options.ocr && !!options.features?.enabled('challenge-auto-check', accountId(req)), ...store.ocrUsage(), limit: options.ocr?.monthlyLimit ?? 450 } })
   })
   app.post('/api/challenges', requireAuth, async (req, res) => {
     const input = parse(z.object({ wordIds: z.array(z.uuid()).min(1).max(100, 'Use at most 100 words on one numbered sheet.') }).strict(), req.body)
@@ -315,7 +315,10 @@ export function createApp(options: AppOptions) {
     }).strict(), req.body)
     res.json(await store.importDocumentWords(accountId(req), input.words, input.language))
   })
-  app.post('/api/challenges/:id/photo', requireAuth, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb', inflate: false }), async (req, res) => {
+  const challengeAutoCheckAvailable: express.RequestHandler = (req, _res, next) => {
+    next(options.features?.enabled('challenge-auto-check', accountId(req)) ? undefined : new HttpError(404, 'Automatic challenge checking is not enabled for this account.'))
+  }
+  app.post('/api/challenges/:id/photo', requireAuth, challengeAutoCheckAvailable, photoAvailable, photoLimiter, express.raw({ type: ['image/jpeg', 'image/png'], limit: '4mb', inflate: false }), async (req, res) => {
     const id = parse(z.uuid(), req.params.id)
     const owner = accountId(req)
     const challenge = store.challenge(owner, id)
@@ -342,8 +345,9 @@ export function createApp(options: AppOptions) {
   app.delete('/api/challenges/:id', requireAuth, async (req, res) => {
     const owner = accountId(req)
     const id = parse(z.uuid(), req.params.id)
-    await options.reminders?.recordCompletion(owner, store.challenge(owner, id).writtenAt)
-    await store.deleteChallenge(owner, id)
+    const input = parse(z.object({ removePractice: z.boolean().default(false) }).strict().default({ removePractice: false }), req.body)
+    const writtenAt = await store.deleteChallenge(owner, id, input.removePractice)
+    if (!input.removePractice) await options.reminders?.recordCompletion(owner, writtenAt)
     res.status(204).end()
   })
   app.use('/api', (_req, _res, next) => { next(new HttpError(404, 'Unknown API endpoint.')) })

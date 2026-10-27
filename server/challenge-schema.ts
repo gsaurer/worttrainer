@@ -22,6 +22,7 @@ export const challengeSchema = z.object({
     evaluatedAt: z.string().datetime(),
   }).strict().nullable(),
   id: z.uuid(),
+  deletedAt: z.string().datetime().optional(),
   startedAt: z.string().datetime(),
   writtenAt: z.string().datetime().nullable(),
   reviewedAt: z.string().datetime().nullable(),

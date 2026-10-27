@@ -44,6 +44,12 @@ describe('word learning progress', () => {
     expect(nextProgress(word, true, [{ wordId: word.id, correct: true }, { wordId: 'another', correct: true }])).toMatchObject({ category: 'new' })
     expect(nextProgress(word, true, [{ wordId: word.id, correct: true }, { wordId: 'another', correct: false }, { wordId: word.id, correct: true }])).toMatchObject({ category: 'plus' })
   })
+  it('ignores deleted answers without counting them or breaking the surviving correct streak', () => {
+    const word = progress([true])[0]
+    const deletedAt = '2026-10-27T12:00:00Z'
+    expect(nextProgress(word, true, [{ wordId: word.id, correct: true, deletedAt }, { wordId: word.id, correct: true }])).toMatchObject({ category: 'new' })
+    expect(nextProgress(word, true, [{ wordId: word.id, correct: true }, { wordId: word.id, correct: false, deletedAt }, { wordId: word.id, correct: true }])).toMatchObject({ category: 'plus' })
+  })
 })
 
 function challenge(results: boolean[] | null, count = results?.length ?? 2): Challenge {
@@ -57,6 +63,10 @@ function challenge(results: boolean[] | null, count = results?.length ?? 2): Cha
 }
 
 describe('parent-confirmed challenge statistics', () => {
+  it('excludes deleted completed and unfinished challenges from every total', () => {
+    const deletedAt = '2026-10-27T12:00:00Z'
+    expect(challengeStatistics([{ ...challenge([false, false]), deletedAt }, { ...challenge(null, 5), deletedAt }, challenge([true])])).toEqual({ started: 1, completed: 1, pending: 0, correct: 1, incorrect: 0, unmarked: 0, reviewed: 1, accuracy: 100 })
+  })
   it('shows no accuracy before any confirmed answer, not a misleading zero percent', () => {
     expect(challengeStatistics([])).toEqual({ started: 0, completed: 0, pending: 0, correct: 0, incorrect: 0, unmarked: 0, reviewed: 0, accuracy: null })
     expect(challengeStatistics([challenge(null, 3)])).toMatchObject({ pending: 1, unmarked: 3, incorrect: 0, correct: 0, accuracy: null })

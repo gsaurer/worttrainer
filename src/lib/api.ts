@@ -65,5 +65,5 @@ export const api = {
   }), true),
   addDocumentWords: (language: DocumentCheck['language'], words: string[]) => request<ResourceImport>('/documents/words', 'POST', { language, words }, true),
   reviewChallenge: (id: string, results: boolean[], check: ChallengeCheckInput) => request<Challenge>(`/challenges/${encodeURIComponent(id)}/review`, 'POST', { results, check }, true),
-  deleteChallenge: (id: string) => request<void>(`/challenges/${encodeURIComponent(id)}`, 'DELETE', {}, true),
+  deleteChallenge: (id: string, removePractice = false) => request<void>(`/challenges/${encodeURIComponent(id)}`, 'DELETE', { removePractice }, true),
 }

@@ -431,6 +431,9 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .photo-history-row .challenge-icon-button { width: 44px; height: 44px; flex-shrink: 0; padding: 10px; }
 .challenge-delete-confirmation { flex-basis: 100%; }
 .challenge-delete-confirmation > span { display: block; margin-bottom: 8px; }
+.challenge-delete-option { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.challenge-delete-option input { flex-shrink: 0; width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; }
+.challenge-delete-option span { min-width: 0; }
 .answer-sheet-preview { display: block; max-width: 100%; max-height: 650px; object-fit: contain; margin: 20px auto; border-radius: 8px; }
 .photo-answer-list { margin: 25px 0; padding-left: 25px; }
 .photo-answer-list li { padding: 20px 0 20px 8px; border-bottom: 1px solid var(--line); }

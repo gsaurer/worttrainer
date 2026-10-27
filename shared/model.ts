@@ -45,6 +45,7 @@ export type Word = {
   consecutive_mistakes: number
   created_at: string
   last_practiced_at: string | null
+  progressOverride?: { category: Category; afterAttemptId: string | null }
 }
 
 export type AuthState = {
@@ -93,6 +94,7 @@ export type ChallengePhoto = { dataUrl: string; uploadedAt: string; evaluatedAt:
 
 export type Challenge = {
   id: string
+  deletedAt?: string
   startedAt: string
   writtenAt: string | null
   reviewedAt: string | null
@@ -110,6 +112,15 @@ export type ChallengeStatus = {
   ocr: { enabled: boolean; month: string; used: number; limit: number }
 }
 
+export type PracticeAttempt = {
+  id: string
+  wordId: string
+  correct: boolean
+  createdAt: string
+  spelling?: string
+  deletedAt?: string
+}
+
 export type AccountDataExport = {
   format: 'worttrainer-account-export'
   schemaVersion: 5
@@ -118,18 +129,19 @@ export type AccountDataExport = {
   languagePreferences: LanguagePreferences
   websiteLanguage: WebsiteLanguage
   words: Word[]
-  attempts: { id: string; wordId: string; correct: boolean; createdAt: string; spelling?: string }[]
+  attempts: PracticeAttempt[]
   challenges: Challenge[]
   wordLists: AddedWordList[]
   statistics: ReturnType<typeof challengeStatistics>
 }
 
 export function challengeStatistics(challenges: Challenge[]) {
+  const active = challenges.filter(challenge => !challenge.deletedAt)
   let completed = 0
   let correct = 0
   let incorrect = 0
   let unmarked = 0
-  for (const challenge of challenges) {
+  for (const challenge of active) {
     if (challenge.reviewedAt !== null && challenge.results !== null) {
       completed++
       correct += challenge.results.filter(Boolean).length
@@ -139,7 +151,7 @@ export function challengeStatistics(challenges: Challenge[]) {
     }
   }
   const reviewed = correct + incorrect
-  return { started: challenges.length, completed, pending: challenges.length - completed, correct, incorrect, unmarked, reviewed, accuracy: reviewed ? Math.round(correct / reviewed * 100) : null }
+  return { started: active.length, completed, pending: active.length - completed, correct, incorrect, unmarked, reviewed, accuracy: reviewed ? Math.round(correct / reviewed * 100) : null }
 }
 
 export function suggestedResult(expected: string, text: string | null, confidence: number | null): boolean | null {
@@ -155,12 +167,12 @@ export function validateWord(value: string): string | null {
   return null
 }
 
-export function nextProgress(word: Word, correct: boolean, attempts: readonly { wordId: string; correct: boolean }[]) {
+export function nextProgress(word: Word, correct: boolean, attempts: readonly { wordId: string; correct: boolean; deletedAt?: string }[]) {
   let correctStreak = correct ? 1 : 0
   if (correct) {
     for (let index = attempts.length - 1; index >= 0 && correctStreak < 3; index--) {
       const attempt = attempts[index]
-      if (attempt.wordId !== word.id) continue
+      if (attempt.wordId !== word.id || attempt.deletedAt) continue
       if (!attempt.correct) break
       correctStreak++
     }

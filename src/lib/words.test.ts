@@ -71,6 +71,17 @@ describe('mixed practice selection', () => {
     expect(selectPracticeWords(words, 15, [...history].reverse()).filter(word => words.slice(0, 5).some(recent => recent.id === word.id))).toEqual([])
   })
 
+  it('does not use deleted challenge appearances when choosing the oldest words', () => {
+    const words = group('new', 20).map((word, index) => ({ ...word, last_practiced_at: `2026-10-${String(index + 1).padStart(2, '0')}T12:00:00Z` }))
+    const deleted: Challenge = {
+      id: 'deleted', startedAt: '2026-10-27T12:00:00Z', deletedAt: '2026-10-27T13:00:00Z',
+      writtenAt: null, reviewedAt: null, nextIndex: 0,
+      words: words.slice(0, 10).map(word => ({ id: word.id, text: word.text, language: word.language, attemptId: word.id })),
+      recognition: null, results: null, telemetry: [], check: null, photo: null,
+    }
+    expect(selectPracticeWords(words, 10, [deleted]).map(word => word.id).sort()).toEqual(words.slice(0, 10).map(word => word.id).sort())
+  })
+
   it.each([
     { size: 10, defaults: 5, minus: 4, plus: 1 },
     { size: 15, defaults: 8, minus: 6, plus: 1 },

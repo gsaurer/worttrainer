@@ -10,7 +10,8 @@ import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from
 import { HttpError } from './errors.js'
 import { challengeSchema, recognitionSchema } from './challenge-schema.js'
 import { wordResources } from './word-resources.js'
-import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList, PracticeWordList } from '../shared/model.js'
+import { mistakeReportSchema } from './words.js'
+import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList, PracticeWordList, PracticeAttempt } from '../shared/model.js'
 import { oauthStateSchema, type OAuthState } from './oauth.js'
 
 export const parentEmailSchema = z.string().trim().toLowerCase().email('Enter a valid parent email address.').max(254)
@@ -31,6 +32,7 @@ const wordSchema = z.object({
   consecutive_mistakes: z.number().int().min(0).max(2),
   created_at: z.string().datetime(),
   last_practiced_at: z.string().datetime().nullable(),
+  progressOverride: z.object({ category: z.enum(['new', 'plus', 'minus']), afterAttemptId: z.uuid().nullable() }).strict().optional(),
 }).strict().refine(word => word.consecutive_mistakes < 2 || word.category === 'minus')
 const oldSessionSchema = z.object({ tokenHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.number().int().positive() }).strict()
 const sessionSchema = oldSessionSchema.extend({ accountId: z.uuid() }).strict()
@@ -43,7 +45,7 @@ const wordListsSchema = z.array(z.object({
 }).strict())
 const collectionShape = {
   words: z.array(wordSchema),
-  attempts: z.array(z.object({ id: z.uuid(), wordId: z.uuid(), correct: z.boolean(), createdAt: z.string().datetime(), spelling: z.string().trim().min(1).max(1000).optional() }).strict()),
+  attempts: z.array(z.object({ id: z.uuid(), wordId: z.uuid(), correct: z.boolean(), createdAt: z.string().datetime(), spelling: z.string().trim().min(1).max(1000).optional(), deletedAt: z.string().datetime().optional() }).strict()),
   challenges: z.array(challengeSchema).default([]),
   wordLists: wordListsSchema.default([]),
 }
@@ -201,6 +203,28 @@ function owned(state: State, accountId: string): AccountData {
   return account
 }
 
+function wordView(word: Word): Word {
+  const view = { ...word }
+  delete view.progressOverride
+  return view
+}
+
+function replayProgress(word: Word, attempts: PracticeAttempt[]) {
+  const replay: Word = { ...word, category: 'new', consecutive_mistakes: 0, last_practiced_at: null }
+  const prior: PracticeAttempt[] = []
+  const override = () => Object.assign(replay, { category: word.progressOverride!.category, consecutive_mistakes: 0 })
+  if (word.progressOverride?.afterAttemptId === null) override()
+  for (const attempt of attempts) {
+    if (attempt.wordId !== word.id) continue
+    if (!attempt.deletedAt) {
+      Object.assign(replay, nextProgress(replay, attempt.correct, prior), { last_practiced_at: attempt.createdAt })
+      prior.push(attempt)
+    }
+    if (word.progressOverride?.afterAttemptId === attempt.id) override()
+  }
+  Object.assign(word, { category: replay.category, consecutive_mistakes: replay.consecutive_mistakes, last_practiced_at: replay.last_practiced_at })
+}
+
 export class FileStore {
   private tail: Promise<void> = Promise.resolve()
   private constructor(private file: string, private state: State) {}
@@ -284,7 +308,7 @@ export class FileStore {
     const item = this.state.accounts.find(item => 'username' in item.account)
     return item ? { id: item.id, account: { ...item.account } } : null
   }
-  words(accountId: string): Word[] { return structuredClone(owned(this.state, accountId).words) }
+  words(accountId: string): Word[] { return owned(this.state, accountId).words.map(wordView) }
   hasAccount(accountId: string): boolean { return this.state.accounts.some(account => account.id === accountId) }
   addedWordLists(accountId: string): AddedWordList[] { return structuredClone(owned(this.state, accountId).wordLists) }
   practiceWordLists(accountId: string): PracticeWordList[] {
@@ -299,7 +323,7 @@ export class FileStore {
       }) }
     })
   }
-  challenges(accountId: string): Challenge[] { return structuredClone(owned(this.state, accountId).challenges) }
+  challenges(accountId: string): Challenge[] { return structuredClone(owned(this.state, accountId).challenges.filter(challenge => !challenge.deletedAt)) }
   languagePreferences(accountId: string): LanguagePreferences { return structuredClone(owned(this.state, accountId).languagePreferences) }
   websiteLanguage(accountId: string): WebsiteLanguage { return owned(this.state, accountId).websiteLanguage }
 
@@ -328,7 +352,7 @@ export class FileStore {
   }
 
   challenge(accountId: string, id: string): Challenge {
-    const challenge = owned(this.state, accountId).challenges.find(challenge => challenge.id === id)
+    const challenge = owned(this.state, accountId).challenges.find(challenge => challenge.id === id && !challenge.deletedAt)
     if (!challenge) throw new HttpError(404, 'Challenge not found.')
     return structuredClone(challenge)
   }
@@ -366,7 +390,7 @@ export class FileStore {
 
   advanceChallenge(accountId: string, id: string, nextIndex: number, timing: NavigationTiming) {
     return this.accountTransaction(accountId, state => {
-      const challenge = state.challenges.find(challenge => challenge.id === id)
+      const challenge = state.challenges.find(challenge => challenge.id === id && !challenge.deletedAt)
       if (!challenge) throw new HttpError(404, 'Challenge not found.')
       if (timing.fromIndex !== challenge.nextIndex) throw new HttpError(409, 'This sheet changed on another device. Reopen it to continue.')
       if (challenge.writtenAt || challenge.reviewedAt || Math.abs(nextIndex - challenge.nextIndex) > 1 || nextIndex < 0 || nextIndex > challenge.words.length) throw new HttpError(409, 'This sheet changed on another device. Reopen it to continue.')
@@ -387,7 +411,7 @@ export class FileStore {
 
   saveRecognition(accountId: string, id: string, recognition: PhotoRecognition, photo: ChallengePhoto) {
     return this.accountTransaction(accountId, state => {
-      const challenge = state.challenges.find(challenge => challenge.id === id)
+      const challenge = state.challenges.find(challenge => challenge.id === id && !challenge.deletedAt)
       if (!challenge) throw new HttpError(404, 'Challenge not found.')
       if (!challenge.writtenAt || challenge.reviewedAt) throw new HttpError(409, 'Finish writing before reading a photo; reviewed sheets cannot be changed.')
       challenge.recognition = recognitionSchema.parse(recognition)
@@ -398,7 +422,7 @@ export class FileStore {
 
   reviewChallenge(accountId: string, id: string, results: boolean[], check: ChallengeCheckInput) {
     return this.accountTransaction(accountId, state => {
-      const challenge = state.challenges.find(challenge => challenge.id === id)
+      const challenge = state.challenges.find(challenge => challenge.id === id && !challenge.deletedAt)
       if (!challenge) throw new HttpError(404, 'Challenge not found.')
       if (!challenge.writtenAt || results.length !== challenge.words.length) throw new HttpError(400, 'Finish the sheet and explicitly mark every answer.')
       if (check.spellings.length !== challenge.words.length || (check.method === 'photo' && !challenge.recognition)) throw new HttpError(400, 'Finish the sheet and explicitly mark every answer.')
@@ -420,10 +444,25 @@ export class FileStore {
     })
   }
 
-  deleteChallenge(accountId: string, id: string) {
+  deleteChallenge(accountId: string, id: string, removePractice = false) {
     return this.accountTransaction(accountId, state => {
-      if (!state.challenges.some(challenge => challenge.id === id)) throw new HttpError(404, 'Challenge not found.')
-      state.challenges = state.challenges.filter(challenge => challenge.id !== id)
+      const challenge = state.challenges.find(challenge => challenge.id === id)
+      if (!challenge) throw new HttpError(404, 'Challenge not found.')
+      const now = new Date().toISOString()
+      challenge.deletedAt ??= now
+      if (removePractice) {
+        const ids = new Set(challenge.words.map(word => word.attemptId))
+        const affected = new Set<string>()
+        for (const attempt of state.attempts) {
+          if (!ids.has(attempt.id) || attempt.deletedAt) continue
+          attempt.deletedAt = now
+          affected.add(attempt.wordId)
+        }
+        for (const word of state.words) {
+          if (affected.has(word.id)) replayProgress(word, state.attempts)
+        }
+      }
+      return challenge.writtenAt
     })
   }
 
@@ -582,8 +621,57 @@ export class FileStore {
     return this.accountTransaction(accountId, state => {
       const word = state.words.find(word => word.id === wordId)
       if (!word) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
-      if (word.category !== category) Object.assign(word, { category, consecutive_mistakes: 0 })
-      return { ...word }
+      if (word.category !== category) Object.assign(word, {
+        category, consecutive_mistakes: 0,
+        progressOverride: { category, afterAttemptId: state.attempts.filter(attempt => attempt.wordId === wordId).at(-1)?.id ?? null },
+      })
+      return wordView(word)
+    })
+  }
+
+  recordMistakes(accountId: string, input: z.input<typeof mistakeReportSchema>) {
+    const { reportId, language, words: entries } = mistakeReportSchema.parse(input)
+    return this.accountTransaction(accountId, state => {
+      const previous = state.challenges.find(challenge => challenge.id === reportId)
+      if (previous) {
+        if (previous.deletedAt) throw new HttpError(409, 'This report was deleted. Use a fresh report ID for a new report.')
+        if (previous.words[0].attemptId !== reportId || previous.words.length !== entries.length ||
+            previous.words.some((word, index) => word.language !== language || word.text.toLowerCase() !== entries[index].correctWord.toLowerCase() ||
+              previous.results?.[index] !== false || previous.check?.spellings[index] !== (entries[index].wrongSpelling ?? null))) {
+          throw new HttpError(409, 'This report ID already belongs to different results. Use a fresh report ID for a new report.')
+        }
+        return { reportId, words: previous.words.map(snapshot => wordView(state.words.find(word => word.id === snapshot.id)!)) }
+      }
+      if (state.attempts.some(attempt => attempt.id === reportId) || state.challenges.some(challenge => challenge.words.some(word => word.attemptId === reportId))) {
+        throw new HttpError(409, 'This report ID already belongs to saved practice. Use a fresh report ID for a new report.')
+      }
+      if (!state.languagePreferences.enabled.includes(language)) {
+        throw new HttpError(409, 'This language is disabled. Enable it in Languages before recording a new report.')
+      }
+      const now = new Date().toISOString()
+      const words = entries.map(entry => {
+        const existing = state.words.find(word => word.language === language && word.text.toLowerCase() === entry.correctWord.toLowerCase())
+        if (existing) return existing
+        const word: Word = {
+          id: randomUUID(), text: entry.correctWord, language, category: 'new', consecutive_mistakes: 0,
+          created_at: now, last_practiced_at: null,
+        }
+        state.words.unshift(word)
+        return word
+      })
+      const snapshots = words.map((word, index) => {
+        const attemptId = index === 0 ? reportId : randomUUID()
+        const spelling = entries[index].wrongSpelling
+        Object.assign(word, nextProgress(word, false, state.attempts), { last_practiced_at: now })
+        state.attempts.push({ id: attemptId, wordId: word.id, correct: false, createdAt: now, ...(spelling === undefined ? {} : { spelling }) })
+        return { id: word.id, text: word.text, language, attemptId }
+      })
+      state.challenges.unshift(challengeSchema.parse({
+        id: reportId, startedAt: now, writtenAt: now, reviewedAt: now, nextIndex: words.length,
+        words: snapshots, results: words.map(() => false), telemetry: [], recognition: null, photo: null,
+        check: { method: 'manual', spellings: entries.map(entry => entry.wrongSpelling ?? null), evaluatedAt: now },
+      }))
+      return { reportId, words: words.map(wordView) }
     })
   }
 
@@ -593,12 +681,13 @@ export class FileStore {
       if (!word) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
       const existing = state.attempts.find(attempt => attempt.id === attemptId)
       if (existing) {
+        if (existing.deletedAt) throw new HttpError(409, 'This attempt was deleted. Use a fresh attempt ID for a new result.')
         if (existing.wordId !== wordId || existing.correct !== correct || existing.spelling !== spelling) throw new HttpError(409, 'This attempt ID already belongs to another answer.')
-        return { ...word }
+        return wordView(word)
       }
       Object.assign(word, nextProgress(word, correct, state.attempts), { last_practiced_at: new Date().toISOString() })
       state.attempts.push({ id: attemptId, wordId, correct, createdAt: word.last_practiced_at!, ...(spelling === undefined ? {} : { spelling }) })
-      return { ...word }
+      return wordView(word)
     })
   }
 }

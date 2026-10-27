@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render as renderComponent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import type { Challenge, ChallengeStatus, Word } from '../../shared/model'
 import { api } from '../lib/api'
 import { ChallengePractice } from './ChallengePractice'
 import { I18nProvider } from '../i18n/I18n'
+import { FeaturesProvider, noFeatures } from '../lib/features'
+
+function render(ui: ReactNode) {
+  return renderComponent(ui, { wrapper: ({ children }) => <FeaturesProvider value={['challenge-auto-check']}>{children}</FeaturesProvider> })
+}
 
 const word: Word = { id: '11111111-1111-4111-8111-111111111111', text: 'Schmetterling', language: 'de', category: 'new', consecutive_mistakes: 0, created_at: '2026-10-22T12:00:00Z', last_practiced_at: null }
 const challenge: Challenge = { id: '22222222-2222-4222-8222-222222222222', startedAt: '2026-10-22T12:00:00Z', writtenAt: null, reviewedAt: null, nextIndex: 0, words: [{ id: word.id, text: word.text, language: word.language, attemptId: '33333333-3333-4333-8333-333333333333' }], recognition: null, results: null, telemetry: [], check: null, photo: null }
@@ -21,6 +27,41 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('persisted whole-challenge practice', () => {
+  it('hides automatic checking by default and still saves manual reviews', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.challengeStatus).mockResolvedValue({ ...status, challenges: [written] })
+    const read = vi.spyOn(api, 'readPhoto')
+    const review = vi.spyOn(api, 'reviewChallenge').mockResolvedValue({ ...written, reviewedAt: '2026-10-22T12:02:00Z', results: [true], check: { method: 'manual', spellings: [word.text], evaluatedAt: '2026-10-22T12:02:00Z' } })
+    renderComponent(<ChallengePractice words={[word]} onUpdated={vi.fn()} />)
+    await screen.findByRole('button', { name: 'Manual check' })
+    expect(screen.queryByRole('button', { name: 'Auto check' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Manual check' }))
+    expect(screen.queryByLabelText('Camera preview')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/one photo of your answers/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Correct' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm all 1 results' }))
+    expect(review).toHaveBeenCalledWith(written.id, [true], { method: 'manual', spellings: [word.text] })
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it('closes the camera and falls back to manual checking when the flag is revoked', async () => {
+    const user = userEvent.setup()
+    const stop = vi.fn()
+    const stream = { getTracks: () => [{ stop }] }
+    vi.stubGlobal('navigator', { language: 'en-US', mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(stream) } })
+    vi.mocked(api.challengeStatus).mockResolvedValue({ ...status, challenges: [written] })
+    const read = vi.spyOn(api, 'readPhoto')
+    const { rerender } = renderComponent(<FeaturesProvider value={['challenge-auto-check']}><ChallengePractice words={[word]} onUpdated={vi.fn()} /></FeaturesProvider>)
+    await user.click(await screen.findByRole('button', { name: 'Auto check' }))
+    await waitFor(() => expect(screen.getByLabelText('Camera preview')).toHaveProperty('srcObject', stream))
+    rerender(<FeaturesProvider value={noFeatures}><ChallengePractice words={[word]} onUpdated={vi.fn()} /></FeaturesProvider>)
+    expect(stop).toHaveBeenCalledOnce()
+    expect(screen.queryByLabelText('Camera preview')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/one photo of your answers/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Correct' })).toBeVisible()
+    expect(read).not.toHaveBeenCalled()
+  })
+
   it('keeps setup quiet and waits for an explicit start after the instructions', async () => {
     const user = userEvent.setup()
     const create = vi.spyOn(api, 'createChallenge').mockResolvedValue(challenge)
@@ -182,7 +223,9 @@ describe('persisted whole-challenge practice', () => {
       expect(play.querySelector('svg')).toBeInTheDocument()
     }
     await user.click(trash)
-    expect(screen.getByText('Remove this challenge and its results? Word progress stays.')).toBeVisible()
+    expect(screen.getByText('Remove this challenge?')).toBeVisible()
+    expect(screen.getByText('Word progress stays.')).toBeVisible()
+    expect(screen.queryByRole('checkbox', { name: 'Also remove its practice results' })).not.toBeInTheDocument()
     expect(remove).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('button', { name: 'Confirm removal' })).not.toBeInTheDocument()
@@ -190,8 +233,31 @@ describe('persisted whole-challenge practice', () => {
     await user.click(trash)
     load.mockResolvedValue(status)
     await user.click(screen.getByRole('button', { name: 'Confirm removal' }))
-    expect(remove).toHaveBeenCalledExactlyOnceWith(saved.id)
+    expect(remove).toHaveBeenCalledExactlyOnceWith(saved.id, false)
     await waitFor(() => expect(screen.queryByRole('region', { name: saved.writtenAt ? 'Ready to check' : 'Continue learning' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Remove challenge' })).not.toBeInTheDocument()
+  })
+  it('can delete reviewed practice results only after explicit selection and refreshes word ratings', async () => {
+    const user = userEvent.setup()
+    const reviewed = { ...written, results: [false], reviewedAt: '2026-10-22T12:02:00Z', check: { method: 'manual' as const, spellings: [null], evaluatedAt: '2026-10-22T12:02:00Z' } }
+    const load = vi.spyOn(api, 'challengeStatus').mockResolvedValue({ ...status, challenges: [reviewed] })
+    const remove = vi.spyOn(api, 'deleteChallenge').mockResolvedValue(undefined)
+    const refresh = vi.fn().mockResolvedValue(undefined)
+    render(<ChallengePractice words={[word]} onUpdated={refresh} view="statistics" />)
+    const trash = await screen.findByRole('button', { name: 'Remove challenge' })
+    await user.click(trash)
+    expect(screen.getByRole('checkbox', { name: 'Also remove its practice results' })).not.toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: 'Also remove its practice results' }))
+    expect(screen.getByText('Word ratings will be recalculated from the remaining practice results.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(remove).not.toHaveBeenCalled()
+    await user.click(trash)
+    expect(screen.getByRole('checkbox', { name: 'Also remove its practice results' })).not.toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: 'Also remove its practice results' }))
+    load.mockResolvedValue(status)
+    await user.click(screen.getByRole('button', { name: 'Confirm removal' }))
+    expect(remove).toHaveBeenCalledExactlyOnceWith(reviewed.id, true)
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
     expect(screen.queryByRole('button', { name: 'Remove challenge' })).not.toBeInTheDocument()
   })
   it('keeps a challenge available when deletion fails', async () => {

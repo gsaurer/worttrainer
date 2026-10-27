@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { HttpError } from './errors.js'
 import { languageSchema } from './languages.js'
 import type { FileStore } from './store.js'
-import { wordInputSchema } from './words.js'
+import { mistakeReportSchema, wordInputSchema } from './words.js'
 import type { OAuthService } from './oauth.js'
 
 export const mcpTokenPrefix = 'wtr_mcp_'
@@ -107,7 +107,7 @@ function createWordServer(store: FileStore, accountId: string, scopes: string[],
   })
   server.registerTool('worttrainer_record_mistake', {
     title: 'Record a Worttrainer spelling mistake',
-    description: 'Record one confirmed incorrect practice result for an existing word in the authenticated account. Optionally include spelling with exactly what was written incorrectly; the correct word text is never replaced. Applies normal progress rules: plus returns to Default on a mistake and two consecutive mistakes lead to minus. Requires a fresh UUID attemptId for each real attempt; reuse that same ID and spelling on retries to avoid counting twice. Do not use for unconfirmed recognition or a category-only move. Use worttrainer_get_words to find the word ID.',
+    description: 'Record one confirmed incorrect practice result for an existing word in the authenticated account. Optionally include spelling with exactly what was written incorrectly; the correct word text is never replaced. Applies normal progress rules: plus returns to Default on a mistake and two consecutive mistakes lead to minus. Requires a fresh UUID attemptId for each real attempt; reuse that same ID and spelling on retries to avoid counting twice. Do not use for unconfirmed recognition or a category-only move. Use worttrainer_get_words to find the word ID. For a grouped report using correct word text, use worttrainer_record_mistakes instead.',
     inputSchema: z.object({
       wordId: z.uuid().describe('ID of the existing correct word in this account.'),
       attemptId: z.uuid().describe('Unique UUID for this confirmed attempt. Reuse unchanged when retrying this same attempt.'),
@@ -124,6 +124,23 @@ function createWordServer(store: FileStore, accountId: string, scopes: string[],
       return { content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent: output }
     } catch (error) {
       return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The mistake could not be saved. Retry with the same attempt ID and spelling.' }] }
+    }
+  })
+  server.registerTool('worttrainer_record_mistakes', {
+    title: 'Record a Worttrainer mistake report',
+    description: 'Save all confirmed spelling mistakes from one report as a single completed challenge in the authenticated account history. Supply the correctWord and optionally wrongSpelling for each word, and one enabled language for the whole report. Existing words are matched case-insensitively in that language; missing correct words are added. Every word receives one incorrect practice result under normal rating rules: plus returns to Default, two consecutive mistakes lead to minus. Include each correct word once. Use a fresh UUID reportId for a new report and reuse the same ID and payload on retries to avoid counting twice. Do not use for unconfirmed recognition or invented mistakes. Returns the report ID and updated word ratings.',
+    inputSchema: mistakeReportSchema,
+    outputSchema: z.object({ reportId: z.uuid(), words: z.array(wordSchema) }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
+  }, async input => {
+    const denied = scopeError('words:write')
+    if (denied) return denied
+    try {
+      const output = await store.recordMistakes(accountId, input)
+      return { content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent: output }
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The report could not be saved. Retry with the same report ID, words and spellings.' }] }
     }
   })
   return server
