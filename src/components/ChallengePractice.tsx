@@ -222,7 +222,11 @@ export function ChallengePractice({ words, initialWords, onUpdated, loading = fa
     {group.challenges.map(item => {
       const stats = challengeStatistics([item])
       return <div className="photo-history-row" key={item.id}>
-      <div><strong>{languages[item.words[0].language].name} · {item.words.length} {t(item.words.length === 1 ? 'word' : 'words')}</strong>{reporting && <small><span className="challenge-id" title={item.id}>{t('Challenge')} #{item.id.slice(0, 8)}</span> · {t('Started')} {date(item.startedAt)}<br />{item.reviewedAt ? t('Reviewed {date} · {correct} correct · {incorrect} incorrect · {accuracy}%', { date: date(item.reviewedAt), correct: stats.correct, incorrect: stats.incorrect, accuracy: stats.accuracy ?? '—' }) : item.writtenAt ? t('Written · awaiting parent review · no results recorded yet') : t('{position} of {count} written · in progress', { position: item.nextIndex, count: item.words.length })}</small>}</div>
+      <div>
+        <strong dir="auto">{item.name ?? <>{languages[item.words[0].language].name} · {item.words.length} {t(item.words.length === 1 ? 'word' : 'words')}</>}</strong>
+        {item.name && <small>{languages[item.words[0].language].name} · {item.words.length} {t(item.words.length === 1 ? 'word' : 'words')}</small>}
+        {reporting && <small><span className="challenge-id" title={item.id}>{t('Challenge')} #{item.id.slice(0, 8)}</span> · {t('Started')} {date(item.startedAt)}<br />{item.reviewedAt ? t('Reviewed {date} · {correct} correct · {incorrect} incorrect · {accuracy}%', { date: date(item.reviewedAt), correct: stats.correct, incorrect: stats.incorrect, accuracy: stats.accuracy ?? '—' }) : item.writtenAt ? t('Written · awaiting parent review · no results recorded yet') : t('{position} of {count} written · in progress', { position: item.nextIndex, count: item.words.length })}</small>}
+      </div>
       <div className="history-check-actions">
         {item.writtenAt && !item.reviewedAt ? <>{autoCheckEnabled && <button className="button secondary challenge-icon-button" title={t('Auto check')} aria-label={t('Auto check')} disabled={busy} onClick={() => openChallenge(item, 'photo')}><Camera size={18} aria-hidden="true" /></button>}<button className="button secondary challenge-icon-button" title={t('Manual check')} aria-label={t('Manual check')} disabled={busy} onClick={() => openChallenge(item, 'manual')}><Check size={18} aria-hidden="true" /></button></> : <button className={`button secondary${item.reviewedAt ? '' : ' challenge-icon-button'}`} title={t(item.reviewedAt ? 'View results' : 'Continue challenge')} aria-label={t(item.reviewedAt ? 'View results' : 'Continue challenge')} disabled={busy} onClick={() => openChallenge(item)}>{item.reviewedAt ? t('View results') : <Play size={18} aria-hidden="true" />}</button>}
         <button className="button secondary challenge-delete-trigger" title={t('Delete challenge')} aria-expanded={deleteId === item.id} aria-controls={`remove-challenge-${item.id}`} disabled={busy} onClick={() => { setDeleteId(item.id); setRemovePractice(false) }}><Trash2 size={18} aria-hidden="true" />{t('Delete challenge')}</button>
@@ -243,7 +247,7 @@ export function ChallengePractice({ words, initialWords, onUpdated, loading = fa
   </section>) : []
   return <section className={`photo-practice${reporting ? ' statistics-challenges' : ''}`} aria-label={t('Challenges')}>
     {(challenge || preparedWords) && <div className="practice-topline">
-      {challenge?.writtenAt && <span>{t('Challenges')}</span>}
+      {challenge && (challenge.name || challenge.writtenAt) && <span dir="auto">{challenge.name ?? t('Challenges')}</span>}
       <button className="text-button" disabled={busy} onClick={back}>{t('Back to challenges')}</button>
     </div>}
     {error && <p className="error" role="alert">{message(error)}</p>}
@@ -351,7 +355,7 @@ export function ChallengePractice({ words, initialWords, onUpdated, loading = fa
         {challenge.reviewedAt && <><p className="notice" role="status">{t('Results saved.')}</p><button className="button primary" disabled={busy} onClick={back}><Check size={18} />{t('Done')}</button></>}
       </div>}
       {!cameraOpen && <details className="challenge-options challenge-details"><summary>{t('Challenge details')}</summary>
-        <p><span className="challenge-id">{t('Challenge')} #{challenge.id.slice(0, 8)}</span><br />{t('Started')} {date(challenge.startedAt)}<br />{t('Writing finished')} {date(challenge.writtenAt!)}{challenge.reviewedAt && <><br />{t('Reviewed and saved')} {date(challenge.reviewedAt)}</>}</p>
+        <p>{challenge.name && <><strong dir="auto">{challenge.name}</strong><br /></>}<span className="challenge-id">{t('Challenge')} #{challenge.id.slice(0, 8)}</span><br />{t('Started')} {date(challenge.startedAt)}<br />{t('Writing finished')} {date(challenge.writtenAt!)}{challenge.reviewedAt && <><br />{t('Reviewed and saved')} {date(challenge.reviewedAt)}</>}</p>
         {challenge.check && <p>{t('Check method')}: {t(challenge.check.method === 'photo' ? 'Auto check' : 'Manual check')}<br />{t('Check evaluated')}: {date(challenge.check.evaluatedAt)}</p>}
         {challenge.photo && <><p>{t('Photo uploaded')}: {date(challenge.photo.uploadedAt)}<br />{t('Photo evaluated')}: {date(challenge.photo.evaluatedAt)}</p>{(challenge.reviewedAt || checkMode !== 'photo') && <img className="answer-sheet-preview" src={challenge.photo.dataUrl} alt={t('Selected answer sheet for parent checking')} />}</>}
         {challenge.recognition && <div><h3>{t('Photo recognition')}</h3><ol>{challenge.recognition.answers.map(answer => <li key={answer.number}><span dir="auto">{answer.text ?? t('Not recognized — check the paper')}</span> · {answer.confidence === null ? t('Confidence unavailable — mark manually') : t('Recognition confidence: {confidence}%', { confidence: Math.round(answer.confidence * 100) })}</li>)}</ol></div>}

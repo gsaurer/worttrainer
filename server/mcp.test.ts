@@ -122,7 +122,7 @@ describe('web connector OAuth', () => {
     for (const [name, args] of [
       ['worttrainer_move_word', { wordId: word.id, category: 'minus' }],
       ['worttrainer_record_mistake', { wordId: word.id, attemptId: randomUUID(), spelling: 'buterfly' }],
-      ['worttrainer_record_mistakes', { reportId: randomUUID(), language: 'en', words: [{ correctWord: 'butterfly' }, { correctWord: 'unauthorized' }] }],
+      ['worttrainer_record_challenge', { language: 'en', words: [{ correctWord: 'butterfly', correct: true }, { correctWord: 'unauthorized', correct: false }] }],
     ] as const) {
       const response = await call(token.body.access_token, name, args).expect(200)
       expect(response.body.result.isError).toBe(true)
@@ -282,13 +282,13 @@ describe('account-scoped Streamable HTTP MCP', () => {
     expect(initialized.body.result.serverInfo.name).toBe('worttrainer-mcp-server')
     expect(initialized.headers['mcp-session-id']).toBeUndefined()
     const response = await rpc(token, 'tools/list').expect(200)
-    expect(response.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word', 'worttrainer_move_word', 'worttrainer_record_mistake', 'worttrainer_record_mistakes'])
+    expect(response.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word', 'worttrainer_move_word', 'worttrainer_record_mistake', 'worttrainer_record_challenge'])
     expect(response.body.result.tools[0]).toMatchObject({ inputSchema: { type: 'object' }, outputSchema: { type: 'object' }, annotations: { readOnlyHint: true } })
     expect(response.body.result.tools[1]).toMatchObject({ annotations: { readOnlyHint: false, destructiveHint: false } })
     for (const tool of response.body.result.tools.slice(2)) {
       expect(tool).toMatchObject({
         inputSchema: { type: 'object', additionalProperties: false }, outputSchema: { type: 'object' },
-        annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+        annotations: { readOnlyHint: false, idempotentHint: tool.name === 'worttrainer_move_word', openWorldHint: false },
         _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
       })
     }
@@ -351,21 +351,53 @@ describe('account-scoped Streamable HTTP MCP', () => {
     expect(reopened.words(firstId)[0]).toEqual({ ...before.words[0], category: 'new', consecutive_mistakes: 0 })
   })
 
-  it('records a mistake report as one persistent history entry with normal ratings for every word', async () => {
+  it('records a dated mixed challenge with generated ID and name', async () => {
+    const token = await issue()
+    const response = await call(token, 'worttrainer_record_challenge', {
+      language: 'en', performedAt: '2026-10-25T18:00:00+02:00',
+      words: [{ correctWord: 'butterfly', correct: true }, { correctWord: 'beautiful', correct: false, spelling: 'beautifull' }],
+    }).expect(200)
+    expect(response.body.result.isError).not.toBe(true)
+    const result = response.body.result.structuredContent
+    expect(result).toMatchObject({
+      challengeId: expect.any(String), name: expect.stringMatching(/^Challenge /), performedAt: '2026-10-25T16:00:00.000Z',
+      words: [
+        { text: 'butterfly', category: 'new', consecutive_mistakes: 0 },
+        { text: 'beautiful', category: 'new', consecutive_mistakes: 1 },
+      ],
+    })
+    const saved = store.exportData(firstId)
+    expect(saved.challenges).toHaveLength(1)
+    expect(saved.challenges[0]).toMatchObject({
+      id: result.challengeId, name: result.name, results: [true, false], nextIndex: 2,
+      startedAt: result.performedAt, writtenAt: result.performedAt, reviewedAt: result.performedAt,
+      check: { method: 'manual', spellings: [null, 'beautifull'], evaluatedAt: result.performedAt },
+    })
+    expect(saved.attempts).toEqual(saved.challenges[0].words.map((word, index) => ({
+      id: word.attemptId, wordId: word.id, correct: index === 0, createdAt: result.performedAt,
+      ...(index === 0 ? {} : { spelling: 'beautifull' }),
+    })))
+    expect(saved.statistics).toMatchObject({ started: 1, completed: 1, correct: 1, incorrect: 1 })
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.challenges(firstId)).toEqual(saved.challenges)
+    expect(reopened.exportData(firstId).attempts).toEqual(saved.attempts)
+  })
+
+  it('records a named challenge with normal ratings and language/account isolation', async () => {
     const learned = await store.addWord(firstId, 'butterfly', 'en')
     await store.moveWord(firstId, learned.id, 'plus')
     const german = await store.addWord(firstId, 'beautiful', 'de')
     await store.addWord(secondId, 'beautiful', 'en')
     const otherBefore = store.exportData(secondId)
     const token = await issue()
-    const reportId = randomUUID()
-    const response = await call(token, 'worttrainer_record_mistakes', {
-      reportId, language: 'en',
-      words: [{ correctWord: ' BUTTERFLY ', wrongSpelling: ' buterfly ' }, { correctWord: 'beautiful' }],
+    const challengeId = randomUUID()
+    const response = await call(token, 'worttrainer_record_challenge', {
+      challengeId, name: ' Weekly spelling ', language: 'en',
+      words: [{ correctWord: ' BUTTERFLY ', correct: false, spelling: ' buterfly ' }, { correctWord: 'beautiful', correct: false }],
     }).expect(200)
     expect(response.body.result.isError).not.toBe(true)
     expect(response.body.result.structuredContent).toMatchObject({
-      reportId,
+      challengeId, name: 'Weekly spelling',
       words: [
         { id: learned.id, text: 'butterfly', language: 'en', category: 'new', consecutive_mistakes: 1 },
         { text: 'beautiful', language: 'en', category: 'new', consecutive_mistakes: 1 },
@@ -375,7 +407,7 @@ describe('account-scoped Streamable HTTP MCP', () => {
     expect(saved.challenges).toHaveLength(1)
     const entry = saved.challenges[0]
     expect(entry).toMatchObject({
-      id: reportId, nextIndex: 2, results: [false, false], telemetry: [], recognition: null, photo: null,
+      id: challengeId, name: 'Weekly spelling', nextIndex: 2, results: [false, false], telemetry: [], recognition: null, photo: null,
       check: { method: 'manual', spellings: ['buterfly', null], evaluatedAt: entry.reviewedAt },
     })
     expect(entry.reviewedAt).toEqual(expect.any(String))
@@ -393,40 +425,43 @@ describe('account-scoped Streamable HTTP MCP', () => {
     expect(reopened.words(firstId)).toEqual(store.words(firstId))
   })
 
-  it('retries mistake reports without double counting and rejects changed report payloads', async () => {
+  it('retries challenges without double counting and rejects changed names, dates or results', async () => {
     const token = await issue()
     const args = {
-      reportId: randomUUID(), language: 'en',
-      words: [{ correctWord: 'butterfly', wrongSpelling: 'buterfly' }, { correctWord: 'beautiful' }],
+      challengeId: randomUUID(), name: 'Weekly practice', performedAt: '2026-10-25', language: 'en',
+      words: [{ correctWord: 'butterfly', correct: false, spelling: 'buterfly' }, { correctWord: 'beautiful', correct: false }],
     }
-    const first = await call(token, 'worttrainer_record_mistakes', args).expect(200)
+    const first = await call(token, 'worttrainer_record_challenge', args).expect(200)
     expect(first.body.result.isError).not.toBe(true)
     const before = store.exportData(firstId)
     const retries = await Promise.all([
-      call(token, 'worttrainer_record_mistakes', args).expect(200),
-      call(token, 'worttrainer_record_mistakes', args).expect(200),
+      call(token, 'worttrainer_record_challenge', args).expect(200),
+      call(token, 'worttrainer_record_challenge', args).expect(200),
     ])
     for (const retry of retries) expect(retry.body.result.structuredContent).toEqual(first.body.result.structuredContent)
     for (const changed of [
       { ...args, language: 'de' },
+      { ...args, name: 'Different practice' },
+      { ...args, performedAt: '2026-10-24' },
       { ...args, words: args.words.slice(0, 1) },
       { ...args, words: [...args.words].reverse() },
-      { ...args, words: [{ correctWord: 'butterfly', wrongSpelling: 'butterfli' }, args.words[1]] },
-      { ...args, words: [{ correctWord: 'butterfly' }, args.words[1]] },
-      { ...args, words: [args.words[0], { correctWord: 'different' }] },
+      { ...args, words: [{ ...args.words[0], correct: true }, args.words[1]] },
+      { ...args, words: [{ correctWord: 'butterfly', correct: false, spelling: 'butterfli' }, args.words[1]] },
+      { ...args, words: [{ correctWord: 'butterfly', correct: false }, args.words[1]] },
+      { ...args, words: [args.words[0], { correctWord: 'different', correct: false }] },
     ]) {
-      const conflict = await call(token, 'worttrainer_record_mistakes', changed).expect(200)
+      const conflict = await call(token, 'worttrainer_record_challenge', changed).expect(200)
       expect(conflict.body.result.isError).toBe(true)
     }
     expect(store.exportData(firstId)).toMatchObject({ words: before.words, attempts: before.attempts, challenges: before.challenges })
     store = await FileStore.open(join(directory, 'store.json'))
     app = createApp({ store, origin, secureCookie: false })
     await store.setLanguagePreferences(firstId, { enabled: ['de'], defaultLanguage: 'de' })
-    const reopenedRetry = await call(token, 'worttrainer_record_mistakes', args).expect(200)
+    const reopenedRetry = await call(token, 'worttrainer_record_challenge', args).expect(200)
     expect(reopenedRetry.body.result.structuredContent).toEqual(first.body.result.structuredContent)
     expect(store.exportData(firstId)).toMatchObject({ words: before.words, attempts: before.attempts, challenges: before.challenges })
     await store.setLanguagePreferences(firstId, { enabled: ['en', 'de'], defaultLanguage: 'en' })
-    const next = await call(token, 'worttrainer_record_mistakes', { ...args, reportId: randomUUID() }).expect(200)
+    const next = await call(token, 'worttrainer_record_challenge', { ...args, challengeId: randomUUID() }).expect(200)
     expect(next.body.result.isError).not.toBe(true)
     expect(next.body.result.structuredContent.words).toEqual([
       expect.objectContaining({ text: 'butterfly', category: 'minus', consecutive_mistakes: 2 }),
@@ -440,7 +475,7 @@ describe('account-scoped Streamable HTTP MCP', () => {
     expect(store.words(firstId).every(word => word.category === 'plus' && word.consecutive_mistakes === 0)).toBe(true)
   })
 
-  it('rejects invalid mistake reports and reserved IDs without partial words, history or ratings', async () => {
+  it('rejects invalid challenges and reserved IDs without partial words, history or ratings', async () => {
     const word = await store.addWord(firstId, 'butterfly', 'en')
     const attemptId = randomUUID()
     await store.mark(firstId, word.id, false, attemptId)
@@ -448,23 +483,27 @@ describe('account-scoped Streamable HTTP MCP', () => {
     const before = store.exportData(firstId)
     const otherBefore = store.exportData(secondId)
     const token = await issue()
-    const args = { reportId: randomUUID(), language: 'en', words: [{ correctWord: 'new word' }, { correctWord: 'butterfly', wrongSpelling: 'buterfly' }] }
+    const args = { challengeId: randomUUID(), language: 'en', words: [{ correctWord: 'new word', correct: true }, { correctWord: 'butterfly', correct: false, spelling: 'buterfly' }] }
     for (const invalid of [
-      { language: 'en', words: args.words }, { ...args, reportId: 'invalid' },
-      { ...args, reportId: challenge.id }, { ...args, reportId: challenge.words[0].attemptId }, { ...args, reportId: attemptId },
+      { ...args, challengeId: 'invalid' }, { ...args, challengeId: null },
+      { ...args, challengeId: challenge.id }, { ...args, challengeId: challenge.words[0].attemptId }, { ...args, challengeId: attemptId },
+      { ...args, name: '' }, { ...args, name: '   ' }, { ...args, name: 'a'.repeat(121) }, { ...args, name: null },
+      { ...args, performedAt: 'invalid' }, { ...args, performedAt: '2026-02-30' },
+      { ...args, performedAt: '2026-10-25T18:00:00' }, { ...args, performedAt: '2999-01-01' },
       { ...args, language: 'xx' }, { ...args, language: 'fr' },
       { ...args, accountId: secondId }, { ...args, words: [] },
-      { ...args, words: Array.from({ length: 101 }, (_, index) => ({ correctWord: `word ${index}` })) },
-      { ...args, words: [args.words[0], { correctWord: '' }] },
-      { ...args, words: [args.words[0], { correctWord: 'a\nb' }] },
-      { ...args, words: [args.words[0], { correctWord: 'a'.repeat(81) }] },
-      { ...args, words: [args.words[0], { correctWord: ' NEW WORD ' }] },
-      { ...args, words: [args.words[0], { correctWord: 'butterfly', wrongSpelling: '' }] },
-      { ...args, words: [args.words[0], { correctWord: 'butterfly', wrongSpelling: 'a'.repeat(1001) }] },
-      { ...args, words: [args.words[0], { correctWord: 'butterfly', wrongSpelling: null }] },
-      { ...args, words: [args.words[0], { correctWord: 'butterfly', correct: true }] },
+      { ...args, words: Array.from({ length: 101 }, (_, index) => ({ correctWord: `word ${index}`, correct: true })) },
+      { ...args, words: [args.words[0], { correctWord: '', correct: true }] },
+      { ...args, words: [args.words[0], { correctWord: 'a\nb', correct: true }] },
+      { ...args, words: [args.words[0], { correctWord: 'a'.repeat(81), correct: true }] },
+      { ...args, words: [args.words[0], { correctWord: ' NEW WORD ', correct: true }] },
+      { ...args, words: [args.words[0], { correctWord: 'butterfly', correct: false, spelling: '' }] },
+      { ...args, words: [args.words[0], { correctWord: 'butterfly', correct: false, spelling: 'a'.repeat(1001) }] },
+      { ...args, words: [args.words[0], { correctWord: 'butterfly', correct: false, spelling: null }] },
+      { ...args, words: [args.words[0], { correctWord: 'butterfly' }] },
+      { ...args, words: [args.words[0], { correctWord: 'butterfly', correct: 'true' }] },
     ]) {
-      const response = await call(token, 'worttrainer_record_mistakes', invalid).expect(200)
+      const response = await call(token, 'worttrainer_record_challenge', invalid).expect(200)
       expect(response.body.result.isError).toBe(true)
     }
     const reopened = await FileStore.open(join(directory, 'store.json'))
@@ -474,24 +513,81 @@ describe('account-scoped Streamable HTTP MCP', () => {
     }
   })
 
-  it('does not revive a deleted mistake report or recount its attempts on MCP retries', async () => {
+  it('does not revive a deleted challenge or recount its attempts on MCP retries', async () => {
     const token = await issue()
-    const args = { reportId: randomUUID(), language: 'en', words: [{ correctWord: 'butterfly', wrongSpelling: 'buterfly' }, { correctWord: 'beautiful' }] }
-    const report = await call(token, 'worttrainer_record_mistakes', args).expect(200)
+    const args = { challengeId: randomUUID(), language: 'en', words: [{ correctWord: 'butterfly', correct: false, spelling: 'buterfly' }, { correctWord: 'beautiful', correct: false }] }
+    const report = await call(token, 'worttrainer_record_challenge', args).expect(200)
     expect(report.body.result.isError).not.toBe(true)
-    await request(app).delete(`/api/challenges/${args.reportId}`).set('Cookie', cookie).set('Origin', origin).send({ removePractice: true }).expect(204)
+    await request(app).delete(`/api/challenges/${args.challengeId}`).set('Cookie', cookie).set('Origin', origin).send({ removePractice: true }).expect(204)
     const beforeRetry = store.exportData(firstId)
-    const retry = await call(token, 'worttrainer_record_mistakes', args).expect(200)
-    expect(retry.body.result).toMatchObject({ isError: true, content: [{ text: 'This report was deleted. Use a fresh report ID for a new report.' }] })
+    const retry = await call(token, 'worttrainer_record_challenge', args).expect(200)
+    expect(retry.body.result).toMatchObject({ isError: true, content: [{ text: 'This challenge was deleted. Use a fresh challenge ID for a new challenge.' }] })
     const firstWord = store.words(firstId).find(word => word.text === 'butterfly')!
-    const attemptRetry = await call(token, 'worttrainer_record_mistake', { wordId: firstWord.id, attemptId: args.reportId, spelling: 'buterfly' }).expect(200)
+    const attemptRetry = await call(token, 'worttrainer_record_mistake', { wordId: firstWord.id, attemptId: args.challengeId, spelling: 'buterfly' }).expect(200)
     expect(attemptRetry.body.result.isError).toBe(true)
     expect(store.exportData(firstId)).toMatchObject({ words: beforeRetry.words, attempts: beforeRetry.attempts, challenges: beforeRetry.challenges })
     expect(store.words(firstId).every(word => word.category === 'new' && word.consecutive_mistakes === 0 && word.last_practiced_at === null)).toBe(true)
-    const fresh = await call(token, 'worttrainer_record_mistakes', { ...args, reportId: randomUUID() }).expect(200)
+    const fresh = await call(token, 'worttrainer_record_challenge', { ...args, challengeId: randomUUID() }).expect(200)
     expect(fresh.body.result.isError).not.toBe(true)
     expect(fresh.body.result.structuredContent.words.every((word: { consecutive_mistakes: number }) => word.consecutive_mistakes === 1)).toBe(true)
     expect(store.challenges(firstId)).toHaveLength(1)
+  })
+
+  it('generates challenge and attempt IDs when omitted and supports retrying the returned IDs', async () => {
+    const token = await issue()
+    const input = { language: 'en', words: [{ correctWord: 'butterfly', correct: true }] }
+    const first = await call(token, 'worttrainer_record_challenge', input).expect(200)
+    const second = await call(token, 'worttrainer_record_challenge', input).expect(200)
+    const firstResult = first.body.result.structuredContent
+    expect(firstResult.challengeId).not.toBe(second.body.result.structuredContent.challengeId)
+    expect(firstResult.name).not.toBe(second.body.result.structuredContent.name)
+    expect(Date.parse(firstResult.performedAt)).toBeLessThanOrEqual(Date.now())
+    const beforeRetry = store.exportData(firstId)
+    const retried = await call(token, 'worttrainer_record_challenge', { ...input, challengeId: firstResult.challengeId }).expect(200)
+    expect(retried.body.result.structuredContent).toMatchObject({ challengeId: firstResult.challengeId, name: firstResult.name, performedAt: firstResult.performedAt })
+    expect(store.exportData(firstId)).toMatchObject({ attempts: beforeRetry.attempts, challenges: beforeRetry.challenges })
+    const wordId = firstResult.words[0].id
+    const mistaken = await call(token, 'worttrainer_record_mistake', { wordId }).expect(200)
+    const attemptId = mistaken.body.result.structuredContent.attemptId
+    expect(attemptId).toMatch(/^[a-f0-9-]{36}$/i)
+    const attempts = store.exportData(firstId).attempts
+    const retry = await call(token, 'worttrainer_record_mistake', { wordId, attemptId }).expect(200)
+    expect(retry.body.result.structuredContent).toEqual(mistaken.body.result.structuredContent)
+    expect(store.exportData(firstId).attempts).toEqual(attempts)
+  })
+
+  it('replays backdated results before newer practice and preserves the latest practice date', async () => {
+    const token = await issue()
+    for (const [performedAt, correct] of [['2026-10-20', false], ['2026-10-22', true], ['2026-10-23', true], ['2026-10-24', true]] as const) {
+      const response = await call(token, 'worttrainer_record_challenge', { language: 'en', performedAt, words: [{ correctWord: 'butterfly', correct }] }).expect(200)
+      expect(response.body.result.isError).not.toBe(true)
+    }
+    const before = store.words(firstId)[0]
+    expect(before).toMatchObject({ category: 'plus', last_practiced_at: '2026-10-24T00:00:00.000Z' })
+    const response = await call(token, 'worttrainer_record_challenge', { language: 'en', performedAt: '2026-10-21', words: [{ correctWord: 'butterfly', correct: false }] }).expect(200)
+    expect(response.body.result.structuredContent.words[0]).toEqual(before)
+    const attempts = store.exportData(firstId).attempts
+    expect(attempts.map(attempt => attempt.correct)).toEqual([false, false, true, true, true])
+    expect(attempts.map(attempt => attempt.createdAt)).toEqual([...attempts].sort((earlier, later) => Date.parse(earlier.createdAt) - Date.parse(later.createdAt)).map(attempt => attempt.createdAt))
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.words(firstId)[0]).toEqual(before)
+    await reopened.deleteChallenge(firstId, response.body.result.structuredContent.challengeId, true)
+    expect(reopened.words(firstId)[0]).toEqual(before)
+  })
+
+  it.each([false, true])('preserves a newer manual category override when importing old practice (existing attempts: %s)', async existingAttempts => {
+    const token = await issue()
+    const word = await store.addWord(firstId, 'butterfly', 'en')
+    if (existingAttempts) {
+      await store.recordChallenge(firstId, { language: 'en', performedAt: '2026-10-20', words: [{ correctWord: 'butterfly', correct: false }] })
+    }
+    await store.moveWord(firstId, word.id, 'plus')
+    const recorded = await call(token, 'worttrainer_record_challenge', { language: 'en', performedAt: '2026-10-21', words: [{ correctWord: 'butterfly', correct: false }] }).expect(200)
+    expect(recorded.body.result.structuredContent.words[0]).toMatchObject({ category: 'plus', consecutive_mistakes: 0, last_practiced_at: '2026-10-21T00:00:00.000Z' })
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.words(firstId)).toEqual(store.words(firstId))
+    const current = await call(token, 'worttrainer_record_mistake', { wordId: word.id }).expect(200)
+    expect(current.body.result.structuredContent.word).toMatchObject({ category: 'new', consecutive_mistakes: 1 })
   })
 
   it('records wrong spellings persistently with normal progress and retry-safe attempt IDs', async () => {
@@ -564,7 +660,7 @@ describe('account-scoped Streamable HTTP MCP', () => {
       expect(response.body.result.isError).toBe(true)
     }
     for (const args of [
-      { ...mistake, wordId: 'invalid' }, { ...mistake, attemptId: 'invalid' }, { wordId: word.id },
+      { ...mistake, wordId: 'invalid' }, { ...mistake, attemptId: 'invalid' }, { spelling: 'buterfly' },
       { ...mistake, spelling: '   ' }, { ...mistake, spelling: 'a'.repeat(1001) }, { ...mistake, spelling: null },
       { ...mistake, accountId: secondId }, { ...mistake, correct: true }, { ...mistake, attemptId: existingAttempt },
     ]) {
@@ -655,7 +751,7 @@ describe('account-scoped Streamable HTTP MCP', () => {
       const url = new URL(`http://127.0.0.1:${address.port}/api/mcp`)
       await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }))
       const tools = await client.listTools()
-      expect(tools.tools.map(tool => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word', 'worttrainer_move_word', 'worttrainer_record_mistake', 'worttrainer_record_mistakes'])
+      expect(tools.tools.map(tool => tool.name)).toEqual(['worttrainer_get_words', 'worttrainer_add_word', 'worttrainer_move_word', 'worttrainer_record_mistake', 'worttrainer_record_challenge'])
       const added = await client.callTool({ name: 'worttrainer_add_word', arguments: { text: 'client word', language: 'en' } })
       expect(added.isError).not.toBe(true)
       expect(added.structuredContent).toMatchObject({ word: { text: 'client word', category: 'new' } })
@@ -668,17 +764,17 @@ describe('account-scoped Streamable HTTP MCP', () => {
       const mistaken = await client.callTool({ name: 'worttrainer_record_mistake', arguments: { wordId, attemptId, spelling: 'clint word' } })
       expect(mistaken.structuredContent).toMatchObject({ attemptId, word: { text: 'client word', category: 'new', consecutive_mistakes: 1 } })
       expect(store.exportData(firstId).attempts[0]).toMatchObject({ id: attemptId, spelling: 'clint word', correct: false })
-      const reportId = randomUUID()
-      const reported = await client.callTool({ name: 'worttrainer_record_mistakes', arguments: {
-        reportId, language: 'en', words: [{ correctWord: 'client word', wrongSpelling: 'clint word' }, { correctWord: 'another word' }],
+      const challengeId = randomUUID()
+      const reported = await client.callTool({ name: 'worttrainer_record_challenge', arguments: {
+        challengeId, language: 'en', words: [{ correctWord: 'client word', correct: false, spelling: 'clint word' }, { correctWord: 'another word', correct: false }],
       } })
       expect(reported.isError).not.toBe(true)
-      expect(reported.structuredContent).toMatchObject({ reportId, words: [
+      expect(reported.structuredContent).toMatchObject({ challengeId, words: [
         { id: wordId, category: 'minus', consecutive_mistakes: 2 },
         { text: 'another word', category: 'new', consecutive_mistakes: 1 },
       ] })
       expect(store.challenges(firstId)).toHaveLength(1)
-      expect(store.challenges(firstId)[0].id).toBe(reportId)
+      expect(store.challenges(firstId)[0].id).toBe(challengeId)
       const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }
       const malformed = await fetch(url, { method: 'POST', headers, body: '{broken' })
       expect(malformed.status).toBe(400)

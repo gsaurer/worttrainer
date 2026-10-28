@@ -7,14 +7,17 @@ export const wordInputSchema = z.object({
   language: languageSchema,
 }).strict()
 
-export const mistakeReportSchema = z.object({
-  reportId: z.uuid().describe('Fresh UUID for this report. Reuse it with the same words and spellings when retrying.'),
-  language: languageSchema.describe('Enabled practice language shared by all words in this report.'),
+export const challengeRecordSchema = z.object({
+  challengeId: z.uuid().optional().describe('Optional UUID. Generated when omitted. Reuse the returned ID and unchanged results when retrying.'),
+  name: z.string().trim().min(1).max(120).optional().describe('Optional challenge name. A date-based name is generated when omitted.'),
+  performedAt: z.union([z.iso.datetime({ offset: true }), z.iso.date()]).transform(value => new Date(value).toISOString()).optional().describe('Optional past date or ISO timestamp with timezone. Dates use midnight UTC; omitted means now.'),
+  language: languageSchema.describe('Enabled practice language shared by all words in this challenge.'),
   words: z.array(z.object({
     correctWord: wordInputSchema.shape.text.describe('Correct word to practice. Matching words are reused; missing words are added.'),
-    wrongSpelling: z.string().trim().min(1).max(1000).optional().describe('Optional actual incorrect spelling. Omit if unknown.'),
+    correct: z.boolean().describe('Confirmed result: true for correct, false for incorrect.'),
+    spelling: z.string().trim().min(1).max(1000).optional().describe('Optional actual written spelling. Omit if unknown.'),
   }).strict()).min(1).max(100).refine(words => new Set(words.map(word => word.correctWord.toLowerCase())).size === words.length,
-    'Include each correct word only once per report.').describe('All confirmed incorrect words from one report, saved together in one history entry.'),
+    'Include each correct word only once per challenge.').describe('All confirmed correct and incorrect answers, saved together as one completed challenge.'),
 }).strict()
 
 export const firstRunSchema = z.discriminatedUnion('source', [

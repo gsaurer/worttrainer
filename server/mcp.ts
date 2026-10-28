@@ -1,13 +1,13 @@
 import express from 'express'
 import { rateLimit } from 'express-rate-limit'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/server'
 import { hostHeaderValidation, NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node'
 import { z } from 'zod'
 import { HttpError } from './errors.js'
 import { languageSchema } from './languages.js'
 import type { FileStore } from './store.js'
-import { mistakeReportSchema, wordInputSchema } from './words.js'
+import { challengeRecordSchema, wordInputSchema } from './words.js'
 import type { OAuthService } from './oauth.js'
 
 export const mcpTokenPrefix = 'wtr_mcp_'
@@ -107,16 +107,16 @@ function createWordServer(store: FileStore, accountId: string, scopes: string[],
   })
   server.registerTool('worttrainer_record_mistake', {
     title: 'Record a Worttrainer spelling mistake',
-    description: 'Record one confirmed incorrect practice result for an existing word in the authenticated account. Optionally include spelling with exactly what was written incorrectly; the correct word text is never replaced. Applies normal progress rules: plus returns to Default on a mistake and two consecutive mistakes lead to minus. Requires a fresh UUID attemptId for each real attempt; reuse that same ID and spelling on retries to avoid counting twice. Do not use for unconfirmed recognition or a category-only move. Use worttrainer_get_words to find the word ID. For a grouped report using correct word text, use worttrainer_record_mistakes instead.',
+    description: 'Record one confirmed incorrect practice result for an existing word in the authenticated account. Optionally include the actual incorrect spelling. Applies normal progress rules. attemptId is optional and generated when omitted; reuse the returned ID and unchanged spelling on retries to avoid counting twice. Calls without an ID create a new attempt each time. Use worttrainer_get_words to find the required existing word ID. For grouped correct and incorrect answers, names or past dates, use worttrainer_record_challenge.',
     inputSchema: z.object({
       wordId: z.uuid().describe('ID of the existing correct word in this account.'),
-      attemptId: z.uuid().describe('Unique UUID for this confirmed attempt. Reuse unchanged when retrying this same attempt.'),
+      attemptId: z.uuid().optional().describe('Optional unique UUID. Generated when omitted. Reuse the returned ID for retries.'),
       spelling: z.string().trim().min(1).max(1000).optional().describe('Optional actual incorrect spelling, not a correction or explanation. Omit if unknown.'),
     }).strict(),
     outputSchema: z.object({ word: wordSchema, attemptId: z.uuid() }),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
-  }, async ({ wordId, attemptId, spelling }) => {
+  }, async ({ wordId, attemptId = randomUUID(), spelling }) => {
     const denied = scopeError('words:write')
     if (denied) return denied
     try {
@@ -126,21 +126,21 @@ function createWordServer(store: FileStore, accountId: string, scopes: string[],
       return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The mistake could not be saved. Retry with the same attempt ID and spelling.' }] }
     }
   })
-  server.registerTool('worttrainer_record_mistakes', {
-    title: 'Record a Worttrainer mistake report',
-    description: 'Save all confirmed spelling mistakes from one report as a single completed challenge in the authenticated account history. Supply the correctWord and optionally wrongSpelling for each word, and one enabled language for the whole report. Existing words are matched case-insensitively in that language; missing correct words are added. Every word receives one incorrect practice result under normal rating rules: plus returns to Default, two consecutive mistakes lead to minus. Include each correct word once. Use a fresh UUID reportId for a new report and reuse the same ID and payload on retries to avoid counting twice. Do not use for unconfirmed recognition or invented mistakes. Returns the report ID and updated word ratings.',
-    inputSchema: mistakeReportSchema,
-    outputSchema: z.object({ reportId: z.uuid(), words: z.array(wordSchema) }),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  server.registerTool('worttrainer_record_challenge', {
+    title: 'Record a Worttrainer challenge',
+    description: 'Save confirmed correct and incorrect answers as one completed challenge in the authenticated account history. Supply one enabled language and each correctWord once with an explicit correct boolean and optional actual spelling. Matching words are reused; missing words are added. Normal progress is replayed chronologically, including backdated challenges. Name and challengeId are optional and generated when omitted; performedAt defaults to now and accepts a past ISO timestamp with timezone or date at midnight UTC. Returns the ID, name, date and updated words. Reuse the returned ID and unchanged results for safe retries; calls without an ID create a new challenge each time. Do not invent results or use unconfirmed recognition.',
+    inputSchema: challengeRecordSchema,
+    outputSchema: z.object({ challengeId: z.uuid(), name: z.string(), performedAt: z.string(), words: z.array(wordSchema) }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['words:write'] }] },
   }, async input => {
     const denied = scopeError('words:write')
     if (denied) return denied
     try {
-      const output = await store.recordMistakes(accountId, input)
+      const output = await store.recordChallenge(accountId, input)
       return { content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent: output }
     } catch (error) {
-      return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The report could not be saved. Retry with the same report ID, words and spellings.' }] }
+      return { isError: true, content: [{ type: 'text', text: error instanceof HttpError ? error.message : 'The challenge could not be saved. Retry with the same challenge ID, words and results.' }] }
     }
   })
   return server

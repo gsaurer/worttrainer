@@ -60,6 +60,20 @@ describe('persisted photo challenges and parent-confirmed batches', () => {
     await post(`/api/challenges/${challenge.id}/review`, { results: [true, false] }).expect(400)
   })
 
+  it('generates stable names for new challenges and legacy unnamed history', async () => {
+    const challenge = await newChallenge()
+    const expectedName = `Challenge ${challenge.startedAt.slice(0, 10)} - ${challenge.id.slice(0, 8)}`
+    expect(challenge.name).toBe(expectedName)
+    const file = join(directory, 'store.accounts', `${accountId}.json`)
+    const legacy = JSON.parse(await readFile(file, 'utf8'))
+    delete legacy.challenges[0].name
+    await writeFile(file, JSON.stringify(legacy))
+    const reopened = await FileStore.open(join(directory, 'store.json'))
+    expect(reopened.challenge(accountId, challenge.id).name).toBe(expectedName)
+    expect(reopened.exportData(accountId).attempts).toEqual([])
+    expect(reopened.words(accountId)).toEqual(store.words(accountId))
+  })
+
   it('records navigation timing and supports previous words without checking answers', async () => {
     const challenge = await newChallenge()
     const path = `/api/challenges/${challenge.id}/advance`

@@ -430,6 +430,8 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .challenge-history-heading h3 { margin-bottom: 0; }
 .challenge-history-heading .eyebrow { font-size: .62rem; margin-bottom: 10px; }
 .challenge-id { font-variant-numeric: tabular-nums; }
+.photo-practice .practice-topline { flex-wrap: wrap; }
+.photo-practice .practice-topline > span, .challenge-details p { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .challenge-filters { grid-template-columns: 1fr; gap: 16px; }
   .challenge-statistics { padding: 24px 18px; }
@@ -445,7 +447,7 @@ footer > span:first-child { font-family: var(--serif); font-style: italic; font-
 .photo-intro.challenge-ready .answer-buttons { justify-content: center; }
 .photo-intro > .button { margin-top: 20px; }
 .photo-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 0; border-top: 1px solid var(--line); }
-.photo-history-row > div:first-child { flex: 1; min-width: 170px; }
+.photo-history-row > div:first-child { flex: 1; min-width: min(170px, 100%); overflow-wrap: anywhere; }
 .photo-history-row small { display: block; margin-top: 8px; font-size: .75rem; line-height: 1.7; color: var(--muted); }
 .photo-history-row > div:last-child { font-size: .8rem; }
 .photo-history-row .text-button { margin-right: 12px; }

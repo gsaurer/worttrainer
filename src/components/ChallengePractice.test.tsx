@@ -27,6 +27,41 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('persisted whole-challenge practice', () => {
+  it.each(['Weekly spelling', undefined])('shows saved challenge names with a fallback for unnamed history (%s)', async name => {
+    const user = userEvent.setup()
+    const reviewed: Challenge = { ...written, name, reviewedAt: '2026-10-22T12:02:00Z', results: [true], check: { method: 'manual', spellings: [word.text], evaluatedAt: '2026-10-22T12:02:00Z' } }
+    vi.mocked(api.challengeStatus).mockResolvedValue({ ...status, challenges: [reviewed] })
+    render(<ChallengePractice words={[word]} onUpdated={vi.fn()} view="statistics" />)
+    const history = await screen.findByRole('region', { name: 'Challenge history' })
+    expect(within(history).getByText(name ?? 'Deutsch · 1 word')).toBeVisible()
+    expect(within(history).getByText('Deutsch · 1 word')).toBeVisible()
+    await user.click(within(history).getByRole('button', { name: 'View results' }))
+    await user.click(screen.getByText('Challenge details', { selector: 'summary' }))
+    const details = screen.getByText('Challenge details', { selector: 'summary' }).parentElement!
+    expect(within(details).getByText(name ?? 'Challenge #22222222')).toBeVisible()
+    expect(within(details).getByText('Challenge #22222222')).toBeVisible()
+  })
+
+  it('keeps the saved name visible from unfinished history through dictation and checking', async () => {
+    const user = userEvent.setup()
+    const name = 'Weekly spelling'
+    vi.mocked(api.challengeStatus).mockResolvedValue({ ...status, challenges: [{ ...challenge, name }] })
+    vi.spyOn(api, 'advanceChallenge').mockResolvedValue({ ...written, name })
+    render(<ChallengePractice words={[word]} onUpdated={vi.fn()} />)
+    const learning = await screen.findByRole('region', { name: 'Continue learning' })
+    expect(within(learning).getByText(name)).toBeVisible()
+    await user.click(within(learning).getByRole('button', { name: 'Continue challenge' }))
+    expect(screen.getByText(name)).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Listen and write the word.' })).toBeVisible()
+    expect(document.body).not.toHaveTextContent(word.text)
+    await user.click(screen.getByRole('button', { name: 'Finish challenge' }))
+    expect(screen.getByText(name, { selector: '.practice-topline > span' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Manual check' }))
+    expect(screen.getByText(name, { selector: '.practice-topline > span' })).toBeVisible()
+    await user.click(screen.getByText('Challenge details', { selector: 'summary' }))
+    expect(screen.getByText(name, { selector: '.challenge-details strong' })).toBeVisible()
+  })
+
   it('hides automatic checking by default and still saves manual reviews', async () => {
     const user = userEvent.setup()
     vi.mocked(api.challengeStatus).mockResolvedValue({ ...status, challenges: [written] })

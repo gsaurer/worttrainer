@@ -22,6 +22,7 @@ export const challengeSchema = z.object({
     evaluatedAt: z.string().datetime(),
   }).strict().nullable(),
   id: z.uuid(),
+  name: z.string().trim().min(1).max(120).optional(),
   deletedAt: z.string().datetime().optional(),
   startedAt: z.string().datetime(),
   writtenAt: z.string().datetime().nullable(),
@@ -57,4 +58,4 @@ export const challengeSchema = z.object({
     challenge.recognition.answers.length === challenge.words.length &&
     challenge.recognition.answers.every((answer, index) => answer.number === index + 1)
   )),
-)
+).transform(challenge => ({ ...challenge, name: challenge.name ?? `Challenge ${challenge.startedAt.slice(0, 10)} - ${challenge.id.slice(0, 8)}` }))

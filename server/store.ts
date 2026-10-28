@@ -10,7 +10,7 @@ import { languagePreferencesSchema, languageSchema, websiteLanguageSchema } from
 import { HttpError } from './errors.js'
 import { challengeSchema, recognitionSchema } from './challenge-schema.js'
 import { wordResources } from './word-resources.js'
-import { firstRunSchema, mistakeReportSchema } from './words.js'
+import { challengeRecordSchema, firstRunSchema } from './words.js'
 import type { FirstRunInput } from '../shared/model.js'
 import type { NavigationTiming, PhotoRecognition, Challenge, ChallengeCheckInput, ChallengePhoto, AddedWordList, PracticeWordList, PracticeAttempt } from '../shared/model.js'
 import { oauthStateSchema, type OAuthState } from './oauth.js'
@@ -33,7 +33,7 @@ const wordSchema = z.object({
   consecutive_mistakes: z.number().int().min(0).max(2),
   created_at: z.string().datetime(),
   last_practiced_at: z.string().datetime().nullable(),
-  progressOverride: z.object({ category: z.enum(['new', 'plus', 'minus']), afterAttemptId: z.uuid().nullable() }).strict().optional(),
+  progressOverride: z.object({ category: z.enum(['new', 'plus', 'minus']), afterAttemptId: z.uuid().nullable(), createdAt: z.string().datetime().optional() }).strict().optional(),
 }).strict().refine(word => word.consecutive_mistakes < 2 || word.category === 'minus')
 const oldSessionSchema = z.object({ tokenHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.number().int().positive() }).strict()
 const sessionSchema = oldSessionSchema.extend({ accountId: z.uuid() }).strict()
@@ -222,16 +222,23 @@ function wordView(word: Word): Word {
 function replayProgress(word: Word, attempts: PracticeAttempt[]) {
   const replay: Word = { ...word, category: 'new', consecutive_mistakes: 0, last_practiced_at: null }
   const prior: PracticeAttempt[] = []
-  const override = () => Object.assign(replay, { category: word.progressOverride!.category, consecutive_mistakes: 0 })
-  if (word.progressOverride?.afterAttemptId === null) override()
+  const overrideTime = word.progressOverride?.createdAt
+  let overrideApplied = false
+  const override = () => {
+    Object.assign(replay, { category: word.progressOverride!.category, consecutive_mistakes: 0 })
+    overrideApplied = true
+  }
+  if (!overrideTime && word.progressOverride?.afterAttemptId === null) override()
   for (const attempt of attempts) {
     if (attempt.wordId !== word.id) continue
+    if (overrideTime && !overrideApplied && Date.parse(attempt.createdAt) > Date.parse(overrideTime)) override()
     if (!attempt.deletedAt) {
       Object.assign(replay, nextProgress(replay, attempt.correct, prior), { last_practiced_at: attempt.createdAt })
       prior.push(attempt)
     }
-    if (word.progressOverride?.afterAttemptId === attempt.id) override()
+    if (word.progressOverride?.afterAttemptId === attempt.id && (!overrideTime || attempt.createdAt === overrideTime)) override()
   }
+  if (overrideTime && !overrideApplied) override()
   Object.assign(word, { category: replay.category, consecutive_mistakes: replay.consecutive_mistakes, last_practiced_at: replay.last_practiced_at })
 }
 
@@ -686,32 +693,35 @@ export class FileStore {
       if (!word) throw new HttpError(404, 'Word not found. Sync your collection and try again.')
       if (word.category !== category) Object.assign(word, {
         category, consecutive_mistakes: 0,
-        progressOverride: { category, afterAttemptId: state.attempts.filter(attempt => attempt.wordId === wordId).at(-1)?.id ?? null },
+        progressOverride: { category, afterAttemptId: state.attempts.filter(attempt => attempt.wordId === wordId).at(-1)?.id ?? null, createdAt: new Date().toISOString() },
       })
       return wordView(word)
     })
   }
 
-  recordMistakes(accountId: string, input: z.input<typeof mistakeReportSchema>) {
-    const { reportId, language, words: entries } = mistakeReportSchema.parse(input)
+  recordChallenge(accountId: string, input: z.input<typeof challengeRecordSchema>) {
+    const { challengeId = randomUUID(), name, performedAt, language, words: entries } = challengeRecordSchema.parse(input)
     return this.accountTransaction(accountId, state => {
-      const previous = state.challenges.find(challenge => challenge.id === reportId)
+      const previous = state.challenges.find(challenge => challenge.id === challengeId)
       if (previous) {
-        if (previous.deletedAt) throw new HttpError(409, 'This report was deleted. Use a fresh report ID for a new report.')
-        if (previous.words[0].attemptId !== reportId || previous.words.length !== entries.length ||
+        if (previous.deletedAt) throw new HttpError(409, 'This challenge was deleted. Use a fresh challenge ID for a new challenge.')
+        if (previous.words[0].attemptId !== challengeId || previous.words.length !== entries.length ||
+            (name !== undefined && previous.name !== name) || (performedAt !== undefined && previous.startedAt !== performedAt) ||
             previous.words.some((word, index) => word.language !== language || word.text.toLowerCase() !== entries[index].correctWord.toLowerCase() ||
-              previous.results?.[index] !== false || previous.check?.spellings[index] !== (entries[index].wrongSpelling ?? null))) {
-          throw new HttpError(409, 'This report ID already belongs to different results. Use a fresh report ID for a new report.')
+              previous.results?.[index] !== entries[index].correct || previous.check?.spellings[index] !== (entries[index].spelling ?? null))) {
+          throw new HttpError(409, 'This challenge ID already belongs to different results. Use a fresh challenge ID for a new challenge.')
         }
-        return { reportId, words: previous.words.map(snapshot => wordView(state.words.find(word => word.id === snapshot.id)!)) }
+        return { challengeId, name: previous.name, performedAt: previous.startedAt, words: previous.words.map(snapshot => wordView(state.words.find(word => word.id === snapshot.id)!)) }
       }
-      if (state.attempts.some(attempt => attempt.id === reportId) || state.challenges.some(challenge => challenge.words.some(word => word.attemptId === reportId))) {
-        throw new HttpError(409, 'This report ID already belongs to saved practice. Use a fresh report ID for a new report.')
+      if (state.attempts.some(attempt => attempt.id === challengeId) || state.challenges.some(challenge => challenge.words.some(word => word.attemptId === challengeId))) {
+        throw new HttpError(409, 'This challenge ID already belongs to saved practice. Use a fresh challenge ID for a new challenge.')
       }
       if (!state.languagePreferences.enabled.includes(language)) {
-        throw new HttpError(409, 'This language is disabled. Enable it in Languages before recording a new report.')
+        throw new HttpError(409, 'This language is disabled. Enable it in Languages before recording a new challenge.')
       }
       const now = new Date().toISOString()
+      const recordedAt = performedAt ?? now
+      if (Date.parse(recordedAt) > Date.parse(now)) throw new HttpError(400, 'A completed challenge cannot be dated in the future.')
       const words = entries.map(entry => {
         const existing = state.words.find(word => word.language === language && word.text.toLowerCase() === entry.correctWord.toLowerCase())
         if (existing) return existing
@@ -723,18 +733,20 @@ export class FileStore {
         return word
       })
       const snapshots = words.map((word, index) => {
-        const attemptId = index === 0 ? reportId : randomUUID()
-        const spelling = entries[index].wrongSpelling
-        Object.assign(word, nextProgress(word, false, state.attempts), { last_practiced_at: now })
-        state.attempts.push({ id: attemptId, wordId: word.id, correct: false, createdAt: now, ...(spelling === undefined ? {} : { spelling }) })
+        const attemptId = index === 0 ? challengeId : randomUUID()
+        const spelling = entries[index].spelling
+        state.attempts.push({ id: attemptId, wordId: word.id, correct: entries[index].correct, createdAt: recordedAt, ...(spelling === undefined ? {} : { spelling }) })
         return { id: word.id, text: word.text, language, attemptId }
       })
-      state.challenges.unshift(challengeSchema.parse({
-        id: reportId, startedAt: now, writtenAt: now, reviewedAt: now, nextIndex: words.length,
-        words: snapshots, results: words.map(() => false), telemetry: [], recognition: null, photo: null,
-        check: { method: 'manual', spellings: entries.map(entry => entry.wrongSpelling ?? null), evaluatedAt: now },
-      }))
-      return { reportId, words: words.map(wordView) }
+      state.attempts.sort((earlier, later) => Date.parse(earlier.createdAt) - Date.parse(later.createdAt))
+      for (const word of words) replayProgress(word, state.attempts)
+      const challenge = challengeSchema.parse({
+        id: challengeId, name, startedAt: recordedAt, writtenAt: recordedAt, reviewedAt: recordedAt, nextIndex: words.length,
+        words: snapshots, results: entries.map(entry => entry.correct), telemetry: [], recognition: null, photo: null,
+        check: { method: 'manual', spellings: entries.map(entry => entry.spelling ?? null), evaluatedAt: recordedAt },
+      })
+      state.challenges.unshift(challenge)
+      return { challengeId, name: challenge.name, performedAt: recordedAt, words: words.map(wordView) }
     })
   }
 

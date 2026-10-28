@@ -49,7 +49,7 @@ export type Word = {
   consecutive_mistakes: number
   created_at: string
   last_practiced_at: string | null
-  progressOverride?: { category: Category; afterAttemptId: string | null }
+  progressOverride?: { category: Category; afterAttemptId: string | null; createdAt?: string }
 }
 
 export type AuthState = {
@@ -99,6 +99,7 @@ export type ChallengePhoto = { dataUrl: string; uploadedAt: string; evaluatedAt:
 
 export type Challenge = {
   id: string
+  name?: string
   deletedAt?: string
   startedAt: string
   writtenAt: string | null
