@@ -823,3 +823,41 @@ For non-container production, run the compiled Node server with `NODE_ENV=produc
 `APP_ORIGIN` set, and a persistent `DATA_FILE`, after `npm run build`. It serves
 `dist` plus `/api`. Static-only hosting is not sufficient anymore. CI also builds
 the Docker image. Run the Node server as a single supervised process.
+
+### GitHub-built releases for the existing systemd installation
+
+Successful pushes to `main` publish a `build-<commit>` GitHub Release after all
+checks pass. Pull requests produce CI artifacts but cannot publish releases.
+Published release assets are never overwritten; failed draft uploads can be
+retried. The archive is extracted from the tested Docker image and contains only
+`dist`, `dist-server`, production `node_modules`, package manifests, and a runtime
+manifest. It includes a SHA-256 checksum and the exact clean commit/build ID.
+The target runtime is Linux x64, Node 22, and glibc 2.36 or newer.
+
+The systemd updater in `it-infrastructure/scripts/worttrainer/` downloads the
+latest published successful release, not untested branch HEAD. It verifies the
+checksum and runtime identity before atomically switching `current`, then checks
+health. Failed starts or interrupted promotion restore the previous release.
+Download failures leave the running release intact and are retried by the next
+timer run. Production does not run git, npm, or a compiler during deployment.
+
+For a private repository, provision a fine-grained GitHub token with **Contents:
+read** access to this repository in `/etc/worttrainer-release.token`, owned by
+root with mode `0600`. Enter the token directly on the server; do not put it in
+Git, release artifacts, command arguments, or chat. Public repositories can omit
+this file. Application secrets remain in `/etc/worttrainer.env`; persistent data
+remains under the existing `DATA_FILE` outside every release.
+
+Before enabling artifact deployment:
+
+1. Push the workflow changes and wait for the first successful published release.
+2. Back up persistent data and validate operator feature-flag UUID allow-lists.
+3. Install `worttrainer-update.sh` as `/usr/local/bin/worttrainer-update` (0755),
+  `worttrainer-release.mjs` as `/usr/local/lib/worttrainer/worttrainer-release.mjs`
+  (0644), and the updated service unit in `/etc/systemd/system/` (0644).
+4. Run `systemctl daemon-reload` and start `worttrainer-update.service` manually.
+  Verify public health/status and the deployed commit before enabling the timer.
+
+The updater's isolated Linux regression tests run with
+`node --test worttrainer-release.test.mjs worttrainer-update.test.mjs` from its
+directory. They use temporary fixtures, not the live systemd service or data.

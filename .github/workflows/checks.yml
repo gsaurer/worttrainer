@@ -5,6 +5,9 @@ on:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   app:
     runs-on: ubuntu-24.04
@@ -19,4 +22,44 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      - run: docker build -t worttrainer:ci .
+      - run: docker build --build-arg BUILD_COMMIT="$GITHUB_SHA" --build-arg BUILD_DIRTY=false -t worttrainer:ci .
+      - name: Package Linux runtime
+        run: |
+          container=$(docker create worttrainer:ci)
+          trap 'docker rm "$container"' EXIT
+          mkdir -p "$RUNNER_TEMP/worttrainer-runtime"
+          docker cp "$container:/app/." "$RUNNER_TEMP/worttrainer-runtime"
+          node scripts/package-release.mjs "$RUNNER_TEMP/worttrainer-runtime" release "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worttrainer-linux-x64-${{ github.sha }}
+          path: release/*
+          if-no-files-found: error
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: app
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: worttrainer-linux-x64-${{ github.sha }}
+          path: release
+      - name: Publish tested release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          tag="build-$COMMIT"
+          if draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$draft" != true ]; then
+              echo "Release already exists; refusing to replace its artifacts."
+              exit 0
+            fi
+            gh release upload "$tag" release/* --clobber
+          else
+            gh release create "$tag" release/* --draft --target "$COMMIT" --title "$tag" --notes "Tested Linux x64 / Node 22 runtime for $COMMIT."
+          fi
+          gh release edit "$tag" --draft=false --latest
