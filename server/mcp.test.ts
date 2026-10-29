@@ -61,8 +61,7 @@ beforeEach(async () => {
 
 afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
 
-async function startOAuth(scope = 'words:read words:write') {
-  const redirectUri = 'https://chatgpt.com/connector_platform_oauth_redirect'
+async function startOAuth(scope = 'words:read words:write', redirectUri = 'https://chatgpt.com/connector_platform_oauth_redirect') {
   const registered = await request(app).post('/api/oauth/register').send({ client_name: 'ChatGPT', redirect_uris: [redirectUri] }).expect(201)
   const verifier = randomBytes(32).toString('base64url')
   const query = {
@@ -79,13 +78,35 @@ async function consentOAuth(flow: Awaited<ReturnType<typeof startOAuth>>, sessio
   await request(app).get('/api/oauth/request').query({ id: flow.id }).set('Cookie', session).expect(200)
   const consent = await request(app).post('/api/oauth/consent').set('Origin', origin).set('Cookie', session).send({ id: flow.id, approve: true }).expect(200)
   const redirect = new URL(consent.body.redirect)
-  expect(redirect.origin + redirect.pathname).toBe(flow.query.redirect_uri)
+  const registeredRedirect = new URL(flow.query.redirect_uri)
+  expect(redirect.origin + redirect.pathname).toBe(registeredRedirect.origin + registeredRedirect.pathname)
   expect(redirect.searchParams.get('state')).toBe(flow.query.state)
   expect(redirect.searchParams.get('iss')).toBe(origin)
   return { grant_type: 'authorization_code', client_id: flow.query.client_id, code: redirect.searchParams.get('code')!, code_verifier: flow.verifier, redirect_uri: flow.query.redirect_uri, resource: flow.query.resource }
 }
 
 describe('web connector OAuth', () => {
+  it('dynamically registers the VS Code desktop and web callbacks together', async () => {
+    const redirectUris = ['http://127.0.0.1:33418', 'https://vscode.dev/redirect']
+    const response = await request(app).post('/api/oauth/register').send({
+      client_name: 'Visual Studio Code', redirect_uris: redirectUris,
+      token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'],
+    }).expect(201)
+    expect(response.body).toMatchObject({ client_name: 'Visual Studio Code', redirect_uris: redirectUris, token_endpoint_auth_method: 'none' })
+    expect(store.oauthState().clients).toContainEqual({ id: response.body.client_id, name: 'Visual Studio Code', redirectUris })
+  })
+
+  it.each(['http://127.0.0.1:33418', 'http://[::1]:33418'])('completes the native PKCE flow with loopback callback %s and rejects an unregistered port', async redirectUri => {
+    const flow = await startOAuth('words:read words:write', redirectUri)
+    const otherPort = new URL(redirectUri)
+    otherPort.port = '33419'
+    await request(app).get('/api/oauth/authorize').query({ ...flow.query, redirect_uri: otherPort.href }).expect(400)
+    const exchange = await consentOAuth(flow)
+    const token = await request(app).post('/api/oauth/token').type('form').send(exchange).expect(200)
+    expect(token.body).toMatchObject({ token_type: 'Bearer', scope: 'words:read words:write' })
+    await rpc(token.body.access_token, 'tools/list').expect(200)
+  })
+
   it('links the consenting account through PKCE, persists only hashes, and reads and adds its words', async () => {
     const flow = await startOAuth()
     await request(app).get('/api/oauth/request').query({ id: flow.id }).expect(401)
@@ -150,7 +171,12 @@ describe('web connector OAuth', () => {
   })
 
   it('rejects unsafe registration, unregistered redirects, invalid resources, plain PKCE and unsupported scopes', async () => {
-    for (const uri of ['http://evil.example/callback', 'javascript:alert(1)', 'https://evil.example/callback#fragment', 'https://user:password@evil.example/callback']) {
+    for (const uri of [
+      'http://evil.example/callback', 'javascript:alert(1)', 'https://evil.example/callback#fragment', 'https://user:password@evil.example/callback',
+      'http://127.0.0.1.evil.example:33418', 'http://127.0.0.1@evil.example:33418', 'http://evil.example@127.0.0.1:33418',
+      'http://localhost:33418', 'http://192.168.10.5:33418', 'http://0.0.0.0:33418', 'http://[::2]:33418',
+      'http://127.0.0.1:33418/#fragment', 'http://user:password@[::1]:33418',
+    ]) {
       await request(app).post('/api/oauth/register').send({ redirect_uris: [uri] }).expect(400)
     }
     const flow = await startOAuth()

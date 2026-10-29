@@ -4,6 +4,7 @@ import App from './App'
 import './styles.css'
 import { translate } from './i18n/messages'
 import { initializeWebApp } from './lib/pwa'
+import { initializeAnalytics } from './lib/analytics'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -19,4 +20,5 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
 }
 
 initializeWebApp()
+void initializeAnalytics()
 createRoot(document.getElementById('root')!).render(<ErrorBoundary><App /></ErrorBoundary>)

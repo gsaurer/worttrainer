@@ -5,6 +5,7 @@ import { ocrConfiguration } from './ocr.js'
 import { pushConfiguration, ReminderService } from './reminders.js'
 import { FeatureFlags } from './feature-flags.js'
 import { passwordResetMailer } from './mail.js'
+import { umamiConfiguration } from '../shared/analytics.js'
 
 const production = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT ?? (production ? 3000 : 3002))
@@ -15,6 +16,7 @@ const secureSetting = process.env.COOKIE_SECURE
 if (secureSetting && !['true', 'false'].includes(secureSetting)) throw new Error('COOKIE_SECURE must be true or false.')
 const secureCookie = secureSetting ? secureSetting === 'true' : production
 if (secureCookie && !origin.startsWith('https://')) throw new Error('Secure cookies require an HTTPS APP_ORIGIN. Set COOKIE_SECURE=false only for a trusted local HTTP preview.')
+const umami = umamiConfiguration(process.env)
 const dataFile = resolve(process.env.DATA_FILE ?? 'data/store.json')
 const store = await FileStore.open(dataFile)
 const reminders = await ReminderService.open(dataFile, store, pushConfiguration(process.env))
@@ -25,6 +27,7 @@ const app = createApp({
   ocr: ocrConfiguration(process.env),
   reminders,
   features,
+  umami,
   sendPasswordReset: passwordResetMailer(process.env),
 })
 const host = process.env.HOST ?? (production ? '0.0.0.0' : '127.0.0.1')

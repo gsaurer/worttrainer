@@ -156,13 +156,14 @@ export function createOAuth(store: FileStore, origin: string) {
       client_name: z.string().trim().min(1).max(100).optional(),
       redirect_uris: z.array(z.url().max(2048).refine(uri => {
         const url = new URL(uri)
-        return url.protocol === 'https:' && !url.username && !url.password && !url.hash
+        const secureOrLoopback = url.protocol === 'https:' || url.protocol === 'http:' && ['127.0.0.1', '[::1]'].includes(url.hostname)
+        return secureOrLoopback && !url.username && !url.password && !url.hash
       })).min(1).max(5),
       token_endpoint_auth_method: z.literal('none').default('none'),
       grant_types: z.array(z.enum(['authorization_code', 'refresh_token'])).default(['authorization_code', 'refresh_token']),
       response_types: z.array(z.literal('code')).default(['code']),
     }).safeParse(req.body)
-    if (!parsed.success) return res.status(400).json({ error: 'invalid_client_metadata', error_description: 'Use HTTPS callback URLs, authorization_code with PKCE, and token_endpoint_auth_method none.' })
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_client_metadata', error_description: 'Use HTTPS or HTTP loopback IP callback URLs, authorization_code with PKCE, and token_endpoint_auth_method none.' })
     const input = parsed.data
     const client = { id: randomUUID(), name: input.client_name ?? new URL(input.redirect_uris[0]).hostname, redirectUris: input.redirect_uris }
     await store.oauthTransaction(state => {

@@ -48,6 +48,29 @@ afterAll(async () => { await rm(directory, { recursive: true, force: true }) })
 beforeEach(() => { app = createApp(options()) })
 
 describe('real self-hosted authentication and JSON persistence', () => {
+  it('disables analytics by default without relaxing the production CSP', async () => {
+    const server = createApp({ ...options(), production: true })
+    const response = await request(server).get('/api/analytics').expect(200).expect('Cache-Control', 'no-store')
+    expect(response.body).toEqual({ umami: null })
+    expect(response.headers['set-cookie']).toBeUndefined()
+    expect(response.headers['content-security-policy']).toContain("script-src 'self';")
+    expect(response.headers['content-security-policy']).toContain("connect-src 'self';")
+  })
+
+  it('exposes only configured public analytics settings and permits only its tracker origin', async () => {
+    const umami = { scriptUrl: 'https://stats.example.com:8443/custom-script.js', websiteId: 'c3fea621-d611-41f0-98a7-a648659b4cc7' }
+    const features = await FeatureFlags.open(join(directory, 'store.json'))
+    const refresh = vi.spyOn(features, 'refresh')
+    const server = createApp({ ...options(), production: true, umami, features })
+    const response = await request(server).get('/api/analytics').expect(200).expect('Cache-Control', 'no-store')
+    expect(response.body).toEqual({ umami })
+    expect(response.headers['set-cookie']).toBeUndefined()
+    expect(refresh).not.toHaveBeenCalled()
+    expect(response.headers['content-security-policy']).toBe("default-src 'self'; script-src 'self' https://stats.example.com:8443; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://stats.example.com:8443; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+    const health = await request(server).get('/api/health').expect(200)
+    expect(health.headers['content-security-policy']).toBe(response.headers['content-security-policy'])
+  })
+
   it('serves public uncached status and both build identities without accessing account features', async () => {
     const build = { version: '0.1.0', buildId: 'b'.repeat(64), commit: 'a'.repeat(40), dirty: false, builtAt: '2026-10-27T10:00:00.000Z' }
     const features = await FeatureFlags.open(join(directory, 'store.json'))

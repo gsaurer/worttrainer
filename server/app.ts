@@ -18,6 +18,7 @@ import { firstRunSchema, wordInputSchema } from './words.js'
 import { createOAuth } from './oauth.js'
 import type { BuildInfo, ServiceStatus } from '../shared/status.js'
 import { loadBuildInfo } from './build-info.js'
+import { umamiSchema, type UmamiConfiguration } from '../shared/analytics.js'
 
 export type AppOptions = {
   store: FileStore
@@ -29,6 +30,7 @@ export type AppOptions = {
   reminders?: ReminderService
   features?: FeatureFlags
   build?: BuildInfo
+  umami?: UmamiConfiguration
   sendPasswordReset?: (message: { to: string; url: string; language: 'de' | 'en' }) => Promise<void>
 }
 
@@ -54,18 +56,24 @@ export function createApp(options: AppOptions) {
   const startedAt = new Date().toISOString()
   const started = performance.now()
   const build = options.build ?? loadBuildInfo()
+  const umami = options.umami ? umamiSchema.parse(options.umami) : null
+  const trackerSource = umami ? ` ${new URL(umami.scriptUrl).origin}` : ''
   app.disable('x-powered-by')
   if (options.trustProxy) app.set('trust proxy', 1)
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Frame-Options', 'DENY')
-    if (options.production) res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+    if (options.production) res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'${trackerSource}; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'${trackerSource}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`)
     next()
   })
   app.get('/api/status', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store')
     res.json({ status: 'ok', backend: build, frontend: build, startedAt, uptimeSeconds: Math.floor((performance.now() - started) / 1000) } satisfies ServiceStatus)
+  })
+  app.get('/api/analytics', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({ umami })
   })
   const oauth = createOAuth(store, options.origin)
   app.all('/api/mcp', mcpHandler(store, options.origin, oauth))

@@ -213,6 +213,40 @@ Before inviting users:
   desktop and phone browsers. Verify installed dictation voices and, if enabled,
   physical camera capture, Azure reading, and real device notifications.
 
+### Optional Umami analytics
+
+Analytics is **disabled by default**. No Umami script or external analytics request
+is made unless the operator configures both settings. No analytics account or
+service is needed to run Worttrainer.
+
+Create a website in your own Umami installation, then set its HTTPS tracking
+script URL and website UUID in your runtime environment or `.env`:
+
+```dotenv
+UMAMI_SCRIPT_URL=https://stats.example.com/script.js
+UMAMI_WEBSITE_ID=replace-with-your-umami-website-uuid
+```
+
+Restart the Node service, or run `docker compose up -d` to apply changed Compose
+environment settings. No frontend rebuild is needed. Leave both settings empty
+and restart/reload to disable analytics again. Partial or invalid settings fail
+startup; script URLs must use HTTPS and cannot include credentials, a query, or
+a fragment. The URL and website ID are public configuration, not API credentials.
+
+Tracking sends one minimal pageview per page load: a fixed `/` URL and Worttrainer
+title, hostname, browser language, screen dimensions, and referrer origin only.
+It does not send account IDs, emails, words, answers, photos, URL query parameters,
+fragments, or custom practice events. Automatic capture is disabled. Browser Do
+Not Track and Global Privacy Control opt out before loading the tracker. Blocked
+or unavailable analytics never prevents using the app. In-app tabs are not
+separate pageviews.
+
+Use a trusted Umami deployment: its script runs inside the app, and its server
+receives visitors' IP addresses and browser headers. Provide appropriate privacy
+information and assess consent requirements for your installation. Production
+CSP permits only the configured tracker origin in addition to the existing
+sources; it remains unchanged when analytics is off.
+
 ### Phone installation and daily reminders
 
 Open the HTTPS site on the phone and choose **Install app** from the account menu
